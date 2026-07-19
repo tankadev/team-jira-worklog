@@ -118,6 +118,18 @@ export default async function BoardPage(props: PageProps<'/'>) {
   const dayIsWeekend = isWeekend(date)
   const dayQuota = dayIsWeekend && !weekendCounts ? 0 : quota
 
+  // Everything except `date`, so the side panel's day links keep the sprint and
+  // filters instead of resetting them.
+  const baseQuery = (() => {
+    const q = new URLSearchParams()
+    for (const [k, v] of Object.entries(sp)) {
+      if (k === 'date') continue
+      const one = Array.isArray(v) ? v[0] : v
+      if (one) q.set(k, one)
+    }
+    return q.toString()
+  })()
+
   const isToday = date === todayIn(tz)
   const dateLabel = formatDateVi(date)
   const todaysEntries = week.entries.filter((e) => e.date === date)
@@ -229,6 +241,7 @@ export default async function BoardPage(props: PageProps<'/'>) {
             secondsByDate={Object.fromEntries(byDate)}
             quotaHours={quota}
             weekendCounts={weekendCounts}
+            baseQuery={baseQuery}
           />
         ) : (
           <WeekPanel

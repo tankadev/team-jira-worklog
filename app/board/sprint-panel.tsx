@@ -35,6 +35,7 @@ export function SprintPanel({
   secondsByDate,
   quotaHours,
   weekendCounts,
+  baseQuery,
 }: {
   sprintName: string
   start: string
@@ -44,7 +45,15 @@ export function SprintPanel({
   secondsByDate: Record<string, number>
   quotaHours: number
   weekendCounts: boolean
+  /** Current filters minus `date`, so day links keep the sprint they belong to. */
+  baseQuery: string
 }) {
+  /**
+   * A bare `?date=…` href replaces the whole query string, which silently drops
+   * `sprint` and bounces the board back to the current sprint. Every day link
+   * has to carry the existing filters forward.
+   */
+  const hrefFor = (d: string) => `/?${baseQuery ? baseQuery + '&' : ''}date=${d}`
   const all = daysBetween(start, end)
   const elapsed = all.filter((d) => d <= today)
   const upcoming = all.filter((d) => d > today)
@@ -91,6 +100,7 @@ export function SprintPanel({
             <DayRow
               key={d}
               date={d}
+              href={hrefFor(d)}
               seconds={secondsByDate[d] ?? 0}
               quota={quotaFor(d)}
               selected={d === selectedDate}
@@ -107,6 +117,7 @@ export function SprintPanel({
                 <DayRow
                   key={d}
                   date={d}
+                  href={hrefFor(d)}
                   seconds={secondsByDate[d] ?? 0}
                   quota={quotaFor(d)}
                   selected={d === selectedDate}
@@ -135,7 +146,7 @@ export function SprintPanel({
             {short.map((d) => (
               <Link
                 key={d}
-                href={`?date=${d}`}
+                href={hrefFor(d)}
                 className="rounded-md border border-warn/40 bg-warn-soft px-2 py-[3px] font-mono text-[11.5px] text-warn hover:border-warn"
                 title={`Thiếu ${formatDuration(quotaFor(d) * 3600 - (secondsByDate[d] ?? 0))} — bấm để log bù`}
               >
@@ -157,6 +168,7 @@ export function SprintPanel({
 
 function DayRow({
   date,
+  href,
   seconds,
   quota,
   selected,
@@ -164,6 +176,7 @@ function DayRow({
   future,
 }: {
   date: string
+  href: string
   seconds: number
   quota: number
   selected: boolean
@@ -178,7 +191,7 @@ function DayRow({
 
   return (
     <Link
-      href={`?date=${date}`}
+      href={href}
       className={
         'grid grid-cols-[58px_minmax(0,1fr)_38px] items-center gap-2 rounded px-1.5 py-1 ' +
         (selected ? '-mx-1.5 bg-accent-soft' : 'hover:bg-surface-2')
