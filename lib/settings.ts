@@ -18,6 +18,7 @@ export const SETTING_KEYS = {
   jiraBoardId: 'jira_board_id',
   googleApiKey: 'google_api_key',
   geminiModel: 'gemini_model',
+  geminiFallbackModels: 'gemini_fallback_models',
   dailyQuotaHours: 'daily_quota_hours',
   logStepHours: 'log_step_hours',
   logPresets: 'log_presets',
@@ -35,7 +36,10 @@ const DEFAULTS: Record<string, string> = {
   // wrong guess produces confusing empty screens rather than an obvious error.
   [SETTING_KEYS.jiraProjectKey]: '',
   [SETTING_KEYS.jiraBoardId]: '',
-  [SETTING_KEYS.geminiModel]: 'gemini-3.5-flash',
+  [SETTING_KEYS.geminiModel]: 'gemini-3.1-flash-lite',
+  // Tried in order when the primary is out of quota. Retrying the same model
+  // cannot fix a spent quota — only a different one can.
+  [SETTING_KEYS.geminiFallbackModels]: 'gemini-3-flash-preview,gemini-3.5-flash',
   [SETTING_KEYS.dailyQuotaHours]: '8',
   [SETTING_KEYS.logStepHours]: '0.5',
   [SETTING_KEYS.logPresets]: '0.5,1,2,4,8',

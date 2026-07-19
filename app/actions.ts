@@ -1,7 +1,5 @@
 'use server'
 
-import { revalidatePath } from 'next/cache'
-
 import { getMyself } from '@/lib/jira/client'
 import { transitionIssue, updateStoryPoints } from '@/lib/jira/issues'
 import { createWorklog } from '@/lib/jira/worklog'
@@ -48,7 +46,8 @@ export async function logWorkAction(input: {
       sequence: input.sequence ?? 0,
       tz: me.timeZone ?? DEFAULT_TZ,
     })
-    revalidatePath('/')
+    // No revalidatePath here: the board is fully dynamic, so there is nothing
+    // cached to expire. The caller refreshes the router instead.
     return { ok: true, message: `Đã log ${input.hours}h cho ${input.issueKey}` }
   } catch (error) {
     return {
@@ -73,7 +72,6 @@ export async function setStoryPointsAction(
 
   try {
     await updateStoryPoints(issueKey, points)
-    revalidatePath('/')
     return {
       ok: true,
       message: points === null ? `Đã xoá point ${issueKey}` : `${issueKey} → ${points} SP`,
@@ -93,7 +91,6 @@ export async function transitionAction(
 ): Promise<ActionResult> {
   try {
     await transitionIssue(issueKey, transitionId)
-    revalidatePath('/')
     return { ok: true, message: `${issueKey} → ${toStatusName}` }
   } catch (error) {
     return {

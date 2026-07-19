@@ -40,12 +40,20 @@ interface Draft {
   storyPoints: number | null
 }
 
-/** Types QC normally files, kept behind a disclosure rather than removed. */
-const QC_TYPES = ['Bug', 'QC', 'Improve']
+/**
+ * Only these two are offered.
+ *
+ * Dev work in this team is a Subtask under a Task, and nothing else. Bug, QC,
+ * Improve, Story and Support are all filed by other roles — showing them here
+ * only creates chances to pick the wrong one, which is awkward to undo once the
+ * issue exists on Jira.
+ */
+const ALLOWED_TYPES = ['Task', 'Subtask']
 
 export function Composer({
   issueTypes,
   parents,
+  epics,
   sprints,
   currentSprintId,
   sprintPrefix,
@@ -59,6 +67,7 @@ export function Composer({
 }: {
   issueTypes: IssueType[]
   parents: ParentOption[]
+  epics: Array<{ key: string; summary: string }>
   sprints: Array<{ id: number; name: string; current: boolean }>
   currentSprintId: number | null
   sprintPrefix: string | null
@@ -85,8 +94,10 @@ export function Composer({
   )
   const [sprintId, setSprintId] = useState<number | null>(draft?.sprintId ?? currentSprintId)
   const [points, setPoints] = useState<number | null>(draft?.storyPoints ?? 2)
+  // Tracks a deliberate pick so generating afterwards cannot quietly replace it.
+  const [pointsPicked, setPointsPicked] = useState(draft?.storyPoints != null)
+  const [pointsSuggested, setPointsSuggested] = useState<number | null>(null)
   const [draftId, setDraftId] = useState<number | undefined>(draft?.id)
-  const [showQc, setShowQc] = useState(false)
   const [templateId, setTemplateId] = useState<number | undefined>()
 
   const [note, setNote] = useState<{ ok: boolean; message: string } | null>(null)
@@ -116,7 +127,13 @@ export function Composer({
         setTitle(res.data.title)
         setDescription(res.data.description)
         setDod(res.data.dod)
-        if (res.data.storyPoints) setPoints(res.data.storyPoints)
+
+        // Only fill the estimate when the user has not chosen one. Overwriting
+        // a deliberate pick is silent — the number changes while their attention
+        // is on the generated text.
+        const suggested = res.data.storyPoints ?? null
+        setPointsSuggested(suggested)
+        if (suggested && !pointsPicked) setPoints(suggested)
       }
     })
   }
@@ -126,7 +143,10 @@ export function Composer({
     setDescription(t.description)
     setDod(t.dod)
     if (t.issueTypeId) setTypeId(t.issueTypeId)
-    if (t.storyPoints) setPoints(t.storyPoints)
+    if (t.storyPoints) {
+      setPoints(t.storyPoints)
+      setPointsPicked(true)
+    }
     // Re-attach the current sprint's prefix; the template never stores one.
     setPicked(sprintPrefix ? [sprintPrefix, ...t.prefixes] : t.prefixes)
     setTemplateId(t.id)
@@ -167,7 +187,9 @@ export function Composer({
         dod,
         parentKey: isSubtask ? parentKey : parentKey,
         sprintId: effectiveSprintId,
-        storyPoints: points,
+        // A parent's estimate is derived from its children, so leave it unset
+        // rather than seeding a number that will be wrong immediately.
+        storyPoints: isSubtask ? points : null,
         assignToMe: true,
       })
       setNote(res)
@@ -178,7 +200,8 @@ export function Composer({
     })
   }
 
-  const canCreate = Boolean(fullTitle && typeId && (!isSubtask || parentKey))
+  // Both levels need a parent: a Subtask needs its Task, a Task needs its Epic.
+  const canCreate = Boolean(fullTitle && typeId && parentKey)
 
   return (
     <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
@@ -275,7 +298,7 @@ export function Composer({
             <div className="flex flex-wrap gap-1.5">
               {[subtaskType, ...standardTypes]
                 .filter((t): t is IssueType => Boolean(t))
-                .filter((t) => showQc || !QC_TYPES.includes(t.name))
+                .filter((t) => ALLOWED_TYPES.includes(t.name))
                 .map((t) => (
                   <button
                     key={t.id}
@@ -285,35 +308,25 @@ export function Composer({
                     className={
                       'rounded-md border px-[10px] py-[5px] text-[12.5px] ' +
                       (typeId === t.id
-                        ? QC_TYPES.includes(t.name)
-                          ? 'border-warn bg-warn-soft font-semibold text-warn'
-                          : 'border-accent bg-accent-soft font-semibold text-accent-ink'
+                        ? 'border-accent bg-accent-soft font-semibold text-accent-ink'
                         : 'border-line bg-ground text-ink-2 hover:border-line-strong')
                     }
                   >
                     {t.name}
                   </button>
                 ))}
-              <button
-                type="button"
-                onClick={() => setShowQc((v) => !v)}
-                className="rounded-md border border-dashed border-line px-[10px] py-[5px] text-[12.5px] text-ink-3 hover:border-solid"
-              >
-                {showQc ? '− thu gọn' : '+ loại khác'}
-              </button>
             </div>
-            <p className={'mt-1.5 text-[11.5px] leading-relaxed ' + (type && QC_TYPES.includes(type.name) ? 'text-warn' : 'text-ink-3')}>
-              {type && QC_TYPES.includes(type.name)
-                ? `${type.name} thường do QC tạo, không phải Dev. Vẫn tạo được nếu bạn thực sự cần.`
-                : isSubtask
-                  ? 'Chỉ log giờ được vào Subtask. Epic lấy theo task cha.'
-                  : `${type?.name ?? 'Task'} gắn thẳng vào epic qua field parent.`}
+            <p className="mt-1.5 text-[11.5px] leading-relaxed text-ink-3">
+              {isSubtask
+                ? 'Chỉ log giờ được vào Subtask. Epic lấy theo task cha.'
+                : 'Task bắt buộc thuộc một epic. Log giờ phải tạo Subtask bên dưới.'}
             </p>
           </Field>
 
           {isSubtask ? (
             <Field label="Task cha" required>
               <ParentPicker
+                key="parent-picker"
                 parents={parents}
                 value={parentKey}
                 onChange={setParentKey}
@@ -334,14 +347,27 @@ export function Composer({
               )}
             </Field>
           ) : (
-            <Field label="Epic" hint="gửi lên Jira bằng field parent">
+            <Field label="Epic" required hint="gửi lên Jira bằng field parent">
               <ParentPicker
-                parents={parents}
+                key="epic-picker"
+                parents={epics.map((e) => ({
+                  key: e.key,
+                  summary: e.summary,
+                  epicName: null,
+                  sprintId: null,
+                  sprintName: null,
+                  inCurrentSprint: false,
+                }))}
                 value={parentKey}
                 onChange={setParentKey}
-                currentSprintId={currentSprintId}
+                currentSprintId={null}
                 epicMode
               />
+              {epics.length === 0 && (
+                <p className="mt-1 text-[11.5px] text-ink-3">
+                  Không tìm thấy epic nào đang mở trong project.
+                </p>
+              )}
             </Field>
           )}
 
@@ -363,42 +389,66 @@ export function Composer({
             </Field>
           )}
 
-          <Field label="Story point estimate">
-            <div className="flex gap-1.5">
-              {[1, 2, 3].map((p) => (
-                <button
-                  key={p}
-                  type="button"
-                  onClick={() => setPoints(p)}
-                  aria-pressed={points === p}
-                  className={
-                    'flex flex-1 flex-col items-center gap-px rounded-md border py-[7px] ' +
-                    (points === p
-                      ? 'border-accent bg-accent-soft'
-                      : 'border-line bg-ground hover:border-line-strong')
-                  }
-                >
-                  <b
+          {isSubtask ? (
+            <Field label="Story point estimate">
+              <div className="flex gap-1.5">
+                {[1, 2, 3].map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => {
+                      setPoints(p)
+                      setPointsPicked(true)
+                    }}
+                    aria-pressed={points === p}
                     className={
-                      'font-mono text-[15px] ' + (points === p ? 'text-accent-ink' : '')
+                      'flex flex-1 flex-col items-center gap-px rounded-md border py-[7px] ' +
+                      (points === p
+                        ? 'border-accent bg-accent-soft'
+                        : 'border-line bg-ground hover:border-line-strong')
                     }
                   >
-                    {p}
-                  </b>
-                  <span
-                    className={
-                      'font-mono text-[10.5px] ' + (points === p ? 'text-accent-ink' : 'text-ink-3')
-                    }
+                    <b
+                      className={
+                        'font-mono text-[15px] ' + (points === p ? 'text-accent-ink' : '')
+                      }
+                    >
+                      {p}
+                    </b>
+                    <span
+                      className={
+                        'font-mono text-[10.5px] ' + (points === p ? 'text-accent-ink' : 'text-ink-3')
+                      }
+                    >
+                      {budgets[p]}
+                    </span>
+                  </button>
+                ))}
+              </div>
+              {pointsSuggested != null && pointsSuggested !== points ? (
+                <p className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11.5px] leading-relaxed text-ink-3">
+                  Gemini đề xuất <b className="font-mono font-semibold text-ink-2">{pointsSuggested}</b>
+                  <button
+                    type="button"
+                    onClick={() => setPoints(pointsSuggested)}
+                    className="rounded border border-line px-1.5 py-px font-mono text-[11px] hover:border-accent hover:text-accent-ink"
                   >
-                    {budgets[p]}
-                  </span>
-                </button>
-              ))}
+                    dùng {pointsSuggested}
+                  </button>
+                  — đang giữ lựa chọn của bạn.
+                </p>
+              ) : (
+                <p className="mt-1.5 text-[11.5px] leading-relaxed text-ink-3">
+                  Tối đa 3 point. Việc lớn hơn phải tách nhỏ thành nhiều task con.
+                </p>
+              )}
+            </Field>
+          ) : (
+            <div className="mb-3 rounded-md bg-surface-2 px-[10px] py-[7px] text-[11.5px] leading-relaxed text-ink-3">
+              <b className="font-medium text-ink-2">Chưa cần story point.</b> Point của task cha là
+              tổng point các task con — tạo task con xong, board sẽ tính sẵn và cho điền một chạm.
             </div>
-            <p className="mt-1.5 text-[11.5px] leading-relaxed text-ink-3">
-              Tối đa 3 point. Việc lớn hơn phải tách nhỏ thành nhiều task con.
-            </p>
-          </Field>
+          )}
 
           <div className="mb-3.5 border-t border-line" />
 
@@ -421,7 +471,9 @@ export function Composer({
               onClick={create}
               disabled={creating || !canCreate}
               title={
-                canCreate ? 'Tạo issue thật trên Jira' : 'Cần title, issue type và task cha'
+                canCreate
+                  ? 'Tạo issue thật trên Jira'
+                  : `Cần title và ${isSubtask ? 'task cha' : 'epic'}`
               }
               className="rounded-md bg-accent px-3 py-1 text-[12.5px] font-medium text-white hover:bg-accent-2 disabled:opacity-60"
             >
@@ -468,7 +520,7 @@ export function Composer({
             {!isSubtask && fieldIds.sprint && (
               <Row k={fieldIds.sprint} v={effectiveSprintId ? String(effectiveSprintId) : '—'} />
             )}
-            {fieldIds.storyPoints && (
+            {isSubtask && fieldIds.storyPoints && (
               <Row k={fieldIds.storyPoints} v={points != null ? String(points) : '—'} />
             )}
             <Row k="summary" v={fullTitle || '—'} />

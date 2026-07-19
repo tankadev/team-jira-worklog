@@ -1,5 +1,6 @@
 'use client'
 
+import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 
 import { logWorkAction } from '@/app/actions'
@@ -40,6 +41,7 @@ export function SubtaskRow({
   const [menuOpen, setMenuOpen] = useState(false)
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null)
   const [pending, startTransition] = useTransition()
+  const router = useRouter()
 
   const spent = subtask.timeSpentSeconds
   const overBudget = budget ? spent / 3600 > budget.max : false
@@ -53,7 +55,13 @@ export function SubtaskRow({
     startTransition(async () => {
       const res = await logWorkAction({ issueKey: subtask.key, hours, date, comment })
       setResult(res)
-      if (res.ok) setComment('')
+      if (res.ok) {
+        setComment('')
+        // Pulls fresh worklogs so the capacity bar and the sprint panel move
+        // together with the row — otherwise "đã log" is the only sign anything
+        // happened, which reads as a half-failure.
+        router.refresh()
+      }
     })
   }
 

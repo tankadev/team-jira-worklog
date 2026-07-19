@@ -146,23 +146,50 @@ async function callOnce(model: string, apiKey: string, prompt: string): Promise<
 export interface GenerateOutcome extends GeneratedTask {
   /** Attempts used, so the UI can mention when it had to fight for a result. */
   attempts: number
+  /** Which model actually answered — may be a fallback. */
+  model: string
 }
 
+/**
+ * Runs the prompt, falling through to a spare model when the primary is out of
+ * quota.
+ *
+ * Retrying alone cannot help there: a spent quota stays spent for the rest of
+ * the window, so the only way through is a different model. Transient failures
+ * are still handled by the retry inside each attempt.
+ */
 export async function generateTask(
   idea: string,
   context: { pointRules: string; parentSummary?: string },
 ): Promise<GenerateOutcome> {
   const apiKey = getSetting(SETTING_KEYS.googleApiKey)
-  const model = getSetting(SETTING_KEYS.geminiModel) ?? 'gemini-3.5-flash'
   if (!apiKey) throw new Error('Chưa có Google API key — vào Settings điền')
 
+  const primary = getSetting(SETTING_KEYS.geminiModel)?.trim() || 'gemini-3.1-flash-lite'
+  const fallbacks = (getSetting(SETTING_KEYS.geminiFallbackModels) ?? '')
+    .split(',')
+    .map((m) => m.trim())
+    .filter((m) => m && m !== primary)
+
   const prompt = buildPrompt(idea, context)
+  let totalAttempts = 0
+  let last: Error | null = null
 
-  const { value, attempts } = await withRetry(() => callOnce(model, apiKey, prompt), {
-    maxAttempts: MAX_ATTEMPTS,
-  })
+  for (const model of [primary, ...fallbacks]) {
+    try {
+      const { value, attempts } = await withRetry(() => callOnce(model, apiKey, prompt), {
+        maxAttempts: MAX_ATTEMPTS,
+      })
+      return { ...value, attempts: totalAttempts + attempts, model }
+    } catch (error) {
+      totalAttempts += MAX_ATTEMPTS
+      last = error instanceof Error ? error : new Error(String(error))
+      // A bad key or a blocked prompt will fail on every model, so stop.
+      if (!/quota|429|503|overload|high demand|không đọc được|dừng sớm/i.test(last.message)) throw last
+    }
+  }
 
-  return { ...value, attempts }
+  throw last ?? new Error('Gemini lỗi')
 }
 
 export function pointRulesText(): string {

@@ -18,6 +18,7 @@ const K = {
   jiraBoardId: 'jira_board_id',
   googleApiKey: 'google_api_key',
   geminiModel: 'gemini_model',
+  geminiFallbackModels: 'gemini_fallback_models',
   dailyQuotaHours: 'daily_quota_hours',
   logStepHours: 'log_step_hours',
   logPresets: 'log_presets',
@@ -63,6 +64,13 @@ export function SettingsForm({ initial }: { initial: Record<string, string> }) {
             hint="Tạo tại aistudio.google.com/apikey"
           />
           <Field label="Model" name={K.geminiModel} defaultValue={initial[K.geminiModel]} mono />
+          <Field
+            label="Model dự phòng"
+            name={K.geminiFallbackModels}
+            defaultValue={initial[K.geminiFallbackModels]}
+            mono
+            hint="Dùng lần lượt khi model chính hết quota. Cách nhau bằng dấu phẩy."
+          />
           <ConnectionTest label="Test Gemini" run={testGeminiConnection} />
         </Card>
       </div>

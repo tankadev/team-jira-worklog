@@ -85,7 +85,15 @@ export async function createIssue(input: CreateIssueInput): Promise<CreatedIssue
 
   const type = meta.issueTypes.find((t) => t.id === input.issueTypeId)
   if (!type) throw new Error('Issue type không hợp lệ')
-  if (type.subtask && !input.parentKey) throw new Error('Subtask bắt buộc phải có task cha')
+
+  // Jira itself would accept a Task with no epic, but this team requires every
+  // task to sit under one — so the rule is enforced here rather than left to
+  // whoever remembers. Both levels use the same `parent` field.
+  if (!input.parentKey) {
+    throw new Error(
+      type.subtask ? 'Subtask bắt buộc phải có task cha' : 'Task bắt buộc phải thuộc một epic',
+    )
+  }
 
   const fields: Record<string, unknown> = {
     project: { key: projectKey },
@@ -130,6 +138,34 @@ export interface ParentOption {
   sprintId: number | null
   sprintName: string | null
   inCurrentSprint: boolean
+}
+
+export interface EpicOption {
+  key: string
+  summary: string
+}
+
+/**
+ * Epics available to attach a standard-level issue to.
+ *
+ * A separate query from `listParentCandidates` on purpose: that one returns
+ * hierarchy level 0 (Task, Bug, …) for subtasks to hang off, while an epic sits
+ * at level 1. Reusing one list for both is how the epic picker ended up with
+ * nothing selectable.
+ */
+export async function listEpics(): Promise<EpicOption[]> {
+  const meta = await getProjectMeta()
+  const projectKey = requireProjectKey()
+  const epic = meta.issueTypes.find((t) => t.hierarchyLevel === 1)
+  if (!epic) return []
+
+  const issues = await searchJql<JiraIssue>(
+    `project = "${projectKey}" AND issuetype = ${epic.id} AND statusCategory != Done ORDER BY created DESC`,
+    ['summary'],
+    { limit: 100 },
+  )
+
+  return issues.map((i) => ({ key: i.key, summary: i.fields.summary ?? '' }))
 }
 
 /** Candidate parents for a subtask: standard-level issues, not Done. */

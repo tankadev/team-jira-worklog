@@ -1,5 +1,6 @@
 'use client'
 
+import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 
 import { transitionAction } from '@/app/actions'
@@ -35,6 +36,7 @@ export function StatusPill({
   const [error, setError] = useState<string | null>(null)
   const [current, setCurrent] = useState(statusName)
   const [pending, startTransition] = useTransition()
+  const router = useRouter()
 
   async function toggle() {
     if (open) return setOpen(false)
@@ -64,6 +66,7 @@ export function StatusPill({
         onChanged?.(t.toStatusName)
         // The list depends on the new status, so force a refetch next open.
         setItems(null)
+        router.refresh()
       } else {
         setError(res.message)
       }

@@ -35,14 +35,17 @@ export function ParentPicker({
   const options = useMemo(() => {
     const q = term.trim().toLowerCase()
     return parents
-      .filter((p) => wide || p.inCurrentSprint)
+      // `currentSprintId` absent means there is nothing to narrow by — epics are
+      // not sprint-scoped — so every option must pass regardless of `wide`,
+      // which may be stale if React reused this instance across a type switch.
+      .filter((p) => !currentSprintId || wide || p.inCurrentSprint)
       .filter(
         (p) =>
           !q ||
           `${p.key} ${p.summary} ${p.epicName ?? ''}`.toLowerCase().includes(q),
       )
       .slice(0, 60)
-  }, [parents, term, wide])
+  }, [parents, term, wide, currentSprintId])
 
   return (
     <div className="relative">

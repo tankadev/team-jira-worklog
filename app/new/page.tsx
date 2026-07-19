@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { connection } from 'next/server'
 
-import { listParentCandidates } from '@/lib/jira/create'
+import { listEpics, listParentCandidates } from '@/lib/jira/create'
 import { getProjectMeta } from '@/lib/jira/meta'
 import { getSprints, sprintPrefix } from '@/lib/jira/sprints'
 import { SETTING_KEYS, getSetting } from '@/lib/settings'
@@ -30,7 +30,10 @@ export default async function NewTaskPage(props: PageProps<'/new'>) {
   const draftId = one(sp.draft) ? Number(one(sp.draft)) : undefined
 
   const [meta, { sprints, current }] = await Promise.all([getProjectMeta(), getSprints()])
-  const parents = await listParentCandidates(current?.id ?? null)
+  const [parents, epics] = await Promise.all([
+    listParentCandidates(current?.id ?? null),
+    listEpics(),
+  ])
 
   const draft = draftId ? getDraft(draftId) : undefined
   const drafts = listDrafts()
@@ -65,6 +68,7 @@ export default async function NewTaskPage(props: PageProps<'/new'>) {
           hierarchyLevel: t.hierarchyLevel,
         }))}
         parents={parents}
+        epics={epics}
         sprints={sprints.map((s) => ({
           id: s.id,
           name: s.name,

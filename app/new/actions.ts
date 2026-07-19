@@ -28,8 +28,13 @@ export async function generateAction(
       ok: true,
       // Worth surfacing: it tells the user the free tier is throttling them
       // rather than leaving them to wonder why it took several seconds.
-      message:
-        data.attempts > 1 ? `Đã sinh nội dung sau ${data.attempts} lần thử` : 'Đã sinh nội dung',
+      message: [
+        'Đã sinh nội dung',
+        data.attempts > 1 ? `sau ${data.attempts} lần thử` : '',
+        `· ${data.model}`,
+      ]
+        .filter(Boolean)
+        .join(' '),
       data,
     }
   } catch (error) {

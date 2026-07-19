@@ -1,9 +1,12 @@
+import Link from 'next/link'
+
 import type { BoardParent } from '@/lib/jira/types'
 import { SETTING_KEYS, getSetting } from '@/lib/settings'
 import { formatDuration } from '@/lib/time'
 
 import { PointsEditor } from './points-editor'
 import { StatusPill } from './status-pill'
+import { LinkPending } from '../link-pending'
 import { SubtaskRow } from './subtask-row'
 import { TypeIcon } from './type-icon'
 
@@ -129,6 +132,18 @@ export function ParentGroup({
             budget={subtask.storyPoints ? (budgets.get(subtask.storyPoints) ?? null) : null}
           />
         ))}
+
+        {/* Sits after the last subtask, where "one more" naturally belongs —
+            the header is already carrying status and points. */}
+        {!isOrphan && (
+          <Link
+            href={`/new?parent=${encodeURIComponent(group.key)}`}
+            className="flex items-center gap-1.5 border-t border-line px-3.5 py-2 text-[12px] text-ink-3 hover:bg-surface-2 hover:text-accent-ink"
+          >
+            + Task con cho {group.key}
+            <LinkPending />
+          </Link>
+        )}
       </div>
     </article>
   )
