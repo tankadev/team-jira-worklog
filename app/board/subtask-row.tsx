@@ -11,6 +11,7 @@ import { formatDuration } from '@/lib/time'
 import { useNav } from './navigation'
 import { PointsEditor } from './points-editor'
 import { StatusPill } from './status-pill'
+import { TypeIcon } from './type-icon'
 
 /**
  * One subtask: the only place hours can actually be logged.
@@ -72,7 +73,8 @@ export function SubtaskRow({
           <div className="mb-1 flex flex-wrap items-center gap-2">
             {/* Third tier marker. Epic and Task cha carry one too, so the level
                 is readable on its own row without tracing the nesting. */}
-            <span className="rounded-[3px] bg-surface-2 px-1.5 py-0.5 font-mono text-[9.5px] font-semibold uppercase tracking-[0.06em] text-ink-3">
+            <span className="inline-flex items-center gap-1 rounded-[3px] bg-surface-2 px-1.5 py-0.5 font-mono text-[9.5px] font-semibold uppercase tracking-[0.06em] text-ink-3">
+              <TypeIcon name="Subtask" className="size-3" />
               Sub task
             </span>
             <span className="font-mono text-[11.5px] font-semibold text-accent-ink">

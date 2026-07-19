@@ -51,7 +51,10 @@ export function EpicHeader({ group }: { group: EpicGroup }) {
   return (
     <div className="mb-2 mt-1 flex flex-wrap items-center gap-2 border-l-2 border-epic pl-2.5">
       <span className="inline-flex items-center gap-1 rounded-[3px] bg-epic px-1.5 py-0.5 font-mono text-[9.5px] font-semibold uppercase tracking-[0.06em] text-white">
-        <TypeIcon name="Epic" className="size-3" />
+        {/* The badge is solid purple, and Jira ships this icon in its own colour —
+            `brightness-0 invert` flattens any SVG to pure white, which is the only
+            way to recolour an <img> the browser treats as opaque. */}
+        <TypeIcon name="Epic" className="size-3 brightness-0 invert" />
         Epic
       </span>
 

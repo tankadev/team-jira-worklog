@@ -80,7 +80,7 @@ export default async function BoardPage(props: PageProps<'/'>) {
       tz,
       visibleIds,
     ),
-    noSprintMatch ? Promise.resolve([]) : getSprintTasks(sprintId, 'all'),
+    noSprintMatch ? Promise.resolve([]) : getSprintTasks(sprintId, status),
   ])
   const week = { days: weekDays, entries }
 
@@ -110,7 +110,12 @@ export default async function BoardPage(props: PageProps<'/'>) {
 
   const coveredParents = new Set(board.map((g) => g.key))
   const uncovered = sprintTasks
+    // Not already shown as a group above…
     .filter((t) => !coveredParents.has(t.key))
+    // …and genuinely has no subtask. `coveredParents` alone is not enough: it
+    // comes from the filtered board, so a parent whose subtasks are all Done
+    // would reappear here as "chưa có task con" while it plainly has some.
+    .filter((t) => t.subtaskCount === 0)
     // Same epic together, matching how the board above is grouped.
     .filter((t) => !epicFilter || t.epicKey === epicFilter)
     .filter((t) => !parentFilter || t.key === parentFilter)
