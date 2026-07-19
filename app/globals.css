@@ -1,0 +1,168 @@
+@import "tailwindcss";
+
+/*
+ * Palette carried over from the design mockup. Raw values live on :root, get
+ * redeclared for dark, and are mapped into Tailwind's namespace in @theme inline
+ * so `bg-surface` / `text-accent-ink` follow the theme automatically.
+ *
+ * Three overrides, in order of increasing priority:
+ *   1. :root                          — light default
+ *   2. @media (prefers-color-scheme)  — the OS preference
+ *   3. :root[data-theme="…"]          — an explicit in-app toggle, wins both ways
+ */
+:root {
+  --ground: #f7f8f8;
+  --surface: #ffffff;
+  --surface-2: #eff2f1;
+  --line: #dde3e1;
+  --line-strong: #c3ccc9;
+  --ink: #101314;
+  --ink-2: #454f4d;
+  --ink-3: #78827f;
+  --accent: #0e8c82;
+  --accent-2: #16a79b;
+  --accent-soft: #d6edea;
+  --accent-ink: #06514b;
+  --warn: #b8791b;
+  --warn-soft: #f7e9cf;
+  --crit: #b4442f;
+  --crit-soft: #f7dfd9;
+  --ot: #7a5ea8;
+  --ot-soft: #e8e1f4;
+  --good: #2f7d4f;
+  --good-soft: #dcede2;
+  --blue: #669df1;
+  --blue-soft: #e3edfd;
+  --epic: #c97cf4;
+  --epic-ink: #7b2cb5;
+  --epic-soft: #f5e7fd;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ground: #101314;
+    --surface: #171b1c;
+    --surface-2: #1e2425;
+    --line: #2a3132;
+    --line-strong: #3c4546;
+    --ink: #ecf0ef;
+    --ink-2: #aeb8b6;
+    --ink-3: #78827f;
+    --accent: #2dbfb1;
+    --accent-2: #37d4c4;
+    --accent-soft: #143c39;
+    --accent-ink: #7fe0d5;
+    --warn: #dca648;
+    --warn-soft: #3a2e15;
+    --crit: #e07a62;
+    --crit-soft: #3b211a;
+    --ot: #a98fd4;
+    --ot-soft: #2a2338;
+    --good: #61b583;
+    --good-soft: #17301f;
+    --blue: #669df1;
+    --blue-soft: #16233a;
+    --epic: #c97cf4;
+    --epic-ink: #e0afff;
+    --epic-soft: #2c1e3b;
+  }
+}
+
+:root[data-theme="light"] {
+  --ground: #f7f8f8;
+  --surface: #ffffff;
+  --surface-2: #eff2f1;
+  --line: #dde3e1;
+  --line-strong: #c3ccc9;
+  --ink: #101314;
+  --ink-2: #454f4d;
+  --ink-3: #78827f;
+  --accent: #0e8c82;
+  --accent-2: #16a79b;
+  --accent-soft: #d6edea;
+  --accent-ink: #06514b;
+  --warn: #b8791b;
+  --warn-soft: #f7e9cf;
+  --crit: #b4442f;
+  --crit-soft: #f7dfd9;
+  --ot: #7a5ea8;
+  --ot-soft: #e8e1f4;
+  --good: #2f7d4f;
+  --good-soft: #dcede2;
+  --blue: #669df1;
+  --blue-soft: #e3edfd;
+  --epic: #c97cf4;
+  --epic-ink: #7b2cb5;
+  --epic-soft: #f5e7fd;
+}
+
+:root[data-theme="dark"] {
+  --ground: #101314;
+  --surface: #171b1c;
+  --surface-2: #1e2425;
+  --line: #2a3132;
+  --line-strong: #3c4546;
+  --ink: #ecf0ef;
+  --ink-2: #aeb8b6;
+  --ink-3: #78827f;
+  --accent: #2dbfb1;
+  --accent-2: #37d4c4;
+  --accent-soft: #143c39;
+  --accent-ink: #7fe0d5;
+  --warn: #dca648;
+  --warn-soft: #3a2e15;
+  --crit: #e07a62;
+  --crit-soft: #3b211a;
+  --ot: #a98fd4;
+  --ot-soft: #2a2338;
+  --good: #61b583;
+  --good-soft: #17301f;
+  --blue: #669df1;
+  --blue-soft: #16233a;
+  --epic: #c97cf4;
+  --epic-ink: #e0afff;
+  --epic-soft: #2c1e3b;
+}
+
+@theme inline {
+  --color-ground: var(--ground);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-accent: var(--accent);
+  --color-accent-2: var(--accent-2);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-ink: var(--accent-ink);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-crit: var(--crit);
+  --color-crit-soft: var(--crit-soft);
+  --color-ot: var(--ot);
+  --color-ot-soft: var(--ot-soft);
+  --color-good: var(--good);
+  --color-good-soft: var(--good-soft);
+  --color-blue: var(--blue);
+  --color-blue-soft: var(--blue-soft);
+  --color-epic: var(--epic);
+  --color-epic-ink: var(--epic-ink);
+  --color-epic-soft: var(--epic-soft);
+
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Digits that sit in columns — hours, story points, issue keys — must line up. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
