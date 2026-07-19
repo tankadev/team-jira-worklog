@@ -31,7 +31,8 @@ export default async function NewTaskPage(props: PageProps<'/new'>) {
 
   const [meta, { sprints, current }] = await Promise.all([getProjectMeta(), getSprints()])
   const [parents, epics] = await Promise.all([
-    listParentCandidates(current?.id ?? null),
+    // Pass the key from ?parent= so a link always lands on a filled picker.
+    listParentCandidates(current?.id ?? null, parentParam),
     listEpics(),
   ])
 

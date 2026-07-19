@@ -11,8 +11,14 @@ import { createContext, useContext, useTransition } from 'react'
  * knows about its own transition, so the rest of the page looks frozen with no
  * explanation. This puts one flag where every part of the board can read it.
  */
-const NavContext = createContext<{ navigate: (href: string) => void; pending: boolean }>({
+const NavContext = createContext<{
+  navigate: (href: string) => void
+  /** Re-fetches the route through the same shared pending flag. */
+  refresh: () => void
+  pending: boolean
+}>({
   navigate: () => {},
+  refresh: () => {},
   pending: false,
 })
 
@@ -28,8 +34,18 @@ export function NavProvider({ children }: { children: React.ReactNode }) {
     startTransition(() => router.push(href))
   }
 
+  /**
+   * Used after a write. Routing it through the shared transition means the
+   * progress bar, the dimmer and the inline spinners all react — otherwise the
+   * side panels sit on stale numbers for the two or three seconds the refetch
+   * takes, which reads as "the save did not work".
+   */
+  function refresh() {
+    startTransition(() => router.refresh())
+  }
+
   return (
-    <NavContext.Provider value={{ navigate, pending }}>
+    <NavContext.Provider value={{ navigate, refresh, pending }}>
       {pending && <TopProgress />}
       {children}
     </NavContext.Provider>
@@ -60,18 +76,34 @@ function TopProgress() {
   )
 }
 
-/** Dims and freezes content while a navigation is in flight. */
-export function NavDimmer({ children }: { children: React.ReactNode }) {
+/**
+ * Dims and freezes content while a navigation or refresh is in flight.
+ *
+ * `label` puts a word on top of the fade. Fading alone is ambiguous — after
+ * logging hours, dimmed-but-unchanged numbers look the same as a failed save.
+ */
+export function NavDimmer({ children, label }: { children: React.ReactNode; label?: string }) {
   const { pending } = useNav()
   return (
-    <div
-      aria-busy={pending}
-      className={
-        'transition-opacity duration-150 ' +
-        (pending ? 'pointer-events-none opacity-45' : 'opacity-100')
-      }
-    >
-      {children}
+    <div className="relative">
+      <div
+        aria-busy={pending}
+        className={
+          'transition-opacity duration-150 ' +
+          (pending ? 'pointer-events-none opacity-40' : 'opacity-100')
+        }
+      >
+        {children}
+      </div>
+
+      {pending && label && (
+        <div className="pointer-events-none absolute inset-x-0 top-3 flex justify-center">
+          <span className="flex items-center gap-1.5 rounded-full border border-line bg-surface px-2.5 py-1 text-[11.5px] text-ink-2 shadow-sm">
+            <span className="inline-block size-3 animate-spin rounded-full border-[1.5px] border-line-strong border-t-accent" />
+            {label}
+          </span>
+        </div>
+      )}
     </div>
   )
 }

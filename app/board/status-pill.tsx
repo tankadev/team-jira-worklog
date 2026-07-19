@@ -1,10 +1,11 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 
 import { transitionAction } from '@/app/actions'
 import { type Transition, statusTone } from '@/lib/jira/types'
+
+import { useNav } from './navigation'
 
 const TONE: Record<string, string> = {
   todo: 'bg-surface-2 text-ink-2',
@@ -36,7 +37,7 @@ export function StatusPill({
   const [error, setError] = useState<string | null>(null)
   const [current, setCurrent] = useState(statusName)
   const [pending, startTransition] = useTransition()
-  const router = useRouter()
+  const { refresh } = useNav()
 
   async function toggle() {
     if (open) return setOpen(false)
@@ -66,7 +67,7 @@ export function StatusPill({
         onChanged?.(t.toStatusName)
         // The list depends on the new status, so force a refetch next open.
         setItems(null)
-        router.refresh()
+        refresh()
       } else {
         setError(res.message)
       }

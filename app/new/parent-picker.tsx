@@ -28,9 +28,13 @@ export function ParentPicker({
   const [open, setOpen] = useState(false)
   const [term, setTerm] = useState('')
   const [wide, setWide] = useState(!currentSprintId)
+  // Off by default: most parents worth picking are still open, and closed ones
+  // would bury them. A parent arriving from a board link is exempt — see below.
+  const [showDone, setShowDone] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const selected = parents.find((p) => p.key === value) ?? null
+  const doneCount = parents.filter((p) => p.isDone).length
 
   const options = useMemo(() => {
     const q = term.trim().toLowerCase()
@@ -39,13 +43,16 @@ export function ParentPicker({
       // not sprint-scoped — so every option must pass regardless of `wide`,
       // which may be stale if React reused this instance across a type switch.
       .filter((p) => !currentSprintId || wide || p.inCurrentSprint)
+      // The already-selected one always stays visible, otherwise arriving from
+      // "+ Task con" on a Done Bug would show an empty field.
+      .filter((p) => showDone || !p.isDone || p.key === value)
       .filter(
         (p) =>
           !q ||
           `${p.key} ${p.summary} ${p.epicName ?? ''}`.toLowerCase().includes(q),
       )
       .slice(0, 60)
-  }, [parents, term, wide, currentSprintId])
+  }, [parents, term, wide, currentSprintId, showDone, value])
 
   return (
     <div className="relative">
@@ -107,6 +114,20 @@ export function ParentPicker({
             </div>
           )}
 
+          {!epicMode && (
+            <label className="mb-1 flex items-center gap-1.5 rounded px-1.5 py-1 text-[11px] text-ink-3 hover:text-ink">
+              <input
+                type="checkbox"
+                checked={showDone}
+                onChange={(e) => setShowDone(e.target.checked)}
+                onMouseDown={(e) => e.stopPropagation()}
+                className="accent-accent"
+              />
+              Hiện cả task đã Done
+              {doneCount > 0 && <span className="font-mono">({doneCount})</span>}
+            </label>
+          )}
+
           {options.length === 0 ? (
             <div className="p-2.5 text-center text-[12.5px] text-ink-3">Không tìm thấy</div>
           ) : (
@@ -123,6 +144,11 @@ export function ParentPicker({
                 className="block w-full rounded px-[9px] py-1.5 text-left hover:bg-accent-soft"
               >
                 <span className="font-mono text-[11px] font-semibold text-accent-ink">{p.key}</span>
+                {p.isDone && (
+                  <span className="ml-1.5 rounded-[3px] bg-good-soft px-1 py-px font-mono text-[9.5px] uppercase text-good">
+                    {p.statusName || 'Done'}
+                  </span>
+                )}
                 {(p.epicName || p.sprintName) && (
                   <span className="ml-1.5 font-mono text-[10.5px] text-ink-3">
                     {[p.epicName, p.sprintName].filter(Boolean).join(' · ')}

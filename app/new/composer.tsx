@@ -25,6 +25,8 @@ export interface ParentOption {
   sprintId: number | null
   sprintName: string | null
   inCurrentSprint: boolean
+  statusName: string
+  isDone: boolean
 }
 
 interface Draft {
@@ -357,6 +359,8 @@ export function Composer({
                   sprintId: null,
                   sprintName: null,
                   inCurrentSprint: false,
+                  statusName: '',
+                  isDone: false,
                 }))}
                 value={parentKey}
                 onChange={setParentKey}

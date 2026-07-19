@@ -124,8 +124,8 @@ export function BoardFilters({
         value={status}
         onChange={(e) => set('status', e.target.value)}
       >
-        <option value="all">Mọi trạng thái</option>
         <option value="open">Chưa Done</option>
+        <option value="all">Mọi trạng thái</option>
       </select>
 
       {epics.length > 1 && (
@@ -182,7 +182,7 @@ export function BoardFilters({
         />
       </form>
 
-      {(search || sprintId === null || status === 'open' || epicKey || parentKey) && (
+      {(search || sprintId === null || status === 'all' || epicKey || parentKey) && (
         <button
           onClick={() => navigate('/')}
           disabled={pending}

@@ -1,6 +1,5 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 
 import { logWorkAction } from '@/app/actions'
@@ -9,6 +8,7 @@ import { logWorkAction } from '@/app/actions'
 import type { BoardSubtask } from '@/lib/jira/types'
 import { formatDuration } from '@/lib/time'
 
+import { useNav } from './navigation'
 import { PointsEditor } from './points-editor'
 import { StatusPill } from './status-pill'
 
@@ -41,7 +41,7 @@ export function SubtaskRow({
   const [menuOpen, setMenuOpen] = useState(false)
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null)
   const [pending, startTransition] = useTransition()
-  const router = useRouter()
+  const { refresh } = useNav()
 
   const spent = subtask.timeSpentSeconds
   const overBudget = budget ? spent / 3600 > budget.max : false
@@ -57,10 +57,9 @@ export function SubtaskRow({
       setResult(res)
       if (res.ok) {
         setComment('')
-        // Pulls fresh worklogs so the capacity bar and the sprint panel move
-        // together with the row — otherwise "đã log" is the only sign anything
-        // happened, which reads as a half-failure.
-        router.refresh()
+        // Shared refresh: the capacity bar and sprint panel show a loading
+        // state while Jira is re-read, instead of sitting on stale numbers.
+        refresh()
       }
     })
   }

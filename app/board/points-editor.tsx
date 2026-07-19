@@ -1,10 +1,10 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
 import { useEffect, useState, useTransition } from 'react'
 
 import { setStoryPointsAction } from '@/app/actions'
 
+import { useNav } from './navigation'
 import { Spinner } from '../spinner'
 
 /**
@@ -31,7 +31,7 @@ export function PointsEditor({
   const [points, setPoints] = useState<number | null>(value)
   const [note, setNote] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
-  const router = useRouter()
+  const { refresh } = useNav()
 
   useEffect(() => setPoints(value), [value])
 
@@ -49,7 +49,7 @@ export function PointsEditor({
       } else {
         // The parent's rollup mismatch is computed server-side, so it only
         // updates once the route re-renders.
-        router.refresh()
+        refresh()
       }
     })
   }

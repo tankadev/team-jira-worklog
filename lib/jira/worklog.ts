@@ -50,6 +50,13 @@ export async function getWorklogs(
   toDate: string,
   accountId: string,
   tz = DEFAULT_TZ,
+  /**
+   * Issue ids currently on screen. Logging to an issue that had no worklog in
+   * this window yet leaves it out of the JQL result until the index catches up,
+   * so the hours appear to vanish right after a successful save. Passing the
+   * ids forces Jira to reconcile them first.
+   */
+  reconcileIds: string[] = [],
 ): Promise<WorklogEntry[]> {
   const projectKey = requireProjectKey()
 
@@ -59,7 +66,10 @@ export async function getWorklogs(
     ` AND worklogDate >= "${fromDate}" AND worklogDate <= "${toDate}"` +
     ` ORDER BY updated DESC`
 
-  const issues = await searchJql<JiraIssue>(jql, ['summary'], { limit: 200 })
+  const issues = await searchJql<JiraIssue>(jql, ['summary'], {
+    limit: 200,
+    reconcileIssues: reconcileIds,
+  })
   if (!issues.length) return []
 
   const after = startOfDay(fromDate, tz) - 1

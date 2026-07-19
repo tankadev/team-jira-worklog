@@ -138,6 +138,9 @@ export interface ParentOption {
   sprintId: number | null
   sprintName: string | null
   inCurrentSprint: boolean
+  statusName: string
+  /** Hidden by default in the picker; QC files Bugs already closed. */
+  isDone: boolean
 }
 
 export interface EpicOption {
@@ -168,8 +171,22 @@ export async function listEpics(): Promise<EpicOption[]> {
   return issues.map((i) => ({ key: i.key, summary: i.fields.summary ?? '' }))
 }
 
-/** Candidate parents for a subtask: standard-level issues, not Done. */
-export async function listParentCandidates(currentSprintId: number | null): Promise<ParentOption[]> {
+/**
+ * Candidate parents for a subtask: standard-level issues.
+ *
+ * Done issues are deliberately included. QC files Bug and Improve already
+ * closed, and the developer still has to log hours against them — filtering by
+ * `statusCategory != Done` made those impossible to select, which is why the
+ * "+ Task con" shortcut appeared to do nothing. Recent-first ordering keeps the
+ * list from filling with ancient closed work.
+ *
+ * `mustInclude` guarantees a specific key is present even if it falls outside
+ * that window, so arriving from a link never lands on an empty picker.
+ */
+export async function listParentCandidates(
+  currentSprintId: number | null,
+  mustInclude?: string | null,
+): Promise<ParentOption[]> {
   const meta = await getProjectMeta()
   const projectKey = requireProjectKey()
 
@@ -177,10 +194,15 @@ export async function listParentCandidates(currentSprintId: number | null): Prom
   if (meta.sprintFieldId) fields.push(meta.sprintFieldId)
 
   const issues = await searchJql<JiraIssue>(
-    `project = "${projectKey}" AND issuetype not in subTaskIssueTypes() AND statusCategory != Done ORDER BY created DESC`,
+    `project = "${projectKey}" AND issuetype not in subTaskIssueTypes() ORDER BY created DESC`,
     fields,
     { limit: 150 },
   )
+
+  if (mustInclude && !issues.some((i) => i.key === mustInclude)) {
+    const extra = await searchJql<JiraIssue>(`key = "${mustInclude}"`, fields, { limit: 1 })
+    issues.unshift(...extra)
+  }
 
   return issues
     .filter((i) => (i.fields.issuetype?.hierarchyLevel ?? 0) === 0)
@@ -196,6 +218,8 @@ export async function listParentCandidates(currentSprintId: number | null): Prom
         sprintId: last?.id ?? null,
         sprintName: last?.name ?? null,
         inCurrentSprint: Boolean(currentSprintId && last?.id === currentSprintId),
+        statusName: issue.fields.status?.name ?? '',
+        isDone: issue.fields.status?.statusCategory?.key === 'done',
       }
     })
 }

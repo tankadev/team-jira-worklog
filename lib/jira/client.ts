@@ -105,7 +105,18 @@ export async function jiraFetch<T = unknown>(path: string, options: JiraFetchOpt
 export async function searchJql<T = JiraIssue>(
   jql: string,
   fields: string[],
-  opts: { maxResults?: number; limit?: number; creds?: JiraCreds; expand?: string } = {},
+  opts: {
+    maxResults?: number
+    limit?: number
+    creds?: JiraCreds
+    expand?: string
+    /**
+     * Issue ids that must reflect their latest state. `search/jql` is eventually
+     * consistent, so an issue written to a moment ago can be missing from the
+     * result — this is Jira's documented remedy. Capped at 50 by the API.
+     */
+    reconcileIssues?: string[]
+  } = {},
 ): Promise<T[]> {
   const pageSize = opts.maxResults ?? 100
   const hardLimit = opts.limit ?? 1000
@@ -120,6 +131,11 @@ export async function searchJql<T = JiraIssue>(
       fields: fields.join(','),
     })
     if (opts.expand) params.set('expand', opts.expand)
+    // Must be repeated, one id per occurrence. A comma-separated list is
+    // rejected with "Failed to convert 'reconcileIssues'".
+    for (const id of opts.reconcileIssues?.slice(0, 50) ?? []) {
+      params.append('reconcileIssues', id)
+    }
     if (token) params.set('nextPageToken', token)
 
     const page = await jiraFetch<{ issues?: T[]; nextPageToken?: string | null }>(

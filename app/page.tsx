@@ -37,9 +37,7 @@ export default async function BoardPage(props: PageProps<'/'>) {
 
   const tz = me.timeZone ?? DEFAULT_TZ
   const date = one(sp.date) ?? todayIn(tz)
-  // Default to every status: a subtask that just moved to Done still needs
-  // its hours logged, and hiding it makes the board look empty.
-  const status = one(sp.status) === 'open' ? 'open' : 'all'
+  const status = one(sp.status) === 'all' ? 'all' : 'open'
   const search = one(sp.q) ?? ''
   const epicFilter = one(sp.epic) ?? ''
   const parentFilter = one(sp.parent) ?? ''
@@ -66,8 +64,13 @@ export default async function BoardPage(props: PageProps<'/'>) {
   const rangeFrom = sprintStart ?? weekDays[0]
   const rangeTo = sprintEnd ?? weekDays[6]
 
-  const [board, entries, sprintTasks] = await Promise.all([
-    noSprintMatch ? Promise.resolve([]) : getBoard({ sprintId, status, search }),
+  const board = noSprintMatch ? [] : await getBoard({ sprintId, status, search })
+
+  // Ids of everything on screen, so a worklog written seconds ago is guaranteed
+  // to be reflected rather than lost to Jira's eventually-consistent search.
+  const visibleIds = board.flatMap((g) => g.subtasks.map((s) => s.id)).slice(0, 50)
+
+  const [entries, sprintTasks] = await Promise.all([
     getWorklogs(
       // The selected day can sit outside the sprint window; widen so its own
       // logged hours still show on the capacity bar.
@@ -75,8 +78,9 @@ export default async function BoardPage(props: PageProps<'/'>) {
       date > rangeTo ? date : rangeTo,
       me.accountId,
       tz,
+      visibleIds,
     ),
-    noSprintMatch ? Promise.resolve([]) : getSprintTasks(sprintId, status),
+    noSprintMatch ? Promise.resolve([]) : getSprintTasks(sprintId, 'all'),
   ])
   const week = { days: weekDays, entries }
 
@@ -170,15 +174,17 @@ export default async function BoardPage(props: PageProps<'/'>) {
 
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_296px]">
         <div>
-          <CapacityBar
-            date={date}
-            quotaHours={dayQuota}
-            isWeekend={dayIsWeekend}
-            entries={todaysEntries.map((e) => ({
-              key: e.issueKey,
-              seconds: e.timeSpentSeconds,
-            }))}
-          />
+          <NavDimmer label="Đang cập nhật giờ…">
+            <CapacityBar
+              date={date}
+              quotaHours={dayQuota}
+              isWeekend={dayIsWeekend}
+              entries={todaysEntries.map((e) => ({
+                key: e.issueKey,
+                seconds: e.timeSpentSeconds,
+              }))}
+            />
+          </NavDimmer>
 
           <BoardFilters
             sprints={sprints.map((s) => ({
@@ -231,6 +237,7 @@ export default async function BoardPage(props: PageProps<'/'>) {
           </NavDimmer>
         </div>
 
+        <NavDimmer label="Đang cập nhật…">
         {selectedSprint && sprintStart && sprintEnd ? (
           <SprintPanel
             sprintName={selectedSprint.name}
@@ -252,6 +259,7 @@ export default async function BoardPage(props: PageProps<'/'>) {
             weekendCounts={weekendCounts}
           />
         )}
+        </NavDimmer>
       </div>
     </NavProvider>
   )
