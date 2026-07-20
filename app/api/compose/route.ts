@@ -1,6 +1,6 @@
 import { getIssueDetail } from '@/lib/jira/issues'
 import { getProjectMeta } from '@/lib/jira/meta'
-import { getSprints, sprintPrefix } from '@/lib/jira/sprints'
+import { getSprints } from '@/lib/jira/sprints'
 import { listPrefixes } from '@/lib/drafts'
 import { SETTING_KEYS, getSetting } from '@/lib/settings'
 import { listTaskTemplates } from '@/lib/task-templates'
@@ -48,9 +48,10 @@ export async function GET(request: Request) {
           : [],
       currentSprintId: current?.id ?? null,
       prefixes: listPrefixes(),
-      // Derived from the sprint that is running now, not the one the template or
-      // the parent was created in.
-      sprintPrefix: current ? sprintPrefix(current.name, pattern) : null,
+      // The raw pattern, not a finished prefix: the client knows which sprint the
+      // issue will land in — the parent's for a subtask, the chosen one for a
+      // task — and that is rarely the sprint merely running today.
+      sprintPrefixPattern: pattern,
       budgets: {
         1: getSetting(SETTING_KEYS.pointBudget1) ?? '1-2h',
         2: getSetting(SETTING_KEYS.pointBudget2) ?? '4h',

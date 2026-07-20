@@ -47,6 +47,8 @@ export interface CreateResult {
   message: string
   key?: string
   url?: string
+  /** Numeric issue id — needed to force Jira's search index to include it. */
+  id?: string
 }
 
 /**
@@ -88,7 +90,13 @@ export async function createIssueAction(input: {
 
     revalidatePath('/')
     revalidatePath('/new')
-    return { ok: true, message: `Đã tạo ${created.key}`, key: created.key, url: created.url }
+    return {
+      ok: true,
+      message: `Đã tạo ${created.key}`,
+      key: created.key,
+      url: created.url,
+      id: created.id,
+    }
   } catch (error) {
     return { ok: false, message: error instanceof Error ? error.message : 'Không tạo được issue' }
   }

@@ -43,6 +43,10 @@ export default async function BoardPage(props: PageProps<'/'>) {
   const search = one(sp.q) ?? ''
   const epicFilter = one(sp.epic) ?? ''
   const parentFilter = one(sp.parent) ?? ''
+  // Ids of issues created moments ago. Jira's search is eventually consistent,
+  // so without these a brand-new subtask stays invisible until the index catches
+  // up — which looked like the create had silently failed.
+  const reconcileIds = (one(sp.reconcile) ?? '').split(',').filter(Boolean)
 
   const { sprints, current } = await getSprints()
   const sprintParam = one(sp.sprint)
@@ -66,7 +70,7 @@ export default async function BoardPage(props: PageProps<'/'>) {
   const rangeFrom = sprintStart ?? weekDays[0]
   const rangeTo = sprintEnd ?? weekDays[6]
 
-  const board = noSprintMatch ? [] : await getBoard({ sprintId, status, search })
+  const board = noSprintMatch ? [] : await getBoard({ sprintId, status, search, reconcileIds })
 
   // Ids of everything on screen, so a worklog written seconds ago is guaranteed
   // to be reflected rather than lost to Jira's eventually-consistent search.
@@ -139,7 +143,7 @@ export default async function BoardPage(props: PageProps<'/'>) {
   const baseQuery = (() => {
     const q = new URLSearchParams()
     for (const [k, v] of Object.entries(sp)) {
-      if (k === 'date') continue
+      if (k === 'date' || k === 'reconcile') continue
       const one = Array.isArray(v) ? v[0] : v
       if (one) q.set(k, one)
     }
@@ -211,7 +215,7 @@ export default async function BoardPage(props: PageProps<'/'>) {
             <div className="flex flex-col gap-4">
               {groupByEpic(visibleBoard).map((epic) => (
                 <div key={epic.key ?? '__none__'}>
-                  <EpicHeader group={epic} />
+                  <EpicHeader group={epic} boardSprintId={sprintId} />
                   <div className="flex flex-col gap-3">
                     {epic.parents.map((group) => (
                       <ParentGroup

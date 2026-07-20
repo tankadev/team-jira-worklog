@@ -41,7 +41,14 @@ export function groupByEpic(parents: BoardParent[]): EpicGroup[] {
   })
 }
 
-export function EpicHeader({ group }: { group: EpicGroup }) {
+export function EpicHeader({
+  group,
+  boardSprintId,
+}: {
+  group: EpicGroup
+  /** Sprint the board is filtered to, so a new task lands where the user is looking. */
+  boardSprintId: number | null
+}) {
   const taskCount = group.parents.length
   const subtaskCount = group.parents.reduce((n, p) => n + p.subtasks.length, 0)
   const logged = group.parents.reduce(
@@ -74,6 +81,7 @@ export function EpicHeader({ group }: { group: EpicGroup }) {
         <CreateIssueButton
           parentKey={group.key}
           mode="task"
+          boardSprintId={boardSprintId}
           className="rounded-md border border-epic/50 px-2 py-[2px] font-mono text-[11px] text-epic-ink hover:border-epic hover:bg-epic-soft"
         >
           + Task

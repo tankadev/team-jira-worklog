@@ -452,6 +452,24 @@ Hiện `endDate` trên UI để người dùng tự kiểm tra lựa chọn tự
 - JQL phải **có giới hạn** — `order by key desc` trơ trọi bị từ chối
 - Kết quả **eventually consistent**, dùng `reconcileIssues` khi cần đọc ngay sau khi ghi
 
+### 3b.6b Nhất quán trễ — đã gây lỗi ba lần
+
+`search/jql` **eventually consistent**. Bất cứ thứ gì vừa ghi lên Jira đều có thể vắng mặt trong truy vấn ngay sau đó, và biểu hiện luôn giống nhau: **thao tác báo thành công nhưng giao diện không đổi**.
+
+Đã dính ba lần:
+
+| Lần | Truy vấn | Triệu chứng |
+|---|---|---|
+| 1 | `getWorklogs` | Log giờ xong, thanh dung lượng đứng im |
+| 2 | `getWorklogs` | Log lần đầu trong khoảng thì hụt, lần sau thì được |
+| 3 | `getBoard` | Subtask vừa tạo không hiện, phải đổi sprint rồi quay lại |
+
+**Quy tắc:** mọi truy vấn `search/jql` đọc lại thứ vừa ghi **phải** truyền `reconcileIssues` kèm **id số** của issue liên quan.
+
+- Tham số phải **lặp lại từng id**, không nối bằng dấu phẩy — dạng phẩy trả `400 Failed to convert`
+- Nhận **id**, không nhận key. `createIssue` có sẵn id, nhớ chuyển lên tới UI
+- `router.refresh()` không mang được tham số → phải điều hướng kèm `?reconcile=<id>`
+
 ### 3b.7 Tám endpoint Agile sắp bị gỡ
 
 Hết hạn **sau 01/11/2026** — khoảng 3,5 tháng nữa `[DOC]`. Gồm `GET /rest/agile/1.0/sprint/{id}/issue` và các endpoint liệt kê issue khác.

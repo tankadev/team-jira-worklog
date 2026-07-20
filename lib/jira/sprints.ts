@@ -108,14 +108,4 @@ export async function getSprints(): Promise<SprintList> {
   return { sprints, current: current ? { ...current, current: true } : null }
 }
 
-/** `VT Sprint 66` → `66`, used to build the [spt 66] title prefix. */
-export function sprintNumber(name: string): string | null {
-  const m = name.match(/(\d+)\s*$/)
-  return m ? m[1] : null
-}
-
-export function sprintPrefix(name: string, pattern: string): string | null {
-  const n = sprintNumber(name)
-  if (!n || !pattern.trim()) return null
-  return pattern.replace('{n}', n)
-}
+export { sprintNumber, sprintPrefix } from '../sprint-name'

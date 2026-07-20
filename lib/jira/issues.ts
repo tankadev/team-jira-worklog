@@ -22,6 +22,13 @@ export interface BoardQuery {
   search?: string
   /** 'open' hides Done, 'all' shows everything. */
   status?: 'open' | 'all'
+  /**
+   * Issue ids that must appear even if Jira's index has not caught up.
+   * An issue created seconds ago is missing from `search/jql` results until it
+   * is indexed, which made a freshly created subtask invisible until the user
+   * switched sprints and back.
+   */
+  reconcileIds?: string[]
 }
 
 /**
@@ -84,7 +91,7 @@ export async function getBoard(query: BoardQuery = {}): Promise<BoardParent[]> {
         searchJql<JiraIssue>(
           `${[...base, `parent in (${chunk})`].join(' AND ')} ORDER BY created DESC`,
           fields,
-          { limit: 200 },
+          { limit: 200, reconcileIssues: query.reconcileIds },
         ),
       )
     }
@@ -93,7 +100,7 @@ export async function getBoard(query: BoardQuery = {}): Promise<BoardParent[]> {
     issues = await searchJql<JiraIssue>(
       `${base.join(' AND ')} ORDER BY created DESC`,
       fields,
-      { limit: 200 },
+      { limit: 200, reconcileIssues: query.reconcileIds },
     )
   }
 

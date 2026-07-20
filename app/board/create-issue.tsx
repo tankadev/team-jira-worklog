@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, useTransition } from 'react'
 
 import { createIssueAction, generateAction } from '@/app/new/actions'
+import { sprintPrefix } from '@/lib/sprint-name'
 
 import { Spinner, Working } from '../spinner'
 import { useNav } from './navigation'
@@ -24,7 +25,7 @@ interface ComposeContext {
   sprints: Array<{ id: number; name: string; current: boolean }>
   currentSprintId: number | null
   prefixes: string[]
-  sprintPrefix: string | null
+  sprintPrefixPattern: string
   budgets: Record<number, string>
   templates: Template[]
   parent: {
@@ -40,12 +41,18 @@ interface ComposeContext {
 export function CreateIssueButton({
   parentKey,
   mode = 'subtask',
+  boardSprintId = null,
   className,
   children,
 }: {
   parentKey: string
   /** 'subtask' hangs off a Task, 'task' hangs off an Epic. */
   mode?: 'subtask' | 'task'
+  /**
+   * Sprint the board is filtered to. A task created from an epic belongs where
+   * the user is looking, not in whichever sprint happens to be running.
+   */
+  boardSprintId?: number | null
   className?: string
   children: React.ReactNode
 }) {
@@ -57,7 +64,12 @@ export function CreateIssueButton({
         {children}
       </button>
       {open && (
-        <CreateIssueModal parentKey={parentKey} mode={mode} onClose={() => setOpen(false)} />
+        <CreateIssueModal
+          parentKey={parentKey}
+          mode={mode}
+          boardSprintId={boardSprintId}
+          onClose={() => setOpen(false)}
+        />
       )}
     </>
   )
@@ -80,13 +92,15 @@ export function CreateIssueButton({
 function CreateIssueModal({
   parentKey,
   mode,
+  boardSprintId,
   onClose,
 }: {
   parentKey: string
   mode: 'subtask' | 'task'
+  boardSprintId: number | null
   onClose: () => void
 }) {
-  const { refresh } = useNav()
+  const { refresh, navigate } = useNav()
 
   const [ctx, setCtx] = useState<ComposeContext | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -102,7 +116,7 @@ function CreateIssueModal({
   const [templateId, setTemplateId] = useState<number | undefined>()
 
   const [note, setNote] = useState<{ ok: boolean; message: string } | null>(null)
-  const [created, setCreated] = useState<Array<{ key: string; url: string }>>([])
+  const [created, setCreated] = useState<Array<{ key: string; url: string; id: string }>>([])
   const [generating, startGenerating] = useTransition()
   const [creating, startCreating] = useTransition()
 
@@ -117,14 +131,13 @@ function CreateIssueModal({
       .then((c) => {
         if (!alive) return
         setCtx(c)
-        if (c.sprintPrefix) setPicked([c.sprintPrefix])
-        setSprintId(c.currentSprintId)
+        setSprintId(boardSprintId ?? c.currentSprintId)
       })
       .catch((e) => alive && setLoadError(e instanceof Error ? e.message : String(e)))
     return () => {
       alive = false
     }
-  }, [parentKey, mode])
+  }, [parentKey, mode, boardSprintId])
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -139,11 +152,30 @@ function CreateIssueModal({
     return px ? `${px} ${title.trim()}`.trim() : title.trim()
   }, [picked, title])
 
-  const allPrefixes = ctx
-    ? [...(ctx.sprintPrefix ? [ctx.sprintPrefix] : []), ...ctx.prefixes]
-    : []
-
   const isTask = mode === 'task'
+
+  /**
+   * A subtask inherits the parent's sprint; a task goes to the one chosen here.
+   * Either way it is that sprint's number in the prefix — using today's running
+   * sprint mislabels anything created while reviewing an earlier one.
+   */
+  const targetSprintName = isTask
+    ? (ctx?.sprints.find((s) => s.id === sprintId)?.name ?? null)
+    : (ctx?.parent.sprintName ?? null)
+
+  const currentPrefix = ctx ? sprintPrefix(targetSprintName, ctx.sprintPrefixPattern) : null
+  const allPrefixes = ctx ? [...(currentPrefix ? [currentPrefix] : []), ...ctx.prefixes] : []
+
+  // Swap the sprint prefix whenever the target sprint changes, leaving every
+  // other chip and its position untouched.
+  useEffect(() => {
+    if (!ctx) return
+    setPicked((list) => {
+      const withoutSprint = list.filter((p) => !/^\[spt\s/i.test(p))
+      return currentPrefix ? [currentPrefix, ...withoutSprint] : withoutSprint
+    })
+  }, [ctx, currentPrefix])
+
 
   function applyTemplate(t: Template) {
     setTitle(t.title)
@@ -153,7 +185,7 @@ function CreateIssueModal({
       setPoints(t.storyPoints)
       setPointsPicked(true)
     }
-    setPicked(ctx?.sprintPrefix ? [ctx.sprintPrefix, ...t.prefixes] : t.prefixes)
+    setPicked(currentPrefix ? [currentPrefix, ...t.prefixes] : t.prefixes)
     setTemplateId(t.id)
     setNote({ ok: true, message: `Đã áp mẫu "${t.name}"` })
   }
@@ -190,13 +222,24 @@ function CreateIssueModal({
       })
       setNote(res)
       if (res.ok && res.key && res.url) {
-        setCreated((list) => [...list, { key: res.key!, url: res.url! }])
+        const next = [...created, { key: res.key, url: res.url, id: res.id ?? '' }]
+        setCreated(next)
         setTitle('')
         setDescription('')
         setDod('')
         setIdea('')
         setTemplateId(undefined)
-        refresh()
+
+        // Re-render carrying the new ids so the board query forces Jira to
+        // include them; a plain refresh would race the search index.
+        const ids = next.map((c) => c.id).filter(Boolean)
+        if (ids.length) {
+          const params = new URLSearchParams(window.location.search)
+          params.set('reconcile', ids.join(','))
+          navigate(`${window.location.pathname}?${params}`)
+        } else {
+          refresh()
+        }
       }
     })
   }
