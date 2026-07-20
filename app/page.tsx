@@ -6,6 +6,8 @@ import { getBoard, getSprintTasks } from '@/lib/jira/issues'
 import type { SprintTask } from '@/lib/jira/types'
 import { getSprints } from '@/lib/jira/sprints'
 import { getWorklogs, sumByDate, sumByIssue } from '@/lib/jira/worklog'
+import { listDaysOff } from '@/lib/days-off'
+import { type QuotaRules, quotaForDate } from '@/lib/quota'
 import { SETTING_KEYS, getSetting } from '@/lib/settings'
 import { DEFAULT_TZ, formatDateVi, isWeekend, todayIn, weekOf } from '@/lib/time'
 
@@ -122,10 +124,15 @@ export default async function BoardPage(props: PageProps<'/'>) {
     // Same epic together, matching how the board above is grouped.
     .sort((a, b) => (a.epicKey ?? 'zz').localeCompare(b.epicKey ?? 'zz') || a.key.localeCompare(b.key))
 
-  const quota = Number(getSetting(SETTING_KEYS.dailyQuotaHours) ?? '8') || 8
-  const weekendCounts = getSetting(SETTING_KEYS.weekendCountsToQuota) === 'true'
+  // One rule object, shared by every panel — the calculation used to be copied
+  // into each of them and could drift apart.
+  const rules: QuotaRules = {
+    dailyHours: Number(getSetting(SETTING_KEYS.dailyQuotaHours) ?? '8') || 8,
+    weekendCounts: getSetting(SETTING_KEYS.weekendCountsToQuota) === 'true',
+    daysOff: listDaysOff(rangeFrom < weekDays[0] ? rangeFrom : weekDays[0], rangeTo > weekDays[6] ? rangeTo : weekDays[6]),
+  }
   const dayIsWeekend = isWeekend(date)
-  const dayQuota = dayIsWeekend && !weekendCounts ? 0 : quota
+  const dayQuota = quotaForDate(date, rules)
 
   // Everything except `date`, so the side panel's day links keep the sprint and
   // filters instead of resetting them.
@@ -241,8 +248,7 @@ export default async function BoardPage(props: PageProps<'/'>) {
             today={todayIn(tz)}
             selectedDate={date}
             secondsByDate={Object.fromEntries(byDate)}
-            quotaHours={quota}
-            weekendCounts={weekendCounts}
+            rules={rules}
             baseQuery={baseQuery}
           />
         ) : (
@@ -250,8 +256,7 @@ export default async function BoardPage(props: PageProps<'/'>) {
             days={week.days}
             today={date}
             hoursByDate={Object.fromEntries([...byDate].map(([d, s]) => [d, s / 3600]))}
-            quotaHours={quota}
-            weekendCounts={weekendCounts}
+            rules={rules}
           />
         )}
         </div>

@@ -1,8 +1,10 @@
 import Link from 'next/link'
 
-import { addDays, formatDuration, isWeekend } from '@/lib/time'
+import { DAY_OFF_SHORT, type DayOffKind, type QuotaRules, quotaForDate } from '@/lib/quota'
+import { addDays, formatDuration } from '@/lib/time'
 
 import { LinkPending } from '../link-pending'
+import { DayOffButton } from './day-off-button'
 
 const VI_DAYS = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7']
 
@@ -33,8 +35,7 @@ export function SprintPanel({
   today,
   selectedDate,
   secondsByDate,
-  quotaHours,
-  weekendCounts,
+  rules,
   baseQuery,
 }: {
   sprintName: string
@@ -43,8 +44,7 @@ export function SprintPanel({
   today: string
   selectedDate: string
   secondsByDate: Record<string, number>
-  quotaHours: number
-  weekendCounts: boolean
+  rules: QuotaRules
   /** Current filters minus `date`, so day links keep the sprint they belong to. */
   baseQuery: string
 }) {
@@ -58,7 +58,7 @@ export function SprintPanel({
   const elapsed = all.filter((d) => d <= today)
   const upcoming = all.filter((d) => d > today)
 
-  const quotaFor = (d: string) => (isWeekend(d) && !weekendCounts ? 0 : quotaHours)
+  const quotaFor = (d: string) => quotaForDate(d, rules)
 
   const workdays = elapsed.filter((d) => quotaFor(d) > 0)
   const short = workdays.filter((d) => (secondsByDate[d] ?? 0) < quotaFor(d) * 3600)
@@ -103,6 +103,7 @@ export function SprintPanel({
               href={hrefFor(d)}
               seconds={secondsByDate[d] ?? 0}
               quota={quotaFor(d)}
+              dayOff={rules.daysOff[d] ?? null}
               selected={d === selectedDate}
               isToday={d === today}
             />
@@ -120,6 +121,7 @@ export function SprintPanel({
                   href={hrefFor(d)}
                   seconds={secondsByDate[d] ?? 0}
                   quota={quotaFor(d)}
+                  dayOff={rules.daysOff[d] ?? null}
                   selected={d === selectedDate}
                   future
                 />
@@ -171,6 +173,7 @@ function DayRow({
   href,
   seconds,
   quota,
+  dayOff,
   selected,
   isToday,
   future,
@@ -179,6 +182,7 @@ function DayRow({
   href: string
   seconds: number
   quota: number
+  dayOff: DayOffKind | null
   selected: boolean
   isToday?: boolean
   future?: boolean
@@ -187,16 +191,16 @@ function DayRow({
   const short = quota > 0 && seconds < quota * 3600 && !future
   const over = quota > 0 && seconds > quota * 3600
 
-  const tone = quota === 0 || over ? 'bg-ot' : short ? 'bg-warn' : 'bg-accent'
+  const tone = dayOff || quota === 0 || over ? 'bg-ot' : short ? 'bg-warn' : 'bg-accent'
 
   return (
-    <Link
-      href={href}
+    <div
       className={
-        'grid grid-cols-[58px_minmax(0,1fr)_38px] items-center gap-2 rounded px-1.5 py-1 ' +
+        'group grid grid-cols-[58px_minmax(0,1fr)_38px_18px] items-center gap-1.5 rounded px-1.5 py-1 ' +
         (selected ? '-mx-1.5 bg-accent-soft' : 'hover:bg-surface-2')
       }
     >
+      <Link href={href} className="contents">
       <span
         className={
           'font-mono text-[11px] ' +
@@ -224,6 +228,9 @@ function DayRow({
         <LinkPending className="mr-1 align-[-1px]" />
         {seconds ? (seconds / 3600).toFixed(seconds % 3600 === 0 ? 0 : 1) : '—'}
       </span>
-    </Link>
+      </Link>
+
+      <DayOffButton date={date} current={dayOff} label={label(date)} />
+    </div>
   )
 }

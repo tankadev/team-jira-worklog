@@ -5,6 +5,8 @@ import { getMyself } from '@/lib/jira/client'
 import { getSprints } from '@/lib/jira/sprints'
 import { getWorklogs, sumByDate } from '@/lib/jira/worklog'
 import { type ReportIssue, renderReport } from '@/lib/report'
+import { listDaysOff } from '@/lib/days-off'
+import { type QuotaRules, quotaForDate } from '@/lib/quota'
 import { SETTING_KEYS, getSetting } from '@/lib/settings'
 import { getTemplate, listTemplates } from '@/lib/templates'
 import { DEFAULT_TZ, formatDateVi, formatDuration, isWeekend, todayIn, weekOf } from '@/lib/time'
@@ -81,15 +83,19 @@ export default async function ReportPage(props: PageProps<'/report'>) {
   })
 
   const byDate = sumByDate(weekEntries)
-  const quota = Number(getSetting(SETTING_KEYS.dailyQuotaHours) ?? '8') || 8
-  const weekendCounts = getSetting(SETTING_KEYS.weekendCountsToQuota) === 'true'
+  const rules: QuotaRules = {
+    dailyHours: Number(getSetting(SETTING_KEYS.dailyQuotaHours) ?? '8') || 8,
+    weekendCounts: getSetting(SETTING_KEYS.weekendCountsToQuota) === 'true',
+    daysOff: listDaysOff(days[0], days[6]),
+  }
+  const quota = rules.dailyHours
 
   const sprintDays = new Set(sprintEntries.map((e) => e.date))
   const sprintSeconds = sprintEntries.reduce((n, e) => n + e.timeSpentSeconds, 0)
   const sprintIssues = new Set(sprintEntries.map((e) => e.issueKey))
 
   const shortDays = days.filter((d) => {
-    const q = isWeekend(d) && !weekendCounts ? 0 : quota
+    const q = quotaForDate(d, rules)
     return q > 0 && (byDate.get(d) ?? 0) < q * 3600
   })
 
@@ -123,8 +129,7 @@ export default async function ReportPage(props: PageProps<'/report'>) {
               days={days}
               today={date}
               secondsByDate={Object.fromEntries(byDate)}
-              quotaHours={quota}
-              weekendCounts={weekendCounts}
+              rules={rules}
             />
           </section>
         </div>
@@ -148,7 +153,7 @@ export default async function ReportPage(props: PageProps<'/report'>) {
                 <Stat
                   key={d}
                   label={formatDateVi(d)}
-                  value={`thiếu ${formatDuration(quota * 3600 - (byDate.get(d) ?? 0))}`}
+                  value={`thiếu ${formatDuration(quotaForDate(d, rules) * 3600 - (byDate.get(d) ?? 0))}`}
                   tone="warn"
                 />
               ))}

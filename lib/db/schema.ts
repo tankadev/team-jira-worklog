@@ -70,6 +70,21 @@ export const taskTemplates = sqliteTable('task_templates', {
   createdAt: integer('created_at').notNull().default(now),
 })
 
+/**
+ * Days the user was away, so the "short hours" figure reflects reality.
+ *
+ * Local only — Jira has no concept of the user's leave, and the team tracks it
+ * elsewhere. This exists purely so the board stops reporting a day as short when
+ * there was never eight hours to log.
+ */
+export const daysOff = sqliteTable('days_off', {
+  /** Local date, YYYY-MM-DD. */
+  date: text('date').primaryKey(),
+  /** 'full' | 'morning' | 'afternoon' */
+  kind: text('kind').notNull(),
+  createdAt: integer('created_at').notNull().default(now),
+})
+
 /** Saved JQL, including the built-in presets shown on the search screen. */
 export const jqlPresets = sqliteTable('jql_presets', {
   id: integer('id').primaryKey({ autoIncrement: true }),
@@ -124,5 +139,6 @@ export type Setting = typeof settings.$inferSelect
 export type Prefix = typeof prefixes.$inferSelect
 export type Draft = typeof drafts.$inferSelect
 export type TaskTemplate = typeof taskTemplates.$inferSelect
+export type DayOff = typeof daysOff.$inferSelect
 export type JqlPreset = typeof jqlPresets.$inferSelect
 export type ReportTemplate = typeof reportTemplates.$inferSelect

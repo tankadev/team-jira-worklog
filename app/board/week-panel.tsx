@@ -1,4 +1,5 @@
-import { formatDuration, isWeekend } from '@/lib/time'
+import { type QuotaRules, quotaForDate } from '@/lib/quota'
+import { formatDuration } from '@/lib/time'
 
 const VI_DAYS = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7']
 
@@ -12,19 +13,17 @@ export function WeekPanel({
   days,
   today,
   hoursByDate,
-  quotaHours,
-  weekendCounts,
+  rules,
 }: {
   days: string[]
   today: string
   hoursByDate: Record<string, number>
-  quotaHours: number
-  weekendCounts: boolean
+  rules: QuotaRules
 }) {
   const total = days.reduce((n, d) => n + (hoursByDate[d] ?? 0), 0)
 
   const shortDays = days.filter((d) => {
-    const quota = isWeekend(d) && !weekendCounts ? 0 : quotaHours
+    const quota = quotaForDate(d, rules)
     return quota > 0 && (hoursByDate[d] ?? 0) < quota
   })
 
@@ -38,7 +37,7 @@ export function WeekPanel({
         <div className="flex flex-col gap-px">
           {days.map((d) => {
             const hours = hoursByDate[d] ?? 0
-            const quota = isWeekend(d) && !weekendCounts ? 0 : quotaHours
+            const quota = quotaForDate(d, rules)
             const pct = quota > 0 ? Math.min(100, (hours / quota) * 100) : hours > 0 ? 100 : 0
             const tone =
               quota === 0 ? 'bg-ot' : hours > quota ? 'bg-ot' : hours < quota ? 'bg-warn' : 'bg-accent'
@@ -87,7 +86,7 @@ export function WeekPanel({
           </div>
           <div className="flex flex-col">
             {shortDays.map((d, i) => {
-              const missing = quotaHours - (hoursByDate[d] ?? 0)
+              const missing = quotaForDate(d, rules) - (hoursByDate[d] ?? 0)
               return (
                 <div
                   key={d}
@@ -105,7 +104,7 @@ export function WeekPanel({
             })}
           </div>
           <p className="mt-2.5 text-[11.5px] leading-relaxed text-ink-3">
-            {weekendCounts
+            {rules.weekendCounts
               ? 'Cuối tuần đang được tính định mức như ngày thường.'
               : 'T7 và CN không tính định mức — giờ log vào vẫn cộng tổng.'}
           </p>
