@@ -18,11 +18,13 @@ export function DatePicker({
   label,
   sprints,
   sprintId,
+  isToday,
 }: {
   date: string
   label: string
   sprints: SprintRange[]
   sprintId: number | null
+  isToday: boolean
 }) {
   const params = useSearchParams()
   const { navigate, pending } = useNav()
@@ -76,9 +78,16 @@ export function DatePicker({
 
   return (
     <div className="flex flex-col items-end gap-1">
-      <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.09em] text-ink-3">
+      {/* The warning used to be a banner across the middle of the board. It
+          belongs on the control it describes, where it costs no vertical room. */}
+      <span
+        className={
+          'flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.09em] ' +
+          (isToday ? 'text-ink-3' : 'text-ot')
+        }
+      >
         <NavSpinner />
-        Ngày đang log
+        {isToday ? 'Ngày đang log' : 'Đang log vào ngày cũ'}
       </span>
 
       <div className="flex items-center gap-1">
@@ -96,7 +105,12 @@ export function DatePicker({
             type="button"
             onClick={openCalendar}
             disabled={pending}
-            className="flex h-[30px] items-center gap-2 rounded-md border border-line-strong bg-surface px-[11px] font-mono text-[12.5px] hover:bg-surface-2 disabled:opacity-60"
+            className={
+              'flex h-[30px] items-center gap-2 rounded-md border px-[11px] font-mono text-[12.5px] hover:bg-surface-2 disabled:opacity-60 ' +
+              (isToday
+                ? 'border-line-strong bg-surface'
+                : 'border-ot bg-ot-soft font-semibold text-ot')
+            }
           >
             {label}
             <svg viewBox="0 0 16 16" className="size-3.5 text-ink-3" fill="none" stroke="currentColor" strokeWidth="1.4">

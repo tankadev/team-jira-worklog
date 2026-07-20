@@ -161,6 +161,7 @@ export default async function BoardPage(props: PageProps<'/'>) {
         <DatePicker
           date={date}
           label={dateLabel}
+          isToday={isToday}
           sprintId={sprintId}
           sprints={sprints.map((s) => ({
             id: s.id,
@@ -170,27 +171,8 @@ export default async function BoardPage(props: PageProps<'/'>) {
         />
       </header>
 
-      {!isToday && (
-        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-md border border-ot/40 bg-ot-soft px-3.5 py-2 text-[12.5px] text-ot">
-          <b className="font-mono font-semibold">{dateLabel}</b>
-          <span>— giờ log sẽ ghi vào ngày này, không phải hôm nay.</span>
-        </div>
-      )}
-
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_296px]">
         <div>
-          <NavDimmer label="Đang cập nhật giờ…">
-            <CapacityBar
-              date={date}
-              quotaHours={dayQuota}
-              isWeekend={dayIsWeekend}
-              entries={todaysEntries.map((e) => ({
-                key: e.issueKey,
-                seconds: e.timeSpentSeconds,
-              }))}
-            />
-          </NavDimmer>
-
           <BoardFilters
             sprints={sprints.map((s) => ({
               id: s.id,
@@ -243,6 +225,14 @@ export default async function BoardPage(props: PageProps<'/'>) {
         </div>
 
         <NavDimmer label="Đang cập nhật…">
+        <div className="flex flex-col gap-3.5">
+        <CapacityBar
+          date={date}
+          quotaHours={dayQuota}
+          isWeekend={dayIsWeekend}
+          entries={todaysEntries.map((e) => ({ key: e.issueKey, seconds: e.timeSpentSeconds }))}
+        />
+
         {selectedSprint && sprintStart && sprintEnd ? (
           <SprintPanel
             sprintName={selectedSprint.name}
@@ -264,6 +254,7 @@ export default async function BoardPage(props: PageProps<'/'>) {
             weekendCounts={weekendCounts}
           />
         )}
+        </div>
         </NavDimmer>
       </div>
     </NavProvider>

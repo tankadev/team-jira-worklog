@@ -26,10 +26,13 @@ export function StatusPill({
   issueKey,
   statusName,
   onChanged,
+  compact = false,
 }: {
   issueKey: string
   statusName: string
   onChanged?: (name: string) => void
+  /** Caps the width on the one-line board row so long statuses cannot push it wide. */
+  compact?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const [items, setItems] = useState<Transition[] | null>(null)
@@ -80,21 +83,23 @@ export function StatusPill({
         type="button"
         onClick={toggle}
         disabled={pending}
-        title="Đổi trạng thái"
+        title={`${current} — bấm để đổi trạng thái`}
         className={
-          'inline-flex items-center gap-1 rounded-[4px] px-[7px] py-[3px] text-[10px] font-bold uppercase tracking-[0.05em] disabled:opacity-60 ' +
+          'inline-flex items-center gap-1 rounded-[4px] px-[6px] py-[3px] font-bold uppercase tracking-[0.05em] disabled:opacity-60 ' +
+          (compact ? 'max-w-[128px] text-[9.5px]' : 'text-[10px]') +
+          ' ' +
           TONE[statusTone(current)]
         }
       >
         {pending ? (
-          <span className="inline-flex items-center gap-1">
+          <span className="inline-flex items-center gap-1 whitespace-nowrap">
             <span className="inline-block size-2.5 animate-spin rounded-full border-[1.5px] border-current/30 border-t-current" />
             đang đổi…
           </span>
         ) : (
           <>
-            {current}
-            <em className="text-[7px] not-italic opacity-70">▾</em>
+            <span className="truncate">{current}</span>
+            <em className="shrink-0 text-[7px] not-italic opacity-70">▾</em>
           </>
         )}
       </button>

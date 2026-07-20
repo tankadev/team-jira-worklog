@@ -8,17 +8,20 @@ import { logWorkAction } from '@/app/actions'
 import type { BoardSubtask } from '@/lib/jira/types'
 import { formatDuration } from '@/lib/time'
 
+import { Spinner } from '../spinner'
 import { useNav } from './navigation'
 import { PointsEditor } from './points-editor'
+import { Popover, PopoverTitle } from './popover'
 import { StatusPill } from './status-pill'
 import { TypeIcon } from './type-icon'
 
 /**
- * One subtask: the only place hours can actually be logged.
+ * One subtask, on a single 42px line.
  *
- * Laid out as two columns — everything descriptive on the left, everything
- * clickable on the right — so the Log button lands in the same spot on every
- * row no matter how long the Vietnamese summary runs.
+ * The row previously ran three lines and ~100px, so ten subtasks filled more
+ * than a screen. Only what is touched on every log stays inline — the hour
+ * stepper and the Log button. Points and the worklog note moved into popovers,
+ * and the two hour figures merged into one `today · total` column.
  */
 export function SubtaskRow({
   subtask,
@@ -27,7 +30,7 @@ export function SubtaskRow({
   isToday,
   step,
   presets,
-  budget,
+  budgets,
 }: {
   subtask: BoardSubtask
   date: string
@@ -35,22 +38,13 @@ export function SubtaskRow({
   isToday: boolean
   step: number
   presets: number[]
-  budget: { min: number; max: number } | null
+  budgets: Record<number, string>
 }) {
   const [hours, setHours] = useState(step)
   const [comment, setComment] = useState('')
-  const [menuOpen, setMenuOpen] = useState(false)
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null)
   const [pending, startTransition] = useTransition()
   const { refresh } = useNav()
-
-  const spent = subtask.timeSpentSeconds
-  const overBudget = budget ? spent / 3600 > budget.max : false
-  const budgetLabel = budget
-    ? budget.min === budget.max
-      ? `${budget.max}h`
-      : `${budget.min}–${budget.max}h`
-    : null
 
   function submit() {
     startTransition(async () => {
@@ -58,118 +52,58 @@ export function SubtaskRow({
       setResult(res)
       if (res.ok) {
         setComment('')
-        // Shared refresh: the capacity bar and sprint panel show a loading
-        // state while Jira is re-read, instead of sitting on stale numbers.
         refresh()
       }
     })
   }
 
+  const today = subtask.loggedTodaySeconds
+  const total = subtask.timeSpentSeconds
+
   return (
-    <div className="border-b border-line px-3.5 py-3 last:border-b-0 hover:bg-surface-2/60">
-      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
-        {/* ── description ── */}
-        <div className="min-w-0">
-          <div className="mb-1 flex flex-wrap items-center gap-2">
-            {/* Third tier marker. Epic and Task cha carry one too, so the level
-                is readable on its own row without tracing the nesting. */}
-            <span className="inline-flex items-center gap-1 rounded-[3px] bg-surface-2 px-1.5 py-0.5 font-mono text-[9.5px] font-semibold uppercase tracking-[0.06em] text-ink-3">
-              <TypeIcon name="Subtask" className="size-3" />
-              Sub task
-            </span>
-            <span className="font-mono text-[11.5px] font-semibold text-accent-ink">
-              {subtask.key}
-            </span>
-            <StatusPill issueKey={subtask.key} statusName={subtask.statusName} />
-            {subtask.loggedTodaySeconds > 0 && (
-              <span className="rounded-[3px] bg-accent-soft px-1.5 py-0.5 font-mono text-[11px] font-medium text-accent-ink">
-                {isToday ? 'hôm nay' : 'ngày này'} {formatDuration(subtask.loggedTodaySeconds)}
-              </span>
-            )}
-          </div>
+    <div className="border-b border-line last:border-b-0 hover:bg-surface-2/60">
+      <div className="grid h-[42px] grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2.5 px-3">
+        <span className="flex items-center gap-1.5 whitespace-nowrap">
+          <TypeIcon name="Subtask" className="size-3" />
+          <span className="font-mono text-[11.5px] font-semibold text-accent-ink">
+            {subtask.key}
+          </span>
+        </span>
 
-          <div className="mb-1.5 text-[13.5px] leading-snug">{subtask.summary}</div>
+        {/* Truncated to keep the row one line; the full text is in the tooltip. */}
+        <span className="truncate text-[13px]" title={subtask.summary}>
+          {subtask.summary}
+        </span>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <PointsEditor issueKey={subtask.key} value={subtask.storyPoints} max={3} />
+        <span className="flex items-center gap-1.5 whitespace-nowrap">
+          <StatusPill issueKey={subtask.key} statusName={subtask.statusName} compact />
 
-            <span
-              className={
-                'rounded px-[7px] py-[3px] font-mono text-[11px] ' +
-                (overBudget ? 'bg-crit-soft text-crit' : 'bg-surface-2 text-ink-3')
-              }
-              title={
-                overBudget ? 'Đã log quá ước lượng — chỉ cảnh báo, không chặn' : 'Tổng giờ đã log'
-              }
-            >
-              {formatDuration(spent)}
-              {budgetLabel && <span className="opacity-70"> / {budgetLabel}</span>}
-            </span>
-          </div>
-        </div>
-
-        {/* ── actions ── */}
-        <div className="flex flex-wrap items-center gap-1.5 lg:justify-end">
-          <div className="relative flex items-center rounded-md border border-line-strong bg-surface">
-            <button
-              type="button"
-              onClick={() => setHours((h) => Math.max(step, +(h - step).toFixed(2)))}
-              className="h-7 w-6 rounded-l-[5px] text-ink-2 hover:bg-surface-2 hover:text-ink"
-              aria-label="Giảm"
-            >
-              −
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setMenuOpen((v) => !v)}
-              className="flex h-7 w-14 items-center justify-center gap-[3px] border-x border-line font-mono text-[12.5px] hover:bg-surface-2"
-            >
-              {hours}h <em className="text-[8px] not-italic text-ink-3">▾</em>
-            </button>
-
-            {menuOpen && (
-              <>
-                <button
-                  type="button"
-                  className="fixed inset-0 z-30 cursor-default"
-                  onClick={() => setMenuOpen(false)}
-                  aria-label="Đóng"
-                />
-                <div className="absolute left-6 top-8 z-40 flex min-w-[92px] flex-col rounded-md border border-line-strong bg-surface p-1 shadow-lg">
-                  {presets.map((p) => (
-                    <button
-                      key={p}
-                      type="button"
-                      onClick={() => {
-                        setHours(p)
-                        setMenuOpen(false)
-                      }}
-                      className="rounded px-[9px] py-[5px] text-left font-mono text-[12.5px] hover:bg-accent-soft hover:text-accent-ink"
-                    >
-                      {p}h
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-
-            <button
-              type="button"
-              onClick={() => setHours((h) => +(h + step).toFixed(2))}
-              className="h-7 w-6 rounded-r-[5px] text-ink-2 hover:bg-surface-2 hover:text-ink"
-              aria-label="Tăng"
-            >
-              +
-            </button>
-          </div>
-
-          <input
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            placeholder="Ghi chú…"
-            className="h-7 w-[150px] rounded-md border border-line bg-surface px-[9px] text-[12.5px]"
+          <PointsEditor
+            issueKey={subtask.key}
+            value={subtask.storyPoints}
+            budgets={budgets}
+            spentSeconds={total}
           />
+
+          <span
+            className="min-w-[62px] text-right font-mono text-[11px] text-ink-3"
+            title={`${isToday ? 'Hôm nay' : dateLabel}: ${formatDuration(today)} · tổng: ${formatDuration(total)}`}
+          >
+            <span className={today > 0 ? 'font-semibold text-accent-ink' : ''}>
+              {today > 0 ? formatDuration(today) : '—'}
+            </span>
+            <span className="opacity-60"> · </span>
+            {total > 0 ? formatDuration(total) : '—'}
+          </span>
+
+          <HourStepper
+            hours={hours}
+            step={step}
+            presets={presets}
+            onChange={setHours}
+          />
+
+          <NoteButton value={comment} onChange={setComment} issueKey={subtask.key} />
 
           <button
             type="button"
@@ -177,29 +111,139 @@ export function SubtaskRow({
             disabled={pending}
             title={`Ghi ${hours}h vào ${dateLabel}`}
             className={
-              'h-7 rounded-md px-3 text-[12.5px] font-medium text-white disabled:opacity-60 ' +
+              'h-[26px] rounded-md px-2.5 text-[12px] font-medium text-white disabled:opacity-60 ' +
               (isToday ? 'bg-accent hover:bg-accent-2' : 'bg-ot hover:brightness-110')
             }
           >
-            {pending ? (
-              <span className="inline-flex items-center gap-1.5">
-                <span className="inline-block size-3 animate-spin rounded-full border-[1.5px] border-white/40 border-t-white" />
-                Đang log…
-              </span>
-            ) : isToday ? (
-              'Log'
-            ) : (
-              `Log ${dateLabel.split(' · ')[1] ?? dateLabel}`
-            )}
+            {pending ? <Spinner className="size-3 border-white/40 border-t-white" /> : 'Log'}
           </button>
-        </div>
+        </span>
       </div>
 
       {result && (
-        <p className={'mt-2 text-[11.5px] ' + (result.ok ? 'text-good' : 'text-crit')}>
+        <p
+          className={
+            'px-3 pb-1.5 text-[11.5px] ' + (result.ok ? 'text-good' : 'text-crit')
+          }
+        >
           {result.message}
         </p>
       )}
     </div>
+  )
+}
+
+function HourStepper({
+  hours,
+  step,
+  presets,
+  onChange,
+}: {
+  hours: number
+  step: number
+  presets: number[]
+  onChange: (h: number) => void
+}) {
+  return (
+    <span className="flex h-[26px] items-center rounded-md border border-line-strong bg-surface">
+      <button
+        type="button"
+        onClick={() => onChange(Math.max(step, +(hours - step).toFixed(2)))}
+        className="h-full w-[22px] rounded-l-[5px] text-ink-2 hover:bg-surface-2 hover:text-ink"
+        aria-label="Giảm"
+      >
+        −
+      </button>
+
+      <Popover
+        align="right"
+        panelClassName="w-[92px] p-1"
+        trigger={() => (
+          <button
+            type="button"
+            className="flex h-[26px] w-[48px] items-center justify-center gap-0.5 border-x border-line font-mono text-[12px] hover:bg-surface-2"
+          >
+            {hours}h <em className="text-[8px] not-italic text-ink-3">▾</em>
+          </button>
+        )}
+      >
+        {(close) => (
+          <>
+            {presets.map((p) => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => {
+                  onChange(p)
+                  close()
+                }}
+                className="block w-full rounded px-2 py-[5px] text-left font-mono text-[12.5px] hover:bg-accent-soft hover:text-accent-ink"
+              >
+                {p}h
+              </button>
+            ))}
+          </>
+        )}
+      </Popover>
+
+      <button
+        type="button"
+        onClick={() => onChange(+(hours + step).toFixed(2))}
+        className="h-full w-[22px] rounded-r-[5px] text-ink-2 hover:bg-surface-2 hover:text-ink"
+        aria-label="Tăng"
+      >
+        +
+      </button>
+    </span>
+  )
+}
+
+/** Worklog note. Behind a button because most logs do not carry one. */
+function NoteButton({
+  value,
+  onChange,
+  issueKey,
+}: {
+  value: string
+  onChange: (v: string) => void
+  issueKey: string
+}) {
+  return (
+    <Popover
+      align="right"
+      panelClassName="w-[248px]"
+      trigger={() => (
+        <button
+          type="button"
+          title={value ? `Ghi chú: ${value}` : 'Thêm ghi chú cho lần log này'}
+          className={
+            'grid h-[26px] w-[26px] place-items-center rounded-md border text-[12px] ' +
+            (value
+              ? 'border-accent bg-accent-soft text-accent-ink'
+              : 'border-line-strong bg-surface text-ink-3 hover:border-accent hover:text-accent-ink')
+          }
+        >
+          ✎
+        </button>
+      )}
+    >
+      {(close) => (
+        <>
+          <PopoverTitle>{issueKey} · ghi chú worklog</PopoverTitle>
+          <textarea
+            rows={3}
+            autoFocus
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) close()
+            }}
+            placeholder="Không bắt buộc…"
+            className="w-full resize-y rounded-md border border-line bg-ground px-2 py-1.5 text-[12.5px] leading-relaxed"
+          />
+          <p className="mt-1.5 text-[11px] text-ink-3">Đi kèm lần bấm Log tiếp theo.</p>
+        </>
+      )}
+    </Popover>
   )
 }

@@ -16,10 +16,16 @@ export function Nav({ label }: { label?: string }) {
   const pathname = usePathname()
 
   return (
-    <aside className="flex flex-row items-center gap-5 border-b border-line bg-surface px-3 py-4 md:flex-col md:items-stretch md:border-b-0 md:border-r">
-      <div className="px-2">
-        <b className="block text-[15px] font-semibold tracking-tight">Jira Logwork</b>
-        {label && <span className="font-mono text-[10.5px] text-ink-3">{label}</span>}
+    <aside className="flex flex-row items-center gap-5 border-b border-line bg-surface px-3 py-4 md:sticky md:top-0 md:h-screen md:flex-col md:items-stretch md:border-b-0 md:border-r">
+      <div className="flex items-center gap-2 px-2">
+        <div className="min-w-0 flex-1">
+          <b className="block text-[15px] font-semibold tracking-tight">Jira Logwork</b>
+          {label && <span className="font-mono text-[10.5px] text-ink-3">{label}</span>}
+        </div>
+        {/* Beside the brand rather than pinned to the bottom: with `mt-auto` on a
+            full-height column it drifted to the end of a long board, out of reach
+            without scrolling back. */}
+        <ThemeToggle />
       </div>
 
       <nav className="flex flex-1 flex-row gap-px md:flex-none md:flex-col">
@@ -47,9 +53,6 @@ export function Nav({ label }: { label?: string }) {
         })}
       </nav>
 
-      <div className="md:mt-auto md:px-2">
-        <ThemeToggle />
-      </div>
     </aside>
   )
 }
@@ -98,12 +101,28 @@ function ThemeToggle() {
     setTheme(next)
   }
 
+  const isDark =
+    theme === 'dark' ||
+    (theme === null && typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-color-scheme: dark)').matches)
+
   return (
     <button
       onClick={toggle}
-      className="w-full rounded-md border border-line px-[9px] py-[5px] text-left text-xs text-ink-2 hover:border-line-strong hover:text-ink"
+      title={isDark ? 'Chuyển sang nền sáng' : 'Chuyển sang nền tối'}
+      aria-label={isDark ? 'Chuyển sang nền sáng' : 'Chuyển sang nền tối'}
+      className="grid size-7 shrink-0 place-items-center rounded-md border border-line text-ink-3 hover:border-line-strong hover:text-ink"
     >
-      ◐ {theme === 'dark' ? 'Nền tối' : theme === 'light' ? 'Nền sáng' : 'Giao diện'}
+      {isDark ? (
+        <svg viewBox="0 0 16 16" className="size-[15px]" fill="none" stroke="currentColor" strokeWidth="1.3">
+          <circle cx="8" cy="8" r="3.1" />
+          <path d="M8 1.4v1.7M8 12.9v1.7M14.6 8h-1.7M3.1 8H1.4M12.67 3.33l-1.2 1.2M4.53 11.47l-1.2 1.2M12.67 12.67l-1.2-1.2M4.53 4.53l-1.2-1.2" strokeLinecap="round" />
+        </svg>
+      ) : (
+        <svg viewBox="0 0 16 16" className="size-[15px]" fill="none" stroke="currentColor" strokeWidth="1.3">
+          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5a5.8 5.8 0 1 0 6.9 6.9Z" strokeLinejoin="round" />
+        </svg>
+      )}
     </button>
   )
 }
