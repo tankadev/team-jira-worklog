@@ -1,6 +1,7 @@
 import type { BoardParent } from '@/lib/jira/types'
 import { formatDuration } from '@/lib/time'
 
+import { CreateIssueButton } from './create-issue'
 import { TypeIcon } from './type-icon'
 
 export interface EpicGroup {
@@ -68,6 +69,16 @@ export function EpicHeader({ group }: { group: EpicGroup }) {
         {taskCount} task · {subtaskCount} task con
         {logged > 0 && <> · {formatDuration(logged)}</>}
       </span>
+
+      {group.key && (
+        <CreateIssueButton
+          parentKey={group.key}
+          mode="task"
+          className="rounded-md border border-epic/50 px-2 py-[2px] font-mono text-[11px] text-epic-ink hover:border-epic hover:bg-epic-soft"
+        >
+          + Task
+        </CreateIssueButton>
+      )}
     </div>
   )
 }

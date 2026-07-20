@@ -1,9 +1,7 @@
-import Link from 'next/link'
-
 import type { SprintTask } from '@/lib/jira/types'
 import { statusTone } from '@/lib/jira/types'
 
-import { LinkPending } from '../link-pending'
+import { CreateIssueButton } from './create-issue'
 import { TypeIcon } from './type-icon'
 
 const TONE: Record<string, string> = {
@@ -79,15 +77,12 @@ export function PendingTasks({ tasks, title }: { tasks: SprintTask[]; title?: st
               {t.subtaskCount === 0 ? 'chưa có task con' : `${t.subtaskCount} task con`}
             </span>
 
-            <Link
-              href={`/new?parent=${encodeURIComponent(t.key)}`}
+            <CreateIssueButton
+              parentKey={t.key}
               className="rounded-md bg-accent px-[9px] py-1 text-[12.5px] font-medium text-white hover:bg-accent-2"
             >
-              <span className="inline-flex items-center gap-1.5">
-                + Task con
-                <LinkPending />
-              </span>
-            </Link>
+              + Task con
+            </CreateIssueButton>
           </div>
         ))}
       </div>
