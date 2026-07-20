@@ -239,6 +239,54 @@ export async function getSprintTasks(
     }))
 }
 
+export interface IssueDetail {
+  key: string
+  summary: string
+  statusName: string
+  issueTypeName: string
+  storyPoints: number | null
+  timeSpentSeconds: number
+  parentKey: string | null
+  parentSummary: string | null
+  sprintName: string | null
+  assigneeName: string | null
+  /** Raw ADF; the client turns it into blocks. */
+  description: unknown
+  url: string
+}
+
+/** Everything the detail panel shows, in one round trip. */
+export async function getIssueDetail(issueKey: string): Promise<IssueDetail> {
+  const meta = await getProjectMeta()
+  const baseUrl = getSetting(SETTING_KEYS.jiraBaseUrl)?.replace(/\/+$/, '') ?? ''
+
+  const fields = ['summary', 'status', 'issuetype', 'parent', 'assignee', 'description', 'timespent']
+  if (meta.storyPointsFieldId) fields.push(meta.storyPointsFieldId)
+  if (meta.sprintFieldId) fields.push(meta.sprintFieldId)
+
+  const issue = await jiraFetch<JiraIssue>(
+    `/rest/api/3/issue/${encodeURIComponent(issueKey)}?fields=${fields.join(',')}`,
+  )
+
+  const rawSprint = meta.sprintFieldId ? issue.fields[meta.sprintFieldId] : null
+  const sprints = Array.isArray(rawSprint) ? (rawSprint as Array<{ name?: string }>) : []
+
+  return {
+    key: issue.key,
+    summary: issue.fields.summary ?? '',
+    statusName: issue.fields.status?.name ?? '',
+    issueTypeName: issue.fields.issuetype?.name ?? '',
+    storyPoints: meta.storyPointsFieldId ? num(issue.fields[meta.storyPointsFieldId]) : null,
+    timeSpentSeconds: issue.fields.timespent ?? 0,
+    parentKey: issue.fields.parent?.key ?? null,
+    parentSummary: issue.fields.parent?.fields?.summary ?? null,
+    sprintName: sprints[sprints.length - 1]?.name ?? null,
+    assigneeName: issue.fields.assignee?.displayName ?? null,
+    description: issue.fields.description ?? null,
+    url: `${baseUrl}/browse/${issue.key}`,
+  }
+}
+
 export async function getTransitions(issueKey: string): Promise<Transition[]> {
   const res = await jiraFetch<{
     transitions?: Array<{ id: string; name: string; to?: { id: string; name: string } }>

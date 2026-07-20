@@ -9,6 +9,7 @@ import type { BoardSubtask } from '@/lib/jira/types'
 import { formatDuration } from '@/lib/time'
 
 import { Spinner } from '../spinner'
+import { IssueDetail } from './issue-detail'
 import { useNav } from './navigation'
 import { PointsEditor } from './points-editor'
 import { Popover, PopoverTitle } from './popover'
@@ -43,6 +44,7 @@ export function SubtaskRow({
   const [hours, setHours] = useState(step)
   const [comment, setComment] = useState('')
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null)
+  const [detailOpen, setDetailOpen] = useState(false)
   const [pending, startTransition] = useTransition()
   const { refresh } = useNav()
 
@@ -63,17 +65,27 @@ export function SubtaskRow({
   return (
     <div className="border-b border-line last:border-b-0 hover:bg-surface-2/60">
       <div className="grid h-[42px] grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2.5 px-3">
-        <span className="flex items-center gap-1.5 whitespace-nowrap">
+        <button
+          type="button"
+          onClick={() => setDetailOpen(true)}
+          title={`Xem chi tiết ${subtask.key}`}
+          className="flex items-center gap-1.5 whitespace-nowrap rounded px-0.5 hover:bg-accent-soft"
+        >
           <TypeIcon name="Subtask" className="size-3" />
-          <span className="font-mono text-[11.5px] font-semibold text-accent-ink">
+          <span className="font-mono text-[11.5px] font-semibold text-accent-ink underline-offset-2 hover:underline">
             {subtask.key}
           </span>
-        </span>
+        </button>
 
         {/* Truncated to keep the row one line; the full text is in the tooltip. */}
-        <span className="truncate text-[13px]" title={subtask.summary}>
+        <button
+          type="button"
+          onClick={() => setDetailOpen(true)}
+          title={subtask.summary}
+          className="min-w-0 truncate text-left text-[13px] hover:text-accent-ink"
+        >
           {subtask.summary}
-        </span>
+        </button>
 
         <span className="flex items-center gap-1.5 whitespace-nowrap">
           <StatusPill issueKey={subtask.key} statusName={subtask.statusName} compact />
@@ -119,6 +131,10 @@ export function SubtaskRow({
           </button>
         </span>
       </div>
+
+      {detailOpen && (
+        <IssueDetail issueKey={subtask.key} onClose={() => setDetailOpen(false)} />
+      )}
 
       {result && (
         <p
