@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 
 import { type GenerateOutcome, generateTask, pointRulesText } from '@/lib/ai/gemini'
 import { createIssue } from '@/lib/jira/create'
-import { deleteDraft, saveDraft, setPrefixes } from '@/lib/drafts'
+import { deleteDraft, saveDraft } from '@/lib/drafts'
 import {
   deleteTaskTemplate,
   markTemplateUsed,
@@ -131,16 +131,6 @@ export async function deleteDraftAction(id: number): Promise<DraftResult> {
   }
 }
 
-export async function savePrefixesAction(labels: string[]): Promise<DraftResult> {
-  try {
-    setPrefixes(labels)
-    revalidatePath('/new')
-    revalidatePath('/settings')
-    return { ok: true, message: 'Đã lưu danh sách tiền tố' }
-  } catch (error) {
-    return { ok: false, message: error instanceof Error ? error.message : 'Không lưu được' }
-  }
-}
 
 
 export interface TemplateResult {

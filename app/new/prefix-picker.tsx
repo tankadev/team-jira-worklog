@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 
 import { Working } from '../spinner'
-import { savePrefixesAction } from './actions'
+import { savePrefixesAction } from '../prefix-actions'
 
 /** Accepts `QA` or `[QA]` and always stores the bracketed form. */
 function normalise(raw: string): string {

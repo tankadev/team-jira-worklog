@@ -1,9 +1,11 @@
 import { connection } from 'next/server'
 
 import { getSettingsForClient } from '@/lib/settings'
+import { listPrefixes } from '@/lib/drafts'
 import { listTemplates } from '@/lib/templates'
 
 import { SettingsForm } from './form'
+import { PrefixManager } from './prefixes'
 import { TemplateManager } from './templates'
 
 /**
@@ -15,6 +17,7 @@ export default async function SettingsPage() {
   await connection()
   const settings = getSettingsForClient()
   const templates = listTemplates()
+  const prefixes = listPrefixes()
 
   return (
     <>
@@ -27,7 +30,7 @@ export default async function SettingsPage() {
 
       <SettingsForm initial={settings} />
 
-      <div className="mt-4">
+      <div className="mt-4 grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
         <TemplateManager
           initial={templates.map((t) => ({
             id: t.id,
@@ -36,6 +39,7 @@ export default async function SettingsPage() {
             isDefault: t.isDefault,
           }))}
         />
+        <PrefixManager initial={prefixes} />
       </div>
     </>
   )
