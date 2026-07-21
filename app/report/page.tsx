@@ -9,7 +9,7 @@ import { listDaysOff } from '@/lib/days-off'
 import { type QuotaRules, quotaForDate } from '@/lib/quota'
 import { SETTING_KEYS, getSetting } from '@/lib/settings'
 import { getTemplate, listTemplates } from '@/lib/templates'
-import { DEFAULT_TZ, formatDateVi, formatDuration, isWeekend, todayIn, weekOf } from '@/lib/time'
+import { DEFAULT_TZ, addDays, formatDateVi, formatDuration, isWeekend, todayIn, weekOf } from '@/lib/time'
 
 import { NavProvider } from '../board/navigation'
 import { ReportDatePicker } from './date-picker'
@@ -37,11 +37,16 @@ export default async function ReportPage(props: PageProps<'/report'>) {
   const tz = me.timeZone ?? DEFAULT_TZ
   const date = one(sp.date) ?? todayIn(tz)
   const templateId = one(sp.template) ? Number(one(sp.template)) : undefined
+  // Task keys are hidden unless explicitly turned on.
+  const showKey = one(sp.key) === '1'
 
   const templates = listTemplates()
   const template = getTemplate(templateId)
 
   const days = weekOf(date)
+  // The report is written for `date` ("today"); its "Previous day" block lists
+  // what was actually logged the day before.
+  const prevDate = addDays(date, -1)
   const { current } = await getSprints()
 
   // The sprint window can start before this week, so it is fetched separately
@@ -49,19 +54,23 @@ export default async function ReportPage(props: PageProps<'/report'>) {
   const sprintFrom = current?.startDate?.slice(0, 10)
   const sprintTo = current?.endDate?.slice(0, 10)
 
+  // prevDate falls in the previous week when `date` is a Monday, so the fetch
+  // reaches back to it; the extra day is harmless to the week table and stats.
   const [weekEntries, sprintEntries] = await Promise.all([
-    getWorklogs(days[0], days[6], me.accountId, tz),
+    getWorklogs(prevDate < days[0] ? prevDate : days[0], days[6], me.accountId, tz),
     sprintFrom && sprintTo
       ? getWorklogs(sprintFrom, min(sprintTo, todayIn(tz)), me.accountId, tz)
       : Promise.resolve([]),
   ])
 
   const dayEntries = weekEntries.filter((e) => e.date === date)
+  const prevEntries = weekEntries.filter((e) => e.date === prevDate)
 
   // One line per issue, not per worklog: several entries on the same issue in a
-  // day should read as a single item in the report.
+  // day should read as a single item in the report. The "Previous day" block is
+  // built from the day before the selected date.
   const byIssue = new Map<string, ReportIssue>()
-  for (const e of dayEntries) {
+  for (const e of prevEntries) {
     const existing = byIssue.get(e.issueKey)
     if (existing) existing.seconds += e.timeSpentSeconds
     else
@@ -74,12 +83,20 @@ export default async function ReportPage(props: PageProps<'/report'>) {
   const issues = [...byIssue.values()].sort((a, b) => a.key.localeCompare(b.key))
   const totalSeconds = issues.reduce((n, i) => n + i.seconds, 0)
 
+  // Distinct today's numbers for the sidebar — how much of the report day has
+  // been logged so far.
+  const dayIssueCount = new Set(dayEntries.map((e) => e.issueKey)).size
+  const daySeconds = dayEntries.reduce((n, e) => n + e.timeSpentSeconds, 0)
+
   const body = renderReport(template?.body ?? '', {
-    date,
+    // Anchored on the previous day so {{next_date}} resolves to `date`, the day
+    // the report is written for.
+    date: prevDate,
     issues,
     totalSeconds,
     displayName: me.displayName,
     sprintName: current?.name,
+    showKey,
   })
 
   const byDate = sumByDate(weekEntries)
@@ -118,6 +135,7 @@ export default async function ReportPage(props: PageProps<'/report'>) {
             date={date}
             templates={templates.map((t) => ({ id: t.id, name: t.name, isDefault: t.isDefault }))}
             templateId={template?.id ?? 0}
+            showKey={showKey}
             empty={issues.length === 0}
           />
 
@@ -139,8 +157,8 @@ export default async function ReportPage(props: PageProps<'/report'>) {
             <div className="mb-2.5 font-mono text-[10.5px] uppercase tracking-[0.09em] text-ink-3">
               Ngày {formatDateVi(date)}
             </div>
-            <Stat label="Số task" value={String(issues.length)} />
-            <Stat label="Tổng giờ" value={formatDuration(totalSeconds)} />
+            <Stat label="Số task" value={String(dayIssueCount)} />
+            <Stat label="Tổng giờ" value={formatDuration(daySeconds)} />
             <Stat label="Số lần log" value={String(dayEntries.length)} />
           </section>
 

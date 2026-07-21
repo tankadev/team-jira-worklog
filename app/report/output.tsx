@@ -9,12 +9,14 @@ export function ReportOutput({
   body,
   templates,
   templateId,
+  showKey,
   empty,
 }: {
   body: string
   date: string
   templates: Array<{ id: number; name: string; isDefault: boolean }>
   templateId: number
+  showKey: boolean
   empty: boolean
 }) {
   const params = useSearchParams()
@@ -24,6 +26,13 @@ export function ReportOutput({
   function pickTemplate(id: string) {
     const q = new URLSearchParams(params.toString())
     q.set('template', id)
+    navigate(`/report?${q}`)
+  }
+
+  function toggleKey(next: boolean) {
+    const q = new URLSearchParams(params.toString())
+    if (next) q.set('key', '1')
+    else q.delete('key')
     navigate(`/report?${q}`)
   }
 
@@ -53,6 +62,16 @@ export function ReportOutput({
         </div>
         <div className="flex items-center gap-1.5">
           <NavSpinner />
+          <label className="flex items-center gap-1.5 text-[12.5px] text-ink-2 select-none">
+            <input
+              type="checkbox"
+              checked={showKey}
+              disabled={pending}
+              onChange={(e) => toggleKey(e.target.checked)}
+              className="accent-accent disabled:opacity-60"
+            />
+            Mã task
+          </label>
           <select
             value={templateId || ''}
             disabled={pending}

@@ -13,7 +13,13 @@ export interface ReportContext {
   totalSeconds: number
   displayName?: string
   sprintName?: string
+  /** Show the Jira issue key on each line. Off by default. */
+  showKey?: boolean
 }
+
+// {{key}} plus the separator that usually follows it (`ABC-1 | summary`), so
+// hiding the key doesn't leave a dangling `| ` behind.
+const KEY_WITH_SEP = /\{\{key\}\}[ \t]*[|\-–—:·]?[ \t]*/g
 
 function ddmmyyyy(date: string): string {
   const [y, m, d] = date.split('-')
@@ -50,8 +56,9 @@ export function renderReport(template: string, ctx: ReportContext): string {
     (_match, body: string) =>
       ctx.issues
         .map((issue) =>
-          body
-            .replace(/\{\{key\}\}/g, issue.key)
+          (ctx.showKey
+            ? body.replace(/\{\{key\}\}/g, issue.key)
+            : body.replace(KEY_WITH_SEP, ''))
             .replace(/\{\{summary\}\}/g, issue.summary)
             .replace(/\{\{time\}\}/g, formatDuration(issue.seconds))
             .replace(/\{\{hours\}\}/g, (issue.seconds / 3600).toFixed(2).replace(/\.?0+$/, '')),
