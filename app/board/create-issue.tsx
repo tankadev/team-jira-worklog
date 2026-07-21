@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState, useTransition } from 'react'
+import { createPortal } from 'react-dom'
 
 import { createIssueAction, generateAction } from '@/app/new/actions'
 import { sprintPrefix } from '@/lib/sprint-name'
@@ -246,7 +247,11 @@ function CreateIssueModal({
 
   const canCreate = Boolean(fullTitle && ctx?.issueTypeId && !creating)
 
-  return (
+  // Rendered through the body, not inline: the button lives inside the board's
+  // NavDimmer, so a plain child would fade to opacity-40 the moment a successful
+  // create kicks off the board refresh. The portal keeps the dialog crisp and
+  // clickable while the board behind it reloads.
+  return createPortal(
     <div
       className="fixed inset-0 z-[90] flex items-start justify-center overflow-auto bg-black/45 p-4 sm:p-8"
       onClick={(e) => {
@@ -521,7 +526,8 @@ function CreateIssueModal({
           </span>
         </footer>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 
