@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Nav } from "./nav";
+import { enabledModuleNav } from "@/lib/modules/state";
 import { SETTING_KEYS, getSetting } from "@/lib/settings";
 
 const geistSans = Geist({
@@ -31,6 +32,7 @@ export default async function RootLayout({
   const project = getSetting(SETTING_KEYS.jiraProjectKey)
   const board = getSetting(SETTING_KEYS.jiraBoardId)
   const label = project ? `${project}${board ? ` · board ${board}` : ''}` : undefined
+  const modules = enabledModuleNav()
 
   return (
     <html
@@ -39,7 +41,7 @@ export default async function RootLayout({
     >
       <body className="min-h-full">
         <div className="grid min-h-screen grid-cols-1 md:grid-cols-[196px_1fr]">
-          <Nav label={label} />
+          <Nav label={label} modules={modules} />
           <main className="max-w-[1340px] px-6 pb-12 pt-5">{children}</main>
         </div>
       </body>

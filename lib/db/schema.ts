@@ -135,6 +135,88 @@ export const reportHistory = sqliteTable(
   (t) => [index('report_history_date_idx').on(t.reportDate)],
 )
 
+/**
+ * Which optional modules the user has switched on. A missing row means off.
+ * Kept in its own table rather than a settings key so a module can grow its own
+ * per-row state later (an `enabled_at` already rides along for "new since…").
+ */
+export const moduleState = sqliteTable('module_state', {
+  moduleId: text('module_id').primaryKey(),
+  enabled: integer('enabled', { mode: 'boolean' }).notNull().default(false),
+  enabledAt: integer('enabled_at'),
+})
+
+/**
+ * `progress` module — one report per member per day. Split into report + items
+ * so a report reads as a unit and its feature lines keep the order they were
+ * written in. Items cascade-delete with their report.
+ */
+export const progressReports = sqliteTable('progress_reports', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  member: text('member').notNull().default(''),
+  /** Local date the report covers, YYYY-MM-DD. */
+  reportDate: text('report_date').notNull(),
+  createdAt: integer('created_at').notNull().default(now),
+  updatedAt: integer('updated_at').notNull().default(now),
+})
+
+export const progressItems = sqliteTable(
+  'progress_items',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    reportId: integer('report_id')
+      .notNull()
+      .references(() => progressReports.id, { onDelete: 'cascade' }),
+    /** Leading tag such as `FR`, rendered before the feature title. */
+    prefix: text('prefix').notNull().default(''),
+    feature: text('feature').notNull().default(''),
+    /** Free-form progress values: `100%`, `8/11`, `Todo`, … */
+    document: text('document').notNull().default(''),
+    implement: text('implement').notNull().default(''),
+    fix: text('fix').notNull().default(''),
+    position: integer('position').notNull().default(0),
+  },
+  (t) => [index('progress_items_report_idx').on(t.reportId)],
+)
+
+/**
+ * `ios-publish` module — a line per submit attempt, so the page can show what
+ * was pushed and when. The build binary itself lives in App Store Connect; this
+ * only records the action taken against it.
+ */
+export const iosPublishLog = sqliteTable('ios_publish_log', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  appName: text('app_name').notNull(),
+  buildNumber: text('build_number').notNull(),
+  groupName: text('group_name').notNull().default(''),
+  /** externalBuildState/processingState summary at the time. */
+  state: text('state').notNull().default(''),
+  ok: integer('ok', { mode: 'boolean' }).notNull().default(false),
+  message: text('message').notNull().default(''),
+  createdAt: integer('created_at').notNull().default(now),
+})
+
+/**
+ * `releases` module — one row per task being tracked toward production. Which
+ * environment a task has reached is a plain field the user moves by hand; there
+ * is no live deployment feed. Ported from the task-tracking tool.
+ */
+export const releaseTasks = sqliteTable('release_tasks', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  /** Jira key or free text, e.g. KAN-812. */
+  taskId: text('task_id').notNull().default(''),
+  description: text('description').notNull().default(''),
+  branchName: text('branch_name').notNull().default(''),
+  /** JSON array of subtask lines. */
+  subTasks: text('sub_tasks').notNull().default('[]'),
+  product: text('product').notNull().default(''),
+  team: text('team').notNull().default(''),
+  environment: text('environment').notNull().default(''),
+  buildStatus: text('build_status').notNull().default(''),
+  createdAt: integer('created_at').notNull().default(now),
+  updatedAt: integer('updated_at').notNull().default(now),
+})
+
 export type Setting = typeof settings.$inferSelect
 export type Prefix = typeof prefixes.$inferSelect
 export type Draft = typeof drafts.$inferSelect
@@ -142,3 +224,8 @@ export type TaskTemplate = typeof taskTemplates.$inferSelect
 export type DayOff = typeof daysOff.$inferSelect
 export type JqlPreset = typeof jqlPresets.$inferSelect
 export type ReportTemplate = typeof reportTemplates.$inferSelect
+export type ModuleState = typeof moduleState.$inferSelect
+export type ProgressReport = typeof progressReports.$inferSelect
+export type ProgressItem = typeof progressItems.$inferSelect
+export type IosPublishLog = typeof iosPublishLog.$inferSelect
+export type ReleaseTask = typeof releaseTasks.$inferSelect

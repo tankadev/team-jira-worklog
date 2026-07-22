@@ -4,16 +4,26 @@ import Link, { useLinkStatus } from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
-const ITEMS = [
+// Core stays fixed; Settings sits at the end. Enabled modules slot in between,
+// under their own heading, via the `modules` prop the server layout supplies.
+const CORE = [
   { href: '/', label: 'Task board' },
   { href: '/find', label: 'Tìm & nhận task' },
   { href: '/new', label: 'Task mới' },
-  { href: '/report', label: 'Report' },
-  { href: '/settings', label: 'Settings' },
+  { href: '/report', label: 'Daily report' },
 ]
 
-export function Nav({ label }: { label?: string }) {
+export function Nav({
+  label,
+  modules = [],
+}: {
+  label?: string
+  modules?: Array<{ href: string; label: string }>
+}) {
   const pathname = usePathname()
+
+  const isActive = (href: string) =>
+    href === '/' ? pathname === '/' : pathname.startsWith(href)
 
   return (
     <aside className="flex flex-row items-center gap-5 border-b border-line bg-surface px-3 py-4 md:sticky md:top-0 md:h-screen md:flex-col md:items-stretch md:border-b-0 md:border-r">
@@ -29,31 +39,46 @@ export function Nav({ label }: { label?: string }) {
       </div>
 
       <nav className="flex flex-1 flex-row gap-px md:flex-none md:flex-col">
-        {ITEMS.map((item) => {
-          const active = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href)
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              // These pages all read live Jira data, so prefetching would fire
-              // requests for screens the user may never open.
-              prefetch={false}
-              aria-current={active ? 'page' : undefined}
-              className={
-                'flex items-center justify-between gap-2 rounded-md px-[9px] py-[7px] text-sm transition-colors ' +
-                (active
-                  ? 'bg-accent-soft font-semibold text-accent-ink'
-                  : 'text-ink-2 hover:bg-surface-2 hover:text-ink')
-              }
-            >
-              {item.label}
-              <LinkSpinner />
-            </Link>
-          )
-        })}
-      </nav>
+        {CORE.map((item) => (
+          <NavLink key={item.href} href={item.href} label={item.label} active={isActive(item.href)} />
+        ))}
 
+        {modules.length > 0 && (
+          <>
+            <div className="mt-3 hidden px-[9px] pb-1 font-mono text-[9.5px] uppercase tracking-[0.09em] text-ink-3 md:block">
+              Modules
+            </div>
+            {modules.map((item) => (
+              <NavLink key={item.href} href={item.href} label={item.label} active={isActive(item.href)} />
+            ))}
+          </>
+        )}
+
+        <div className="mt-3 hidden md:block" />
+        <NavLink href="/settings" label="Settings" active={isActive('/settings')} />
+      </nav>
     </aside>
+  )
+}
+
+function NavLink({ href, label, active }: { href: string; label: string; active: boolean }) {
+  return (
+    <Link
+      href={href}
+      // These pages all read live Jira data, so prefetching would fire requests
+      // for screens the user may never open.
+      prefetch={false}
+      aria-current={active ? 'page' : undefined}
+      className={
+        'flex items-center justify-between gap-2 rounded-md px-[9px] py-[7px] text-sm transition-colors ' +
+        (active
+          ? 'bg-accent-soft font-semibold text-accent-ink'
+          : 'text-ink-2 hover:bg-surface-2 hover:text-ink')
+      }
+    >
+      {label}
+      <LinkSpinner />
+    </Link>
   )
 }
 

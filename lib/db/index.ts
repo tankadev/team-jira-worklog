@@ -96,6 +96,57 @@ CREATE TABLE IF NOT EXISTS report_history (
   created_at  INTEGER NOT NULL DEFAULT (strftime('%s','now'))
 );
 CREATE INDEX IF NOT EXISTS report_history_date_idx ON report_history (report_date);
+
+CREATE TABLE IF NOT EXISTS module_state (
+  module_id  TEXT PRIMARY KEY,
+  enabled    INTEGER NOT NULL DEFAULT 0,
+  enabled_at INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS progress_reports (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  member      TEXT NOT NULL DEFAULT '',
+  report_date TEXT NOT NULL,
+  created_at  INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+  updated_at  INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+);
+
+CREATE TABLE IF NOT EXISTS progress_items (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  report_id  INTEGER NOT NULL REFERENCES progress_reports(id) ON DELETE CASCADE,
+  prefix     TEXT NOT NULL DEFAULT '',
+  feature    TEXT NOT NULL DEFAULT '',
+  document   TEXT NOT NULL DEFAULT '',
+  implement  TEXT NOT NULL DEFAULT '',
+  fix        TEXT NOT NULL DEFAULT '',
+  position   INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS progress_items_report_idx ON progress_items (report_id);
+
+CREATE TABLE IF NOT EXISTS ios_publish_log (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  app_name     TEXT NOT NULL,
+  build_number TEXT NOT NULL,
+  group_name   TEXT NOT NULL DEFAULT '',
+  state        TEXT NOT NULL DEFAULT '',
+  ok           INTEGER NOT NULL DEFAULT 0,
+  message      TEXT NOT NULL DEFAULT '',
+  created_at   INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+);
+
+CREATE TABLE IF NOT EXISTS release_tasks (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  task_id      TEXT NOT NULL DEFAULT '',
+  description  TEXT NOT NULL DEFAULT '',
+  branch_name  TEXT NOT NULL DEFAULT '',
+  sub_tasks    TEXT NOT NULL DEFAULT '[]',
+  product      TEXT NOT NULL DEFAULT '',
+  team         TEXT NOT NULL DEFAULT '',
+  environment  TEXT NOT NULL DEFAULT '',
+  build_status TEXT NOT NULL DEFAULT '',
+  created_at   INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+  updated_at   INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+);
 `
 
 function open() {

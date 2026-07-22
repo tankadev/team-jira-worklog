@@ -1,10 +1,12 @@
 import { connection } from 'next/server'
 
+import { listModuleStates } from '@/lib/modules/state'
 import { getSettingsForClient } from '@/lib/settings'
 import { listPrefixes } from '@/lib/drafts'
 import { listTemplates } from '@/lib/templates'
 
 import { SettingsForm } from './form'
+import { ModuleManager } from './modules'
 import { PrefixManager } from './prefixes'
 import { TemplateManager } from './templates'
 
@@ -18,6 +20,7 @@ export default async function SettingsPage() {
   const settings = getSettingsForClient()
   const templates = listTemplates()
   const prefixes = listPrefixes()
+  const moduleStates = listModuleStates()
 
   return (
     <>
@@ -29,6 +32,10 @@ export default async function SettingsPage() {
       </header>
 
       <SettingsForm initial={settings} />
+
+      <div className="mt-4">
+        <ModuleManager states={moduleStates} />
+      </div>
 
       <div className="mt-4 grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
         <TemplateManager
