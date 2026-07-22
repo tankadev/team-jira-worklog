@@ -253,10 +253,10 @@ function CreateIssueModal({
   // clickable while the board behind it reloads.
   return createPortal(
     <div
+      // Deliberately no backdrop-click-to-close: a create form holds several
+      // minutes of typing, and a stray click outside must not throw it away.
+      // Close is the ×, the "Đóng" button, or Escape.
       className="fixed inset-0 z-[90] flex items-start justify-center overflow-auto bg-black/45 p-4 sm:p-8"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose()
-      }}
     >
       <div
         role="dialog"
