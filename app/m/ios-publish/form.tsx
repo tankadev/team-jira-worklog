@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState, useTransition } from 'react'
+import { useEffect, useRef, useState, useTransition } from 'react'
 
 import type { BuildStatus } from '@/lib/modules/ios-publish/asc'
 import type { AppPreset, ProfileView } from '@/lib/modules/ios-publish/config'
@@ -33,6 +33,9 @@ interface LogRow {
   message: string
   when: string
 }
+
+/** Remembers the Publish tab's account filter per browser, so it re-selects it. */
+const FILTER_KEY = 'mod:ios-publish:publish-filter'
 
 const CARD = 'rounded-[9px] border border-line bg-surface p-[17px]'
 const CTITLE = 'font-mono text-[10.5px] uppercase tracking-[0.09em] text-ink-3'
@@ -72,7 +75,7 @@ export function IosPublish({
 
       {tab === 'publish' ? (
         config.apps.length ? (
-          <PublishCards apps={config.apps} log={log} />
+          <PublishCards apps={config.apps} profiles={config.profiles} log={log} />
         ) : (
           <div className={CARD + ' text-[12.5px] text-ink-2'}>
             Chưa có app nào.{' '}
@@ -114,7 +117,22 @@ function TabBtn({ on, onClick, children }: { on: boolean; onClick: () => void; c
 
 // ── publish ──────────────────────────────────────────────────────────────────
 
-function PublishCards({ apps, log }: { apps: AppPreset[]; log: LogRow[] }) {
+function PublishCards({
+  apps,
+  profiles,
+  log,
+}: {
+  apps: AppPreset[]
+  profiles: ProfileView[]
+  log: LogRow[]
+}) {
+  // Only worth filtering when apps span more than one ASC account; with a single
+  // account the picker would just be a control that never changes anything.
+  const canFilter = profiles.length > 1
+  const [profileId, setProfileId] = useState('')
+  const visibleApps = profileId ? apps.filter((a) => a.profileId === profileId) : apps
+  const profileName = (id: string) => profiles.find((p) => p.id === id)?.name ?? '—'
+
   const [appId, setAppId] = useState(apps[0]?.id ?? '')
   const [version, setVersion] = useState(apps[0]?.version ?? '')
   const [groupName, setGroupName] = useState(apps[0]?.groups[0] ?? '')
@@ -136,6 +154,35 @@ function PublishCards({ apps, log }: { apps: AppPreset[]; log: LogRow[] }) {
     setResult(null)
   }
 
+  // Narrowing the account may hide the app that was selected — fall back to the
+  // first one still visible so the form never points at a hidden app.
+  function pickProfile(id: string) {
+    setProfileId(id)
+    try {
+      localStorage.setItem(FILTER_KEY, id)
+    } catch {
+      // Private mode / disabled storage — the filter just won't be remembered.
+    }
+    const list = id ? apps.filter((a) => a.profileId === id) : apps
+    if (!list.some((a) => a.id === appId)) pickApp(list[0]?.id ?? '')
+  }
+
+  // Re-apply the last chosen account on open. Runs after mount (not in the
+  // initial state) to keep the server and client's first render identical, and
+  // skips a stale id whose account has since been deleted.
+  useEffect(() => {
+    if (!canFilter) return
+    let saved: string | null = null
+    try {
+      saved = localStorage.getItem(FILTER_KEY)
+    } catch {
+      saved = null
+    }
+    if (saved && profiles.some((p) => p.id === saved)) pickProfile(saved)
+    // Mount-only: restoring once is the whole intent.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const payload = () => ({ appId, version, groupName, buildNumber, content })
   function check() {
     startCheck(async () => setResult(await checkStatusAction(payload())))
@@ -149,12 +196,31 @@ function PublishCards({ apps, log }: { apps: AppPreset[]; log: LogRow[] }) {
       <section className={CARD}>
         <div className={'mb-3 ' + CTITLE}>Submit build lên TestFlight external</div>
 
+        {canFilter && (
+          <label className="mb-3 flex flex-col gap-[5px]">
+            <span className="text-xs font-medium text-ink-2">Tài khoản</span>
+            <select value={profileId} onChange={(e) => pickProfile(e.target.value)} className={INPUT}>
+              <option value="">Tất cả tài khoản ({apps.length} app)</option>
+              {profiles.map((p) => {
+                const count = apps.filter((a) => a.profileId === p.id).length
+                return (
+                  <option key={p.id} value={p.id}>
+                    {p.name} ({count} app)
+                  </option>
+                )
+              })}
+            </select>
+          </label>
+        )}
+
         <label className="mb-3 flex flex-col gap-[5px]">
           <span className="text-xs font-medium text-ink-2">App</span>
           <select value={appId} onChange={(e) => pickApp(e.target.value)} className={INPUT}>
-            {apps.map((a) => (
+            {visibleApps.length === 0 && <option value="">— Không có app nào —</option>}
+            {visibleApps.map((a) => (
               <option key={a.id} value={a.id}>
                 {a.name}
+                {canFilter && !profileId ? ` · ${profileName(a.profileId)}` : ''}
               </option>
             ))}
           </select>
