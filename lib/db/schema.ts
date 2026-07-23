@@ -213,6 +213,10 @@ export const releaseTasks = sqliteTable('release_tasks', {
   team: text('team').notNull().default(''),
   environment: text('environment').notNull().default(''),
   buildStatus: text('build_status').notNull().default(''),
+  /** Marks a task with no code branch of its own (e.g. a version-only rebuild). */
+  noBranch: integer('no_branch', { mode: 'boolean' }).notNull().default(false),
+  /** Optional id of another release task this one is derived from (e.g. the SDK task). */
+  refId: integer('ref_id'),
   createdAt: integer('created_at').notNull().default(now),
   updatedAt: integer('updated_at').notNull().default(now),
 })

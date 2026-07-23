@@ -3,8 +3,8 @@
 import { revalidatePath } from 'next/cache'
 
 import { isModuleEnabled } from '@/lib/modules/state'
-import type { ProductConfig, ReleaseTaskShape } from '@/lib/modules/releases/model'
-import { setProducts, setTeams } from '@/lib/modules/releases/config'
+import type { ProductConfig, ReleaseTaskShape, ReportExclude } from '@/lib/modules/releases/model'
+import { setProducts, setReportExcludes, setTeams } from '@/lib/modules/releases/config'
 import {
   deleteReleaseTask,
   patchReleaseTask,
@@ -42,6 +42,8 @@ export async function saveReleaseTaskAction(
       team: input.team,
       environment: input.environment,
       buildStatus: input.buildStatus,
+      noBranch: input.noBranch,
+      refId: input.noBranch ? input.refId : null,
     })
     revalidatePath('/m/releases')
     return { ok: true, message: 'Đã lưu task', id }
@@ -95,6 +97,17 @@ export async function saveTeamsAction(teams: string[]): Promise<ReleaseResult> {
     setTeams(teams)
     revalidatePath('/m/releases')
     return { ok: true, message: 'Đã lưu teams' }
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : 'Không lưu được' }
+  }
+}
+
+export async function saveReportExcludesAction(excludes: ReportExclude[]): Promise<ReleaseResult> {
+  if (!enabled()) return { ok: false, message: 'Module đang tắt' }
+  try {
+    setReportExcludes(excludes)
+    revalidatePath('/m/releases')
+    return { ok: true, message: 'Đã lưu quy tắc ẩn team' }
   } catch (error) {
     return { ok: false, message: error instanceof Error ? error.message : 'Không lưu được' }
   }

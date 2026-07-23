@@ -1,8 +1,10 @@
 'use client'
 
 import Link, { useLinkStatus } from 'next/link'
-import { usePathname } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { usePathname, useRouter } from 'next/navigation'
+import { useEffect, useState, useTransition } from 'react'
+
+import { refreshDataAction } from './refresh-actions'
 
 // Core stays fixed; Settings sits at the end. Enabled modules slot in between,
 // under their own heading, via the `modules` prop the server layout supplies.
@@ -35,6 +37,7 @@ export function Nav({
         {/* Beside the brand rather than pinned to the bottom: with `mt-auto` on a
             full-height column it drifted to the end of a long board, out of reach
             without scrolling back. */}
+        <RefreshButton />
         <ThemeToggle />
       </div>
 
@@ -62,12 +65,16 @@ export function Nav({
 }
 
 function NavLink({ href, label, active }: { href: string; label: string; active: boolean }) {
+  const router = useRouter()
   return (
     <Link
       href={href}
-      // These pages all read live Jira data, so prefetching would fire requests
-      // for screens the user may never open.
+      // Auto-prefetch stays off (it would fire Jira requests for every screen).
+      // Instead we warm just the one the pointer lands on — an intent signal —
+      // so the click feels instant without prefetching the whole nav.
       prefetch={false}
+      onMouseEnter={() => router.prefetch(href)}
+      onFocus={() => router.prefetch(href)}
       aria-current={active ? 'page' : undefined}
       className={
         'flex items-center justify-between gap-2 rounded-md px-[9px] py-[7px] text-sm transition-colors ' +
@@ -98,6 +105,31 @@ function LinkSpinner() {
       aria-hidden
       className="inline-block size-3 shrink-0 animate-spin rounded-full border-[1.5px] border-line-strong border-t-accent"
     />
+  )
+}
+
+/** Drops the short Jira read cache and re-renders — the "give me live data now" button. */
+function RefreshButton() {
+  const router = useRouter()
+  const [pending, startTransition] = useTransition()
+
+  function refresh() {
+    startTransition(async () => {
+      await refreshDataAction()
+      router.refresh()
+    })
+  }
+
+  return (
+    <button
+      onClick={refresh}
+      disabled={pending}
+      title="Làm mới dữ liệu Jira"
+      aria-label="Làm mới dữ liệu Jira"
+      className="grid size-7 shrink-0 place-items-center rounded-md border border-line text-ink-3 hover:border-line-strong hover:text-ink disabled:opacity-60"
+    >
+      <span className={'text-[15px] leading-none ' + (pending ? 'inline-block animate-spin' : '')}>↻</span>
+    </button>
   )
 }
 

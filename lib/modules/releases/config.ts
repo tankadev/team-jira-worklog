@@ -7,7 +7,12 @@ import { eq } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { settings } from '@/lib/db/schema'
 
-import { DEFAULT_PRODUCTS, DEFAULT_TEAMS, type ProductConfig } from './model'
+import {
+  DEFAULT_PRODUCTS,
+  DEFAULT_TEAMS,
+  type ProductConfig,
+  type ReportExclude,
+} from './model'
 
 /**
  * Products (repos/projects) and teams are per-user config, stored in the shared
@@ -18,11 +23,13 @@ const PREFIX = 'mod:releases:'
 const K = {
   products: `${PREFIX}products`,
   teams: `${PREFIX}teams`,
+  reportExcludes: `${PREFIX}report_excludes`,
 } as const
 
 export interface ReleasesConfig {
   products: ProductConfig[]
   teams: string[]
+  reportExcludes: ReportExclude[]
 }
 
 function getRaw(key: string): string | undefined {
@@ -67,6 +74,19 @@ function parseTeams(raw: string): string[] {
   }
 }
 
+function parseExcludes(raw: string): ReportExclude[] {
+  try {
+    const arr = JSON.parse(raw)
+    if (!Array.isArray(arr)) return []
+    return arr
+      .filter((e) => e && typeof e === 'object')
+      .map((e) => ({ environment: String(e.environment ?? ''), team: String(e.team ?? '') }))
+      .filter((e) => e.environment && e.team)
+  } catch {
+    return []
+  }
+}
+
 export function getReleasesConfig(): ReleasesConfig {
   // Seed only when the key has never been written, so a deliberately-emptied
   // list is not re-populated on the next read.
@@ -80,7 +100,11 @@ export function getReleasesConfig(): ReleasesConfig {
     tRaw = JSON.stringify(DEFAULT_TEAMS)
     setRaw(K.teams, tRaw)
   }
-  return { products: parseProducts(pRaw), teams: parseTeams(tRaw) }
+  return {
+    products: parseProducts(pRaw),
+    teams: parseTeams(tRaw),
+    reportExcludes: parseExcludes(getRaw(K.reportExcludes) ?? ''),
+  }
 }
 
 export function setProducts(list: ProductConfig[]) {
@@ -97,4 +121,11 @@ export function setProducts(list: ProductConfig[]) {
 
 export function setTeams(list: string[]) {
   setRaw(K.teams, JSON.stringify(list.map((t) => t.trim()).filter(Boolean)))
+}
+
+export function setReportExcludes(list: ReportExclude[]) {
+  const clean = list
+    .map((e) => ({ environment: e.environment.trim(), team: e.team.trim() }))
+    .filter((e) => e.environment && e.team)
+  setRaw(K.reportExcludes, JSON.stringify(clean))
 }

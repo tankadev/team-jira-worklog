@@ -144,10 +144,24 @@ CREATE TABLE IF NOT EXISTS release_tasks (
   team         TEXT NOT NULL DEFAULT '',
   environment  TEXT NOT NULL DEFAULT '',
   build_status TEXT NOT NULL DEFAULT '',
+  no_branch    INTEGER NOT NULL DEFAULT 0,
+  ref_id       INTEGER,
   created_at   INTEGER NOT NULL DEFAULT (strftime('%s','now')),
   updated_at   INTEGER NOT NULL DEFAULT (strftime('%s','now'))
 );
 `
+
+/**
+ * Adds a column to an existing table when it is missing. `CREATE TABLE IF NOT
+ * EXISTS` never alters a table that already exists, so a new column on an old
+ * table needs this. Idempotent — checked against the live schema each boot.
+ */
+function ensureColumn(sqlite: Database.Database, table: string, column: string, ddl: string) {
+  const cols = (sqlite.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>).map(
+    (c) => c.name,
+  )
+  if (!cols.includes(column)) sqlite.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`)
+}
 
 function open() {
   fs.mkdirSync(DB_DIR, { recursive: true })
@@ -155,6 +169,8 @@ function open() {
   sqlite.pragma('journal_mode = WAL')
   sqlite.pragma('foreign_keys = ON')
   sqlite.exec(CREATE_TABLES)
+  ensureColumn(sqlite, 'release_tasks', 'no_branch', 'no_branch INTEGER NOT NULL DEFAULT 0')
+  ensureColumn(sqlite, 'release_tasks', 'ref_id', 'ref_id INTEGER')
   return drizzle(sqlite, { schema })
 }
 

@@ -36,6 +36,8 @@ export function listReleaseTasks(): ReleaseTaskRow[] {
       team: r.team,
       environment: r.environment,
       buildStatus: r.buildStatus,
+      noBranch: r.noBranch,
+      refId: r.refId,
     }))
 }
 
@@ -50,6 +52,8 @@ export function saveReleaseTask(input: ReleaseTaskShape & { id?: number }): numb
     team: input.team,
     environment: input.environment,
     buildStatus: input.buildStatus,
+    noBranch: input.noBranch,
+    refId: input.refId,
     updatedAt: stamp,
   }
 

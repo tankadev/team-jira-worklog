@@ -18,6 +18,12 @@ export interface ProductConfig {
 /** Progress of a task's build, low → high. */
 export const BUILD_STATUS = ['đang PR', 'đã merge', 'đã build', 'đã public'] as const
 
+/** "Hide team X at environment Y" in the report (e.g. CXP not shown at Develop). */
+export interface ReportExclude {
+  environment: string
+  team: string
+}
+
 export const DEFAULT_PRODUCTS: ProductConfig[] = [
   { id: 'lite', name: 'Lite', environments: ['CTalk Dev', 'Integration', 'Staging', 'Released'], inReport: true },
   { id: 'matrix', name: 'MatrixRustSDK', environments: ['CTalk Dev', 'Integration', 'Staging', 'Released'], inReport: true },
@@ -35,6 +41,10 @@ export interface ReleaseTaskShape {
   team: string
   environment: string
   buildStatus: string
+  /** No code branch of its own (e.g. Lite just rebuilds against a new SDK). */
+  noBranch: boolean
+  /** Another task this one derives from (e.g. the MatrixRustSDK task). */
+  refId: number | null
 }
 
 interface ReportTask {
@@ -69,7 +79,13 @@ export const REPORTED_STATUS = BUILD_STATUS[BUILD_STATUS.length - 1]
  * *Product block. A task that reached a higher env is also listed under the
  * lower ones ("in or above"), ranked within its own product.
  */
-export function renderReleaseReport(products: ReportProduct[]): string {
+export function renderReleaseReport(
+  products: ReportProduct[],
+  excludes: ReportExclude[] = [],
+): string {
+  const isHidden = (environment: string, team: string) =>
+    excludes.some((e) => e.environment === environment && e.team === team)
+
   // Section order: every environment, in first-appearance order.
   const sections: string[] = []
   for (const p of products) {
@@ -93,6 +109,7 @@ export function renderReleaseReport(products: ReportProduct[]): string {
           const teams = [...new Set(active.map((t) => t.team).filter(Boolean))]
           const lines = teams
             .map((team) => {
+              if (isHidden(env, team)) return null // team hidden at this environment
               const ids = active
                 .filter((t) => t.team === team)
                 .map((t) => t.taskId.trim() || t.description.trim())

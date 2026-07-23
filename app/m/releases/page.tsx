@@ -9,11 +9,11 @@ import { ReleaseBoard } from './board'
 export default async function ReleasesPage() {
   await connection()
   const tasks = listReleaseTasks()
-  const { products, teams } = getReleasesConfig()
+  const { products, teams, reportExcludes } = getReleasesConfig()
 
   return (
     <ModuleGate id="releases">
-      <ReleaseBoard initial={tasks} products={products} teams={teams} />
+      <ReleaseBoard initial={tasks} products={products} teams={teams} reportExcludes={reportExcludes} />
     </ModuleGate>
   )
 }

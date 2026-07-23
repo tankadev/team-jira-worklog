@@ -6,6 +6,7 @@ import { createPortal } from 'react-dom'
 import {
   BUILD_STATUS,
   type ProductConfig,
+  type ReportExclude,
   type ReportProduct,
   renderReleaseReport,
 } from '@/lib/modules/releases/model'
@@ -15,6 +16,7 @@ import {
   patchReleaseTaskAction,
   saveProductsAction,
   saveReleaseTaskAction,
+  saveReportExcludesAction,
   saveTeamsAction,
 } from './actions'
 
@@ -28,6 +30,8 @@ interface Task {
   team: string
   environment: string
   buildStatus: string
+  noBranch: boolean
+  refId: number | null
 }
 
 type Draft = Omit<Task, 'id'> & { id?: number }
@@ -105,10 +109,12 @@ export function ReleaseBoard({
   initial,
   products,
   teams,
+  reportExcludes,
 }: {
   initial: Task[]
   products: ProductConfig[]
   teams: string[]
+  reportExcludes: ReportExclude[]
 }) {
   const [tab, setTab] = useState<'board' | 'config'>(products.length ? 'board' : 'config')
 
@@ -131,7 +137,7 @@ export function ReleaseBoard({
 
       {tab === 'board' ? (
         products.length ? (
-          <Board initial={initial} products={products} teams={teams} />
+          <Board initial={initial} products={products} teams={teams} reportExcludes={reportExcludes} />
         ) : (
           <div className={CARD + ' text-[12.5px] text-ink-2'}>
             Chưa có product nào.{' '}
@@ -149,6 +155,7 @@ export function ReleaseBoard({
         <div className="flex flex-col gap-4">
           <ProductsManager products={products} />
           <TeamsManager teams={teams} />
+          <ExcludesManager products={products} teams={teams} excludes={reportExcludes} />
         </div>
       )}
     </>
@@ -172,7 +179,17 @@ function TabBtn({ on, onClick, children }: { on: boolean; onClick: () => void; c
 
 // ── board ────────────────────────────────────────────────────────────────────
 
-function Board({ initial, products, teams }: { initial: Task[]; products: ProductConfig[]; teams: string[] }) {
+function Board({
+  initial,
+  products,
+  teams,
+  reportExcludes,
+}: {
+  initial: Task[]
+  products: ProductConfig[]
+  teams: string[]
+  reportExcludes: ReportExclude[]
+}) {
   const [tasks, setTasks] = useState<Task[]>(initial)
   const [productName, setProductName] = useState(products[0]?.name ?? '')
   const [team, setTeam] = useState('')
@@ -196,6 +213,17 @@ function Board({ initial, products, teams }: { initial: Task[]; products: Produc
     )
   }, [tasks, product, team, search])
 
+  // One column per environment, plus a catch-all for tasks whose environment
+  // isn't in the product's list any more (e.g. after an env was renamed) — so
+  // they stay visible and fixable instead of silently vanishing.
+  const columns: Array<{ key: string; label: string; tasks: Task[] }> = envs.map((e) => ({
+    key: e,
+    label: e,
+    tasks: visible.filter((t) => t.environment === e),
+  }))
+  const orphans = visible.filter((t) => !envs.includes(t.environment))
+  if (orphans.length) columns.push({ key: '__orphan__', label: '⚠ môi trường lạ', tasks: orphans })
+
   function openNew() {
     setEditing({
       taskId: '',
@@ -206,7 +234,14 @@ function Board({ initial, products, teams }: { initial: Task[]; products: Produc
       team: '',
       environment: envs[0] ?? '',
       buildStatus: BUILD_STATUS[0],
+      noBranch: false,
+      refId: null,
     })
+  }
+
+  const refLabelOf = (id: number) => {
+    const rt = tasks.find((x) => x.id === id)
+    return rt ? `${rt.product} · ${rt.taskId || rt.description || 'task'}` : ''
   }
 
   function move(id: number, environment: string) {
@@ -228,21 +263,33 @@ function Board({ initial, products, teams }: { initial: Task[]; products: Produc
     <>
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <div className="flex overflow-hidden rounded-md border border-line-strong text-[12.5px]">
-          {products.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              onClick={() => setProductName(p.name)}
-              className={
-                'border-l border-line px-3 py-[5px] first:border-l-0 ' +
-                (p.name === product?.name
-                  ? 'bg-accent-soft font-semibold text-accent-ink'
-                  : 'bg-surface text-ink-2 hover:bg-surface-2')
-              }
-            >
-              {p.name}
-            </button>
-          ))}
+          {products.map((p) => {
+            const on = p.name === product?.name
+            const count = tasks.filter((t) => t.product === p.name).length
+            return (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => setProductName(p.name)}
+                className={
+                  'inline-flex items-center gap-1.5 border-l border-line px-3 py-[5px] first:border-l-0 ' +
+                  (on
+                    ? 'bg-accent-soft font-semibold text-accent-ink'
+                    : 'bg-surface text-ink-2 hover:bg-surface-2')
+                }
+              >
+                {p.name}
+                <span
+                  className={
+                    'rounded-full px-1.5 font-mono text-[10px] font-normal ' +
+                    (on ? 'bg-accent text-white' : 'bg-surface-2 text-ink-3')
+                  }
+                >
+                  {count}
+                </span>
+              </button>
+            )
+          })}
         </div>
         <select
           value={team}
@@ -272,14 +319,14 @@ function Board({ initial, products, teams }: { initial: Task[]; products: Produc
 
       <div
         className="grid gap-3 overflow-x-auto pb-2"
-        style={{ gridTemplateColumns: `repeat(${Math.max(envs.length, 1)}, minmax(210px, 1fr))` }}
+        style={{ gridTemplateColumns: `repeat(${Math.max(columns.length, 1)}, minmax(210px, 1fr))` }}
       >
-        {envs.map((env) => {
-          const col = visible.filter((t) => t.environment === env)
+        {columns.map((column) => {
+          const col = column.tasks
           return (
-            <div key={env} className="rounded-[10px] border border-line bg-surface-2 p-2.5">
+            <div key={column.key} className="rounded-[10px] border border-line bg-surface-2 p-2.5">
               <div className="mb-2 flex items-center justify-between">
-                <span className="text-[12px] font-semibold">{env}</span>
+                <span className="text-[12px] font-semibold">{column.label}</span>
                 <span className="rounded-full border border-line bg-surface px-[7px] font-mono text-[10px] text-ink-3">
                   {col.length}
                 </span>
@@ -301,6 +348,7 @@ function Board({ initial, products, teams }: { initial: Task[]; products: Produc
                           key={t.id}
                           task={t}
                           envs={envs}
+                          refLabel={t.refId ? refLabelOf(t.refId) : ''}
                           onMove={(e) => move(t.id, e)}
                           onToggleBuild={(s) => toggleBuild(t.id, s)}
                           onEdit={() => setEditing(t)}
@@ -322,6 +370,7 @@ function Board({ initial, products, teams }: { initial: Task[]; products: Produc
           draft={editing}
           products={products}
           teams={teams}
+          allTasks={tasks}
           onClose={() => setEditing(null)}
           onSaved={(t) => {
             setTasks((list) => [t, ...list.filter((x) => x.id !== t.id)])
@@ -336,7 +385,7 @@ function Board({ initial, products, teams }: { initial: Task[]; products: Produc
 
       {reportOpen && (
         <ReportModal
-          text={renderReleaseReport(buildReportProducts(products, tasks))}
+          text={renderReleaseReport(buildReportProducts(products, tasks), reportExcludes)}
           onClose={() => setReportOpen(false)}
         />
       )}
@@ -347,6 +396,7 @@ function Board({ initial, products, teams }: { initial: Task[]; products: Produc
 function TaskCard({
   task,
   envs,
+  refLabel,
   onMove,
   onToggleBuild,
   onEdit,
@@ -354,6 +404,7 @@ function TaskCard({
 }: {
   task: Task
   envs: string[]
+  refLabel: string
   onMove: (env: string) => void
   onToggleBuild: (buildStatus: string) => void
   onEdit: () => void
@@ -405,10 +456,26 @@ function TaskCard({
         </div>
       </div>
 
-      {task.description && (
-        <div className="truncate text-[11.5px] leading-snug text-ink-3" title={task.description}>
-          {task.description}
+      {task.noBranch ? (
+        <div
+          title={refLabel ? 'Không có nhánh — ref: ' + refLabel : 'Không có nhánh code'}
+          className="flex items-start gap-1 font-mono text-[10.5px] text-ot"
+        >
+          <span className="shrink-0">⊘</span>
+          <span className="break-all">{refLabel || 'không có nhánh code'}</span>
         </div>
+      ) : (
+        task.branchName && (
+          <button
+            type="button"
+            onClick={copyBranch}
+            title={'Copy nhánh: ' + task.branchName}
+            className="flex items-start gap-1 text-left font-mono text-[10.5px] text-ink-3 hover:text-accent-ink"
+          >
+            <span className="shrink-0">{copied ? '✓' : '⑂'}</span>
+            <span className="break-all">{task.branchName}</span>
+          </button>
+        )
       )}
 
       <div className="flex items-center gap-1">
@@ -424,17 +491,6 @@ function TaskCard({
           <span className="font-mono text-[10px] text-ink-3" title={task.subTasks.length + ' subtask'}>
             ≡{task.subTasks.length}
           </span>
-        )}
-        {task.branchName && (
-          <button
-            type="button"
-            onClick={copyBranch}
-            title={'Copy nhánh: ' + task.branchName}
-            className="inline-flex min-w-0 max-w-[120px] items-center gap-0.5 font-mono text-[10px] text-ink-3 hover:text-accent-ink"
-          >
-            <span className="shrink-0">{copied ? '✓' : '⑂'}</span>
-            <span className="truncate">{task.branchName}</span>
-          </button>
         )}
         <select
           value={task.environment}
@@ -459,6 +515,7 @@ function TaskModal({
   draft,
   products,
   teams,
+  allTasks,
   onClose,
   onSaved,
   onDelete,
@@ -466,6 +523,7 @@ function TaskModal({
   draft: Draft
   products: ProductConfig[]
   teams: string[]
+  allTasks: Task[]
   onClose: () => void
   onSaved: (t: Task) => void
   onDelete: (id: number) => void
@@ -494,6 +552,7 @@ function TaskModal({
 
   function save() {
     startSaving(async () => {
+      const refId = d.noBranch ? d.refId : null
       const res = await saveReleaseTaskAction({
         id: d.id,
         taskId: d.taskId,
@@ -504,6 +563,8 @@ function TaskModal({
         team: d.team,
         environment: d.environment,
         buildStatus: d.buildStatus,
+        noBranch: d.noBranch,
+        refId,
       })
       setNote(res)
       if (res.ok && res.id) {
@@ -517,6 +578,8 @@ function TaskModal({
           team: d.team,
           environment: d.environment,
           buildStatus: d.buildStatus,
+          noBranch: d.noBranch,
+          refId,
         })
       }
     })
@@ -615,14 +678,45 @@ function TaskModal({
             </Field>
           </div>
 
-          <Field label="Branch">
-            <input
-              value={d.branchName}
-              onChange={(e) => patch({ branchName: e.target.value })}
-              placeholder="feature/invite-link"
-              className="w-full rounded-md border border-line bg-ground px-2.5 py-1.5 font-mono text-[12.5px]"
-            />
-          </Field>
+          <div className="flex flex-col gap-2">
+            <label className="flex items-center gap-1.5 text-[12px] text-ink-2">
+              <input
+                type="checkbox"
+                checked={d.noBranch}
+                onChange={(e) => patch({ noBranch: e.target.checked })}
+                className="accent-accent"
+              />
+              Không có nhánh code (vd Lite chỉ build theo version)
+            </label>
+
+            {d.noBranch ? (
+              <Field label="Tham chiếu task" hint="task chứa code, vd ở MatrixRustSDK">
+                <select
+                  value={d.refId ?? ''}
+                  onChange={(e) => patch({ refId: e.target.value ? Number(e.target.value) : null })}
+                  className="w-full rounded-md border border-line bg-ground px-2.5 py-1.5 text-[13px]"
+                >
+                  <option value="">— không —</option>
+                  {allTasks
+                    .filter((t) => t.id !== d.id)
+                    .map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.product} · {t.taskId || t.description || 'task'}
+                      </option>
+                    ))}
+                </select>
+              </Field>
+            ) : (
+              <Field label="Branch">
+                <input
+                  value={d.branchName}
+                  onChange={(e) => patch({ branchName: e.target.value })}
+                  placeholder="feature/invite-link"
+                  className="w-full rounded-md border border-line bg-ground px-2.5 py-1.5 font-mono text-[12.5px]"
+                />
+              </Field>
+            )}
+          </div>
 
           <Field label="Subtask" hint="mỗi dòng một cái">
             <textarea
@@ -854,6 +948,96 @@ function TeamsManager({ teams }: { teams: string[] }) {
       <div className="mt-3 flex items-center gap-2">
         <button type="button" onClick={save} disabled={saving} className={BTN_PRI}>
           {saving ? 'Đang lưu…' : 'Lưu teams'}
+        </button>
+        {note && <span className={'text-[12px] ' + (note.ok ? 'text-good' : 'text-crit')}>{note.message}</span>}
+      </div>
+    </section>
+  )
+}
+
+function ExcludesManager({
+  products,
+  teams,
+  excludes,
+}: {
+  products: ProductConfig[]
+  teams: string[]
+  excludes: ReportExclude[]
+}) {
+  const [list, setList] = useState<ReportExclude[]>(excludes)
+  const [note, setNote] = useState<Note>(null)
+  const [saving, startSaving] = useTransition()
+
+  const allEnvs = [...new Set(products.flatMap((p) => p.environments))]
+
+  function patch(i: number, fields: Partial<ReportExclude>) {
+    setList((l) => l.map((e, j) => (j === i ? { ...e, ...fields } : e)))
+  }
+
+  return (
+    <section className={CARD}>
+      <div className={'mb-1 ' + CTITLE}>Report — ẩn team theo môi trường</div>
+      <p className="mb-3 text-[11.5px] text-ink-3">
+        Vd ẩn <b>CXP</b> ở <b>Develop</b>: team đó sẽ không hiện dưới môi trường đó trong report (in-or-above vẫn
+        áp cho các môi trường khác).
+      </p>
+
+      <div className="flex flex-col gap-2">
+        {list.map((e, i) => (
+          <div key={i} className="flex flex-wrap items-center gap-2">
+            <select
+              value={e.environment}
+              onChange={(ev) => patch(i, { environment: ev.target.value })}
+              className="rounded-md border border-line bg-ground px-2.5 py-1 text-[12.5px]"
+            >
+              <option value="">— môi trường —</option>
+              {allEnvs.map((env) => (
+                <option key={env} value={env}>
+                  {env}
+                </option>
+              ))}
+            </select>
+            <span className="text-[11px] text-ink-3">ẩn</span>
+            <select
+              value={e.team}
+              onChange={(ev) => patch(i, { team: ev.target.value })}
+              className="rounded-md border border-line bg-ground px-2.5 py-1 text-[12.5px]"
+            >
+              <option value="">— team —</option>
+              {teams.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => setList((l) => l.filter((_, j) => j !== i))}
+              aria-label="Xoá quy tắc"
+              className="grid size-6 place-items-center rounded-md text-[15px] leading-none text-ink-3 hover:bg-surface-2 hover:text-crit"
+            >
+              ×
+            </button>
+          </div>
+        ))}
+        {list.length === 0 && <p className="text-[11.5px] text-ink-3">Chưa có quy tắc nào.</p>}
+      </div>
+
+      <div className="mt-3 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setList((l) => [...l, { environment: '', team: '' }])}
+          className={BTN}
+        >
+          + Quy tắc
+        </button>
+        <button
+          type="button"
+          onClick={() => startSaving(async () => setNote(await saveReportExcludesAction(list)))}
+          disabled={saving}
+          className={BTN_PRI}
+        >
+          {saving ? 'Đang lưu…' : 'Lưu quy tắc'}
         </button>
         {note && <span className={'text-[12px] ' + (note.ok ? 'text-good' : 'text-crit')}>{note.message}</span>}
       </div>

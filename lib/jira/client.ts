@@ -53,19 +53,46 @@ function describeError(status: number, body: unknown): string {
 
 export interface JiraFetchOptions extends Omit<RequestInit, 'body'> {
   body?: unknown
+  /** Bypass the short read cache — for reads that must reflect a just-made change. */
+  fresh?: boolean
   creds?: JiraCreds
 }
 
 /**
- * Every Jira call goes through here. `cache: 'no-store'` is deliberate — this is
- * a live view over Jira and a cached read would silently show stale worklogs.
+ * Short-lived read cache.
+ *
+ * The underlying fetch stays `cache: 'no-store'` — this layer is our own so we
+ * control it exactly. GET responses are held for a few seconds so flipping
+ * between screens doesn't re-hit Jira every time; ANY write clears the whole
+ * cache, so a change is never hidden behind a stale read. Stashed on globalThis
+ * so a dev hot-reload keeps the cache instead of leaking a new Map.
  */
+const JIRA_TTL_MS = 30_000
+interface JiraCacheEntry {
+  at: number
+  data: unknown
+}
+const globalForJira = globalThis as unknown as { __jiraReadCache?: Map<string, JiraCacheEntry> }
+const readCache: Map<string, JiraCacheEntry> = globalForJira.__jiraReadCache ?? new Map()
+globalForJira.__jiraReadCache = readCache
+
+/** Drops every cached read — used on writes and by the manual "Làm mới". */
+export function clearJiraCache() {
+  readCache.clear()
+}
+
 export async function jiraFetch<T = unknown>(path: string, options: JiraFetchOptions = {}): Promise<T> {
-  const { body, creds: given, headers, ...rest } = options
+  const { body, creds: given, headers, fresh, ...rest } = options
   const creds = given ?? readCreds()
   if (!creds) throw new JiraError('Chưa cấu hình Jira — vào Settings điền URL, email và API token', 0, path)
 
   const url = path.startsWith('http') ? path : `${creds.baseUrl}${path}`
+  const isRead = (rest.method ?? 'GET').toUpperCase() === 'GET' && body === undefined
+
+  if (isRead && !fresh) {
+    const hit = readCache.get(url)
+    if (hit && Date.now() - hit.at < JIRA_TTL_MS) return hit.data as T
+  }
 
   const res = await fetch(url, {
     ...rest,
@@ -79,6 +106,9 @@ export async function jiraFetch<T = unknown>(path: string, options: JiraFetchOpt
     ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
   })
 
+  // A successful write can change what any read returns — invalidate everything.
+  if (!isRead && (res.ok || res.status === 204)) readCache.clear()
+
   // 204 is the documented success response for a transition.
   if (res.status === 204) return undefined as T
 
@@ -88,6 +118,8 @@ export async function jiraFetch<T = unknown>(path: string, options: JiraFetchOpt
     : await res.text()
 
   if (!res.ok) throw new JiraError(describeError(res.status, payload), res.status, url, payload)
+
+  if (isRead) readCache.set(url, { at: Date.now(), data: payload })
 
   return payload as T
 }
@@ -140,7 +172,8 @@ export async function searchJql<T = JiraIssue>(
 
     const page = await jiraFetch<{ issues?: T[]; nextPageToken?: string | null }>(
       `/rest/api/3/search/jql?${params}`,
-      { creds: opts.creds },
+      // A reconcile read must see the just-written issue — never a cached page.
+      { creds: opts.creds, fresh: (opts.reconcileIssues?.length ?? 0) > 0 },
     )
 
     out.push(...(page.issues ?? []))

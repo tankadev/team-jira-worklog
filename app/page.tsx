@@ -30,9 +30,12 @@ export default async function BoardPage(props: PageProps<'/'>) {
   const sp = await props.searchParams
   const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v)
 
+  // `getMyself` and `getSprints` don't depend on each other, so fetch both at
+  // once — one fewer serial Jira round-trip before the board can render.
   let me
+  let sprintsResult
   try {
-    me = await getMyself()
+    ;[me, sprintsResult] = await Promise.all([getMyself(), getSprints()])
   } catch (error) {
     return <ConnectionProblem error={error} />
   }
@@ -48,7 +51,7 @@ export default async function BoardPage(props: PageProps<'/'>) {
   // up — which looked like the create had silently failed.
   const reconcileIds = (one(sp.reconcile) ?? '').split(',').filter(Boolean)
 
-  const { sprints, current } = await getSprints()
+  const { sprints, current } = sprintsResult
   const sprintParam = one(sp.sprint)
   // Three states, not two: a specific sprint, every sprint, or a date that sits
   // outside every sprint — which must not silently fall back to "every".
