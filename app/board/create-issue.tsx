@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { createPortal } from 'react-dom'
 
 import { createIssueAction, generateAction } from '@/app/new/actions'
@@ -118,6 +118,13 @@ function CreateIssueModal({
 
   const [note, setNote] = useState<{ ok: boolean; message: string } | null>(null)
   const [created, setCreated] = useState<Array<{ key: string; url: string; id: string }>>([])
+  /**
+   * The issue created by the last click, or null once the user starts the next
+   * one. Drives the prominent success banner so a finished create is impossible
+   * to miss — the reason a second, accidental click used to slip through.
+   */
+  const [justCreated, setJustCreated] = useState<{ key: string; url: string } | null>(null)
+  const ideaRef = useRef<HTMLTextAreaElement>(null)
   const [generating, startGenerating] = useTransition()
   const [creating, startCreating] = useTransition()
 
@@ -147,6 +154,13 @@ function CreateIssueModal({
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
   }, [onClose])
+
+  // Land the cursor back in the first field after a create, so the reset form
+  // reads as "ready for the next one" instead of an unchanged, already-submitted
+  // one. New object each time means a run of creates re-focuses every time.
+  useEffect(() => {
+    if (justCreated) ideaRef.current?.focus()
+  }, [justCreated])
 
   const fullTitle = useMemo(() => {
     const px = picked.join('')
@@ -179,6 +193,7 @@ function CreateIssueModal({
 
 
   function applyTemplate(t: Template) {
+    setJustCreated(null)
     setTitle(t.title)
     setDescription(t.description)
     setDod(t.dod)
@@ -192,6 +207,7 @@ function CreateIssueModal({
   }
 
   function generate() {
+    setJustCreated(null)
     startGenerating(async () => {
       const res = await generateAction(idea, ctx?.parent.summary)
       setNote(res)
@@ -221,8 +237,11 @@ function CreateIssueModal({
         storyPoints: isTask ? null : points,
         assignToMe: true,
       })
-      setNote(res)
       if (res.ok && res.key && res.url) {
+        // The banner carries success now; a duplicate green note in the footer
+        // would just compete with it.
+        setNote(null)
+        setJustCreated({ key: res.key, url: res.url })
         const next = [...created, { key: res.key, url: res.url, id: res.id ?? '' }]
         setCreated(next)
         setTitle('')
@@ -241,11 +260,17 @@ function CreateIssueModal({
         } else {
           refresh()
         }
+      } else {
+        setNote(res)
       }
     })
   }
 
-  const canCreate = Boolean(fullTitle && ctx?.issueTypeId && !creating)
+  // Requires a real title, not just a lingering prefix chip: after a create the
+  // title clears but the sprint prefix stays, so keying `canCreate` off the
+  // combined string would leave the button armed to fire a prefix-only issue on
+  // an accidental second click.
+  const canCreate = Boolean(title.trim() && ctx?.issueTypeId && !creating)
 
   // Rendered through the body, not inline: the button lives inside the board's
   // NavDimmer, so a plain child would fade to opacity-40 the moment a successful
@@ -290,6 +315,30 @@ function CreateIssueModal({
             </p>
           )}
 
+          {justCreated && (
+            <div
+              role="status"
+              aria-live="polite"
+              className="mb-4 flex items-center gap-2.5 rounded-lg border border-good/50 bg-good-soft px-3 py-2.5"
+            >
+              <span className="grid size-6 shrink-0 place-items-center rounded-full bg-good text-[13px] font-bold text-white">
+                ✓
+              </span>
+              <div className="text-[12.5px] leading-snug text-ink">
+                Đã tạo{' '}
+                <a
+                  href={justCreated.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-mono font-semibold text-good underline-offset-2 hover:underline"
+                >
+                  {justCreated.key}
+                </a>{' '}
+                thành công. Form đã xoá trắng, sẵn sàng cho task tiếp theo.
+              </div>
+            </div>
+          )}
+
           {ctx && (
             <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_268px]">
               {/* ── content ── */}
@@ -297,10 +346,14 @@ function CreateIssueModal({
                 <Field label="Bạn định làm gì?">
                   <div className="flex items-start gap-2">
                     <textarea
+                      ref={ideaRef}
                       rows={2}
                       autoFocus
                       value={idea}
-                      onChange={(e) => setIdea(e.target.value)}
+                      onChange={(e) => {
+                        setJustCreated(null)
+                        setIdea(e.target.value)
+                      }}
                       placeholder="viết unit test cho luồng exclude types…"
                       className="w-full resize-y rounded-md border border-line bg-ground px-2.5 py-1.5 text-[13px] leading-relaxed"
                     />
@@ -318,7 +371,10 @@ function CreateIssueModal({
                 <Field label="Title" hint="không gõ tiền tố ở đây">
                   <input
                     value={title}
-                    onChange={(e) => setTitle(e.target.value)}
+                    onChange={(e) => {
+                      setJustCreated(null)
+                      setTitle(e.target.value)
+                    }}
                     className="w-full rounded-md border border-line bg-ground px-2.5 py-1.5 text-[13.5px]"
                   />
                   {fullTitle && (
