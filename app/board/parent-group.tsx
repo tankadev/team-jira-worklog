@@ -94,7 +94,7 @@ export function ParentGroup({
             <PointsRollup
               value={group.storyPoints}
               childTotal={group.childPointsTotal}
-              childCount={group.subtasks.length}
+              childCount={group.childCount}
             />
           </div>
         )}

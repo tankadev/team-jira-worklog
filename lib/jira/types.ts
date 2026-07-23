@@ -30,8 +30,15 @@ export interface BoardParent {
   epicName: string | null
   /** What the parent currently records. */
   storyPoints: number | null
-  /** Sum of its children's points — what it *should* record. */
+  /**
+   * Sum of its children's points — what it *should* record. Always the total
+   * over every child, even when the board hides Done subtasks, so the "save"
+   * suggestion never proposes overwriting the parent with a filtered subtotal.
+   */
   childPointsTotal: number
+  /** How many children the parent has in total, matching `childPointsTotal`. */
+  childCount: number
+  /** The children shown on the board — narrowed by the status filter. */
   subtasks: BoardSubtask[]
 }
 

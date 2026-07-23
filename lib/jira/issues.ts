@@ -116,13 +116,21 @@ export async function getBoard(query: BoardQuery = {}): Promise<BoardParent[]> {
     loggedTodaySeconds: 0,
   }))
 
-  return groupByParent(subtasks, issues, meta.storyPointsFieldId)
+  // When the board hides Done subtasks, the fetched list is a subset of each
+  // parent's children — so the child-points sum must be recovered separately,
+  // otherwise the "save" suggestion would offer to overwrite the parent with a
+  // filtered subtotal.
+  const childrenFiltered = query.status !== 'all'
+  return groupByParent(subtasks, issues, meta.storyPointsFieldId, projectKey, childrenFiltered)
 }
 
 async function groupByParent(
   subtasks: BoardSubtask[],
   issues: JiraIssue[],
   storyPointsFieldId: string | null,
+  projectKey: string,
+  /** True when Done children were excluded from `subtasks` by the status filter. */
+  childrenFiltered: boolean,
 ): Promise<BoardParent[]> {
   const parentInfo = new Map<
     string,
@@ -186,12 +194,49 @@ async function groupByParent(
         epicName: info?.epicName ?? null,
         storyPoints: parentPoints.get(key) ?? null,
         childPointsTotal: 0,
+        childCount: 0,
         subtasks: [],
       })
     }
     const group = groups.get(key)!
     group.subtasks.push(st)
     group.childPointsTotal += st.storyPoints ?? 0
+    group.childCount += 1
+  }
+
+  // The displayed list may be missing Done children, which would undercount the
+  // rollup. Recover the true totals from a lightweight all-status query over the
+  // same parents (same assignee scope as the board), leaving the shown rows as-is.
+  if (childrenFiltered && storyPointsFieldId && keys.length) {
+    const totals = new Map<string, { points: number; count: number }>()
+    const CHUNK = 50
+    const batches: Promise<JiraIssue[]>[] = []
+    for (let i = 0; i < keys.length; i += CHUNK) {
+      const chunk = keys.slice(i, i + CHUNK).map((k) => `"${k}"`).join(',')
+      batches.push(
+        searchJql<JiraIssue>(
+          `project = "${escapeJql(projectKey)}" AND assignee = currentUser() AND ` +
+            `issuetype in subTaskIssueTypes() AND parent in (${chunk})`,
+          ['parent', storyPointsFieldId],
+          { limit: 200 },
+        ),
+      )
+    }
+    for (const child of (await Promise.all(batches)).flat()) {
+      const pk = child.fields.parent?.key
+      if (!pk) continue
+      const agg = totals.get(pk) ?? { points: 0, count: 0 }
+      agg.points += num(child.fields[storyPointsFieldId]) ?? 0
+      agg.count += 1
+      totals.set(pk, agg)
+    }
+    for (const group of groups.values()) {
+      const agg = totals.get(group.key)
+      if (agg) {
+        group.childPointsTotal = agg.points
+        group.childCount = agg.count
+      }
+    }
   }
 
   return [...groups.values()]
