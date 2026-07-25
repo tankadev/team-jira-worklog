@@ -46,6 +46,11 @@ export default async function BoardPage(props: PageProps<'/'>) {
   const search = one(sp.q) ?? ''
   const epicFilter = one(sp.epic) ?? ''
   const parentFilter = one(sp.parent) ?? ''
+  // How the three levels are ordered by creation date. 'new' (default) puts the
+  // most recently created task at the top; 'old' flips it. Remembered per
+  // browser by <BoardFilters>.
+  const sort = one(sp.sort) === 'old' ? 'old' : 'new'
+  const newestFirst = sort === 'new'
   // Ids of issues created moments ago. Jira's search is eventually consistent,
   // so without these a brand-new subtask stays invisible until the index catches
   // up — which looked like the create had silently failed.
@@ -116,6 +121,12 @@ export default async function BoardPage(props: PageProps<'/'>) {
     (g) =>
       (!epicFilter || g.epicKey === epicFilter) && (!parentFilter || g.key === parentFilter),
   )
+
+  // Order subtasks within each parent, then the parents themselves, by creation
+  // date in the chosen direction; epics get ordered inside groupByEpic.
+  const dir = newestFirst ? -1 : 1
+  for (const g of visibleBoard) g.subtasks.sort((a, b) => (a.created - b.created) * dir)
+  const sortedParents = [...visibleBoard].sort((a, b) => (a.created - b.created) * dir)
 
   const coveredParents = new Set(board.map((g) => g.key))
   const uncovered = sprintTasks
@@ -203,6 +214,7 @@ export default async function BoardPage(props: PageProps<'/'>) {
             epicKey={epicFilter}
             parents={parentOptions}
             parentKey={parentFilter}
+            sort={sort}
           />
 
           <NavDimmer>
@@ -216,7 +228,7 @@ export default async function BoardPage(props: PageProps<'/'>) {
             />
           ) : (
             <div className="flex flex-col gap-4">
-              {groupByEpic(visibleBoard).map((epic) => (
+              {groupByEpic(sortedParents, newestFirst).map((epic) => (
                 <div key={epic.key ?? '__none__'}>
                   <EpicHeader group={epic} boardSprintId={sprintId} />
                   <div className="flex flex-col gap-3">

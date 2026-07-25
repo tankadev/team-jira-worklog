@@ -65,6 +65,73 @@ export interface ReportProduct {
 /** Only fully-shipped tasks reach the report — the last build stage. */
 export const REPORTED_STATUS = BUILD_STATUS[BUILD_STATUS.length - 1]
 
+/** The stage where a build exists and is ready to hand to testers. */
+export const BUILT_STATUS = BUILD_STATUS[2] // 'đã build'
+
+/** The task fields the "What to Test" seed needs. */
+export interface BuiltTaskLike {
+  team: string
+  taskId: string
+  description: string
+  product: string
+  environment: string
+  buildStatus: string
+}
+
+/**
+ * Groups tasks by team as TestFlight-ready lines:
+ *
+ *   - Hir: VTL-456, VTL-555
+ *   - CTalk: VTL-222
+ *
+ * Uses the task id, falling back to the description when a task has no id. Teams
+ * appear in first-seen order.
+ */
+function groupByTeam(tasks: BuiltTaskLike[]): string {
+  const teams = [...new Set(tasks.map((t) => t.team).filter(Boolean))]
+  return teams
+    .map((team) => {
+      const ids = tasks
+        .filter((t) => t.team === team)
+        .map((t) => t.taskId.trim() || t.description.trim())
+        .filter(Boolean)
+        .join(', ')
+      return ids ? `- ${team}: ${ids}` : null
+    })
+    .filter(Boolean)
+    .join('\n')
+}
+
+/** Every "đã build" task grouped by team — the unscoped seed. */
+export function renderBuiltTasksByTeam(tasks: BuiltTaskLike[]): string {
+  return groupByTeam(tasks.filter((t) => t.buildStatus === BUILT_STATUS))
+}
+
+/**
+ * "What to Test" seed for one iOS app, scoped to the product and environment the
+ * app is mapped to. A build at a given environment carries every "đã build" task
+ * of that product that has reached that environment or higher — the same
+ * "in or above" rule the status report uses — grouped by team.
+ *
+ * With no environment mapping (or one the product no longer lists), the env
+ * filter is dropped and all of the product's built tasks are used.
+ */
+export function renderBuiltForApp(
+  tasks: BuiltTaskLike[],
+  productName: string,
+  environment: string,
+  environments: string[],
+): string {
+  const rankHere = environments.indexOf(environment)
+  const active = tasks.filter(
+    (t) =>
+      t.product === productName &&
+      t.buildStatus === BUILT_STATUS &&
+      (rankHere < 0 || environments.indexOf(t.environment) >= rankHere),
+  )
+  return groupByTeam(active)
+}
+
 /**
  * Copy-ready status report, in the shape the original task-tracking tool used:
  *

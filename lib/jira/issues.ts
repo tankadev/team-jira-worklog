@@ -12,6 +12,11 @@ function num(v: unknown): number | null {
   return typeof v === 'number' ? v : null
 }
 
+/** Parses a Jira `created` timestamp to epoch ms; 0 when missing or unparseable. */
+function ms(v: unknown): number {
+  return typeof v === 'string' ? Date.parse(v) || 0 : 0
+}
+
 function escapeJql(value: string): string {
   return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
 }
@@ -73,7 +78,7 @@ export async function getBoard(query: BoardQuery = {}): Promise<BoardParent[]> {
     base.push(`(summary ~ "${term}*" OR key = "${term}")`)
   }
 
-  const fields = ['summary', 'status', 'parent', 'issuetype', 'timespent']
+  const fields = ['summary', 'status', 'parent', 'issuetype', 'timespent', 'created']
   if (meta.storyPointsFieldId) fields.push(meta.storyPointsFieldId)
 
   let issues: JiraIssue[]
@@ -114,6 +119,7 @@ export async function getBoard(query: BoardQuery = {}): Promise<BoardParent[]> {
     storyPoints: meta.storyPointsFieldId ? num(issue.fields[meta.storyPointsFieldId]) : null,
     timeSpentSeconds: issue.fields.timespent ?? 0,
     loggedTodaySeconds: 0,
+    created: ms(issue.fields.created),
   }))
 
   // When the board hides Done subtasks, the fetched list is a subset of each
@@ -140,6 +146,7 @@ async function groupByParent(
       statusName: string
       epicKey: string | null
       epicName: string | null
+      created: number
     }
   >()
   for (const issue of issues) {
@@ -151,6 +158,9 @@ async function groupByParent(
         statusName: '',
         epicKey: null,
         epicName: null,
+        // A child's `parent` object carries no created date — the direct fetch
+        // below fills it in.
+        created: 0,
       })
     }
   }
@@ -160,20 +170,23 @@ async function groupByParent(
   // point of showing the parent row — cannot be computed.
   const parentPoints = new Map<string, number | null>()
   const keys = [...parentInfo.keys()]
-  if (keys.length && storyPointsFieldId) {
+  if (keys.length) {
+    const fields = ['summary', 'issuetype', 'parent', 'status', 'created']
+    if (storyPointsFieldId) fields.push(storyPointsFieldId)
     const fetched = await searchJql<JiraIssue>(
       `key in (${keys.map((k) => `"${k}"`).join(',')})`,
-      ['summary', 'issuetype', 'parent', 'status', storyPointsFieldId],
+      fields,
       { limit: keys.length },
     )
     for (const p of fetched) {
-      parentPoints.set(p.key, num(p.fields[storyPointsFieldId]))
+      parentPoints.set(p.key, storyPointsFieldId ? num(p.fields[storyPointsFieldId]) : null)
       parentInfo.set(p.key, {
         summary: p.fields.summary ?? parentInfo.get(p.key)?.summary ?? '',
         issueTypeName: p.fields.issuetype?.name ?? 'Task',
         statusName: p.fields.status?.name ?? '',
         epicKey: p.fields.parent?.key ?? null,
         epicName: p.fields.parent?.fields?.summary ?? null,
+        created: ms(p.fields.created),
       })
     }
   }
@@ -195,6 +208,7 @@ async function groupByParent(
         storyPoints: parentPoints.get(key) ?? null,
         childPointsTotal: 0,
         childCount: 0,
+        created: info?.created ?? 0,
         subtasks: [],
       })
     }

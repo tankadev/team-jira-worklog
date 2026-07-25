@@ -18,7 +18,7 @@ export interface EpicGroup {
  * boxing eats the width those need. Two levels of card plus a light epic rule
  * reads as three levels without costing horizontal room.
  */
-export function groupByEpic(parents: BoardParent[]): EpicGroup[] {
+export function groupByEpic(parents: BoardParent[], newestFirst = true): EpicGroup[] {
   const groups = new Map<string, EpicGroup>()
 
   for (const parent of parents) {
@@ -33,11 +33,17 @@ export function groupByEpic(parents: BoardParent[]): EpicGroup[] {
     groups.get(key)!.parents.push(parent)
   }
 
-  // Largest epics first; the catch-all bucket always sinks to the bottom.
+  // Order epics by the created date of their leading task, matching the chosen
+  // direction — newest-first ranks by the newest task, oldest-first by the
+  // oldest — so the sort reads consistently at every level. `parents` arrives
+  // pre-sorted, so its first entry is that leading task. The catch-all bucket
+  // ("not in any epic") always sinks to the bottom.
   return [...groups.values()].sort((a, b) => {
     if (!a.key) return 1
     if (!b.key) return -1
-    return b.parents.length - a.parents.length
+    const at = a.parents[0]?.created ?? 0
+    const bt = b.parents[0]?.created ?? 0
+    return newestFirst ? bt - at : at - bt
   })
 }
 

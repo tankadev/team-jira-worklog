@@ -19,6 +19,9 @@ function dm(iso: string | null) {
   return iso ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}` : ''
 }
 
+/** Remembers the board's created-date sort direction per browser. */
+const SORT_KEY = 'board:sort'
+
 export function BoardFilters({
   sprints,
   sprintId,
@@ -29,6 +32,7 @@ export function BoardFilters({
   epicKey,
   parents,
   parentKey,
+  sort,
 }: {
   sprints: SprintOption[]
   sprintId: number | null
@@ -39,6 +43,7 @@ export function BoardFilters({
   epicKey: string
   parents: Array<{ key: string; summary: string }>
   parentKey: string
+  sort: string
 }) {
   const params = useSearchParams()
   const { navigate, pending } = useNav()
@@ -46,11 +51,41 @@ export function BoardFilters({
 
   useEffect(() => setTerm(search), [search])
 
+  // Re-apply a remembered non-default sort when the URL hasn't pinned one, so
+  // the choice survives across sessions. Only 'old' needs restoring — 'new' is
+  // the server default, so it never has to touch the URL.
+  useEffect(() => {
+    if (params.has('sort')) return
+    let saved: string | null = null
+    try {
+      saved = localStorage.getItem(SORT_KEY)
+    } catch {
+      saved = null
+    }
+    if (saved === 'old') {
+      const q = new URLSearchParams(params.toString())
+      q.set('sort', 'old')
+      navigate(`/?${q}`)
+    }
+    // Mount-only: restoring once is the whole intent.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   function set(key: string, value: string | null) {
     const q = new URLSearchParams(params.toString())
     if (value === null || value === '') q.delete(key)
     else q.set(key, value)
     navigate(q.size ? `/?${q}` : '/')
+  }
+
+  function pickSort(value: string) {
+    try {
+      localStorage.setItem(SORT_KEY, value)
+    } catch {
+      // Private mode / disabled storage — the choice just won't be remembered.
+    }
+    // 'new' is the default, so drop the param rather than pinning it.
+    set('sort', value === 'new' ? null : 'old')
   }
 
   /**
@@ -128,6 +163,17 @@ export function BoardFilters({
         <option value="all">Mọi trạng thái</option>
       </select>
 
+      <select
+        className={control}
+        disabled={pending}
+        value={sort}
+        onChange={(e) => pickSort(e.target.value)}
+        title="Sắp xếp epic, task cha và task con theo ngày tạo"
+      >
+        <option value="new">Mới nhất trước</option>
+        <option value="old">Cũ nhất trước</option>
+      </select>
+
       {epics.length > 1 && (
         <select
           className={control + ' max-w-[190px]'}
@@ -184,7 +230,8 @@ export function BoardFilters({
 
       {(search || sprintId === null || status === 'all' || epicKey || parentKey) && (
         <button
-          onClick={() => navigate('/')}
+          // Keep the sort preference — it's a display choice, not a filter.
+          onClick={() => navigate(sort === 'old' ? '/?sort=old' : '/')}
           disabled={pending}
           className="rounded-md border border-line px-[9px] py-[5px] text-[12.5px] text-ink-3 hover:border-line-strong hover:text-ink disabled:opacity-60"
         >

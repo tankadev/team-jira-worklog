@@ -5,7 +5,7 @@ import { desc, eq, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { releaseTasks } from '@/lib/db/schema'
 
-import type { ReleaseTaskShape } from './model'
+import { BUILT_STATUS, REPORTED_STATUS, type ReleaseTaskShape } from './model'
 
 export interface ReleaseTaskRow extends ReleaseTaskShape {
   id: number
@@ -74,4 +74,31 @@ export function patchReleaseTask(id: number, patch: { environment?: string; buil
 
 export function deleteReleaseTask(id: number) {
   db.delete(releaseTasks).where(eq(releaseTasks.id, id)).run()
+}
+
+/** Whether `token` appears in `text` as a standalone id (bounded by non-alnum). */
+function mentions(text: string, token: string): boolean {
+  const esc = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return new RegExp(`(^|[^A-Za-z0-9])${esc}([^A-Za-z0-9]|$)`, 'i').test(text)
+}
+
+/**
+ * Promote every "đã build" task whose id is named in `text` to "đã public",
+ * returning the ids moved. Called when an iOS build ships to testers — the
+ * What-to-Test text lists exactly those tasks. Restricted to the "đã build"
+ * stage so a stray mention can't jump a task straight from "đang PR" to public,
+ * which also makes a repeat submit a no-op.
+ */
+export function publishBuiltTasksMentioned(text: string): string[] {
+  if (!text.trim()) return []
+  const promoted: string[] = []
+  for (const r of listReleaseTasks()) {
+    if (r.buildStatus !== BUILT_STATUS) continue
+    const id = r.taskId.trim()
+    if (id && mentions(text, id)) {
+      patchReleaseTask(r.id, { buildStatus: REPORTED_STATUS })
+      promoted.push(id)
+    }
+  }
+  return promoted
 }

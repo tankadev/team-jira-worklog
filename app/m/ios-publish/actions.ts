@@ -22,6 +22,7 @@ import {
   submitToExternalTesting,
 } from '@/lib/modules/ios-publish/asc'
 import { recordIosLog } from '@/lib/modules/ios-publish/store'
+import { publishBuiltTasksMentioned } from '@/lib/modules/releases/store'
 
 export interface IosResult {
   ok: boolean
@@ -94,6 +95,8 @@ export async function saveAppPresetAction(input: {
   version: string
   groups: string[]
   roomIds: string
+  product: string
+  environment: string
 }): Promise<AppResult> {
   if (!enabled()) return { ok: false, message: 'Module đang tắt' }
   if (!input.name.trim()) return { ok: false, message: 'Điền tên app' }
@@ -200,7 +203,18 @@ export async function submitBuildAction(input: PublishInput): Promise<IosResult>
       message: outcome.message,
     })
     revalidatePath('/m/ios-publish')
-    return { ok: outcome.done, message: outcome.message, status: outcome.status }
+
+    // Shipping to testers means these tasks are now public — flip them on the
+    // releases board so its status stays in sync with what actually went out.
+    let message = outcome.message
+    if (outcome.done && isModuleEnabled('releases')) {
+      const promoted = publishBuiltTasksMentioned(input.content)
+      if (promoted.length) {
+        revalidatePath('/m/releases')
+        message += ` · ${promoted.length} task → đã public`
+      }
+    }
+    return { ok: outcome.done, message, status: outcome.status }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Submit thất bại'
     recordIosLog({

@@ -3,6 +3,9 @@ import { connection } from 'next/server'
 import { ModuleGate } from '@/lib/modules/gate'
 import { getIosConfig, isIosConfigured, toProfileView } from '@/lib/modules/ios-publish/config'
 import { listIosLog } from '@/lib/modules/ios-publish/store'
+import { getReleasesConfig } from '@/lib/modules/releases/config'
+import { renderBuiltForApp, renderBuiltTasksByTeam } from '@/lib/modules/releases/model'
+import { listReleaseTasks } from '@/lib/modules/releases/store'
 
 import { IosPublish } from './form'
 
@@ -29,6 +32,20 @@ export default async function IosPublishPage() {
     when: when.format(new Date(e.createdAt * 1000)),
   }))
 
+  // "What to Test" seeds from the releases module's "đã build" tasks. Each app
+  // maps to a product + environment, so its seed is scoped to that slice; an
+  // app with no mapping falls back to every built task.
+  const tasks = listReleaseTasks()
+  const products = getReleasesConfig().products
+  const envByProduct = new Map(products.map((p) => [p.name, p.environments]))
+  const suggestions: Record<string, string> = {}
+  for (const app of cfg.apps) {
+    suggestions[app.id] = app.product
+      ? renderBuiltForApp(tasks, app.product, app.environment, envByProduct.get(app.product) ?? [])
+      : renderBuiltTasksByTeam(tasks)
+  }
+  const releaseProducts = products.map((p) => ({ name: p.name, environments: p.environments }))
+
   return (
     <ModuleGate id="ios-publish">
       <IosPublish
@@ -40,6 +57,8 @@ export default async function IosPublishPage() {
           hasWebhook: Boolean(cfg.chatWebhook),
         }}
         log={log}
+        suggestions={suggestions}
+        releaseProducts={releaseProducts}
       />
     </ModuleGate>
   )

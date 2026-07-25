@@ -61,6 +61,16 @@ export interface AppPreset {
   groups: string[]
   /** Comma-separated room ids the build announcement goes to. */
   roomIds: string
+  /**
+   * Releases-module product name this build corresponds to (e.g. "Lite"). Used
+   * to seed "What to Test" from that product's built tasks. Empty = not mapped.
+   */
+  product: string
+  /**
+   * Which of the product's environments this build targets (e.g. "CTalk Dev").
+   * Scopes the "What to Test" seed to tasks at that environment or above.
+   */
+  environment: string
 }
 
 export interface IosConfig {
@@ -103,6 +113,8 @@ function parseApps(raw: string): AppPreset[] {
     version: String(a.version ?? ''),
     groups: Array.isArray(a.groups) ? a.groups.map((g) => String(g)).filter(Boolean) : [],
     roomIds: String(a.roomIds ?? ''),
+    product: String(a.product ?? ''),
+    environment: String(a.environment ?? ''),
   })).filter((a) => a.id)
 }
 
@@ -200,6 +212,8 @@ export function saveAppPreset(input: {
   version: string
   groups: string[]
   roomIds: string
+  product: string
+  environment: string
 }): AppPreset {
   const list = listApps()
   const clean = {
@@ -208,6 +222,8 @@ export function saveAppPreset(input: {
     version: input.version.trim(),
     groups: input.groups.map((g) => g.trim()).filter(Boolean),
     roomIds: input.roomIds.trim(),
+    product: input.product.trim(),
+    environment: input.environment.trim(),
   }
 
   if (input.id) {

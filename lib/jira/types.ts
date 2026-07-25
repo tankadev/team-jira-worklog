@@ -18,6 +18,8 @@ export interface BoardSubtask {
   timeSpentSeconds: number
   /** Logged by this user on the selected day; filled in by the worklog pass. */
   loggedTodaySeconds: number
+  /** Creation time as epoch ms, for the board's created-date sort. 0 if unknown. */
+  created: number
 }
 
 export interface BoardParent {
@@ -38,6 +40,8 @@ export interface BoardParent {
   childPointsTotal: number
   /** How many children the parent has in total, matching `childPointsTotal`. */
   childCount: number
+  /** Creation time as epoch ms, for the board's created-date sort. 0 if unknown. */
+  created: number
   /** The children shown on the board — narrowed by the status filter. */
   subtasks: BoardSubtask[]
 }

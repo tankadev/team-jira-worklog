@@ -23,6 +23,12 @@ interface ConfigView {
   chatTemplate: string
 }
 
+/** A releases-module product an app can map to, with its ordered environments. */
+interface ReleaseProduct {
+  name: string
+  environments: string[]
+}
+
 interface LogRow {
   id: number
   appName: string
@@ -37,6 +43,16 @@ interface LogRow {
 /** Remembers the Publish tab's account filter per browser, so it re-selects it. */
 const FILTER_KEY = 'mod:ios-publish:publish-filter'
 
+/** Remembers the last selected app, so navigating away and back keeps it. */
+const APP_KEY = 'mod:ios-publish:publish-app'
+
+/**
+ * Per-app cache of the two fields typed fresh each publish — build number and
+ * "What to Test". Keyed by app id so a half-written note survives leaving the
+ * page, and the next app doesn't inherit the previous one's build note.
+ */
+const DRAFT_PREFIX = 'mod:ios-publish:draft:'
+
 const CARD = 'rounded-[9px] border border-line bg-surface p-[17px]'
 const CTITLE = 'font-mono text-[10.5px] uppercase tracking-[0.09em] text-ink-3'
 const INPUT = 'w-full rounded-md border border-line bg-ground px-2.5 py-1.5 text-[13px]'
@@ -48,10 +64,16 @@ type Note = { ok: boolean; message: string } | null
 export function IosPublish({
   config,
   log,
+  suggestions,
+  releaseProducts,
 }: {
   configured: boolean
   config: ConfigView
   log: LogRow[]
+  /** Per-app "What to Test" seed (app id → text) from the releases module. */
+  suggestions: Record<string, string>
+  /** Releases products an app can map to, for the config selectors. */
+  releaseProducts: ReleaseProduct[]
 }) {
   const canPublish = config.profiles.length > 0 && config.apps.length > 0
   const [tab, setTab] = useState<'publish' | 'config'>(canPublish ? 'publish' : 'config')
@@ -75,7 +97,12 @@ export function IosPublish({
 
       {tab === 'publish' ? (
         config.apps.length ? (
-          <PublishCards apps={config.apps} profiles={config.profiles} log={log} />
+          <PublishCards
+            apps={config.apps}
+            profiles={config.profiles}
+            log={log}
+            suggestions={suggestions}
+          />
         ) : (
           <div className={CARD + ' text-[12.5px] text-ink-2'}>
             Chưa có app nào.{' '}
@@ -92,7 +119,7 @@ export function IosPublish({
       ) : (
         <div className="flex flex-col gap-4">
           <ProfilesManager profiles={config.profiles} />
-          <AppsManager apps={config.apps} profiles={config.profiles} />
+          <AppsManager apps={config.apps} profiles={config.profiles} releaseProducts={releaseProducts} />
           <NotifyManager hasWebhook={config.hasWebhook} chatTemplate={config.chatTemplate} />
         </div>
       )}
@@ -121,10 +148,12 @@ function PublishCards({
   apps,
   profiles,
   log,
+  suggestions,
 }: {
   apps: AppPreset[]
   profiles: ProfileView[]
   log: LogRow[]
+  suggestions: Record<string, string>
 }) {
   // Only worth filtering when apps span more than one ASC account; with a single
   // account the picker would just be a control that never changes anything.
@@ -152,6 +181,11 @@ function PublishCards({
     setVersion(a?.version ?? '')
     setGroupName(a?.groups[0] ?? '')
     setResult(null)
+    try {
+      localStorage.setItem(APP_KEY, id)
+    } catch {
+      // Private mode / disabled storage — the selection just won't be remembered.
+    }
   }
 
   // Narrowing the account may hide the app that was selected — fall back to the
@@ -167,21 +201,79 @@ function PublishCards({
     if (!list.some((a) => a.id === appId)) pickApp(list[0]?.id ?? '')
   }
 
-  // Re-apply the last chosen account on open. Runs after mount (not in the
-  // initial state) to keep the server and client's first render identical, and
-  // skips a stale id whose account has since been deleted.
+  // Re-apply the last chosen account and app on open, so navigating away and
+  // back lands on the same selection instead of resetting to the first app.
+  // Runs after mount (not in initial state) to keep server/client render equal,
+  // and skips stale ids whose account/app has since been removed.
   useEffect(() => {
-    if (!canFilter) return
-    let saved: string | null = null
-    try {
-      saved = localStorage.getItem(FILTER_KEY)
-    } catch {
-      saved = null
+    const read = (key: string) => {
+      try {
+        return localStorage.getItem(key)
+      } catch {
+        return null
+      }
     }
-    if (saved && profiles.some((p) => p.id === saved)) pickProfile(saved)
+
+    let filter = ''
+    if (canFilter) {
+      const savedFilter = read(FILTER_KEY)
+      if (savedFilter && profiles.some((p) => p.id === savedFilter)) filter = savedFilter
+    }
+    if (filter) setProfileId(filter)
+
+    const list = filter ? apps.filter((a) => a.profileId === filter) : apps
+    const savedApp = read(APP_KEY)
+    if (savedApp && list.some((a) => a.id === savedApp)) pickApp(savedApp)
+    else if (!list.some((a) => a.id === appId)) pickApp(list[0]?.id ?? '')
     // Mount-only: restoring once is the whole intent.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Seed content from the app's released-tasks suggestion only when it has no
+  // draft yet — a started draft (even one edited down to empty) always wins.
+  function loadDraft(id: string) {
+    const seed = suggestions[id] ?? ''
+    if (!id) {
+      setBuildNumber('')
+      setContent(seed)
+      return
+    }
+    try {
+      const raw = localStorage.getItem(DRAFT_PREFIX + id)
+      const d = raw ? JSON.parse(raw) : null
+      setBuildNumber(d && typeof d.buildNumber === 'string' ? d.buildNumber : '')
+      setContent(d && typeof d.content === 'string' ? d.content : seed)
+    } catch {
+      setBuildNumber('')
+      setContent(seed)
+    }
+  }
+
+  // Overwrite What to Test with the current app's released-tasks suggestion, e.g.
+  // after clearing it or when the release board moved on.
+  function fillFromReleases() {
+    const seed = suggestions[appId] ?? ''
+    setContent(seed)
+    saveDraft({ content: seed })
+  }
+
+  // Only the user's keystrokes write the draft — never a programmatic load —
+  // so restoring an app's draft can't overwrite it with empty fields.
+  function saveDraft(patch: { buildNumber?: string; content?: string }) {
+    if (!appId) return
+    try {
+      localStorage.setItem(DRAFT_PREFIX + appId, JSON.stringify({ buildNumber, content, ...patch }))
+    } catch {
+      // Private mode / disabled storage — the draft just won't be remembered.
+    }
+  }
+
+  // Restore the selected app's draft on mount and whenever the app changes
+  // (including an account-filter switch), so leaving and coming back keeps it.
+  useEffect(() => {
+    loadDraft(appId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appId])
 
   const payload = () => ({ appId, version, groupName, buildNumber, content })
   function check() {
@@ -227,15 +319,18 @@ function PublishCards({
         </label>
 
         <div className="mb-3 flex gap-3">
-          <label className="flex flex-1 flex-col gap-[5px]">
+          <label className="flex w-[130px] flex-col gap-[5px]">
             <span className="text-xs font-medium text-ink-2">Version</span>
             <input value={version} onChange={(e) => setVersion(e.target.value)} className={INPUT} />
           </label>
-          <label className="flex w-[150px] flex-col gap-[5px]">
+          <label className="flex flex-1 flex-col gap-[5px]">
             <span className="text-xs font-medium text-ink-2">Build number</span>
             <input
               value={buildNumber}
-              onChange={(e) => setBuildNumber(e.target.value)}
+              onChange={(e) => {
+                setBuildNumber(e.target.value)
+                saveDraft({ buildNumber: e.target.value })
+              }}
               placeholder="2381"
               className={INPUT + ' font-mono'}
             />
@@ -253,16 +348,31 @@ function PublishCards({
           </select>
         </label>
 
-        <label className="mb-3 flex flex-col gap-[5px]">
-          <span className="text-xs font-medium text-ink-2">What to Test</span>
+        <div className="mb-3 flex flex-col gap-[5px]">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs font-medium text-ink-2">What to Test</span>
+            {(suggestions[appId] ?? '') && (
+              <button
+                type="button"
+                onClick={fillFromReleases}
+                title="Điền các task đã build của product/môi trường app này từ module releases"
+                className="text-[11.5px] text-accent-ink underline-offset-2 hover:underline"
+              >
+                ✦ Điền từ releases
+              </button>
+            )}
+          </div>
           <textarea
             value={content}
-            onChange={(e) => setContent(e.target.value)}
+            onChange={(e) => {
+              setContent(e.target.value)
+              saveDraft({ content: e.target.value })
+            }}
             rows={4}
             placeholder="- Mô tả bản build cho tester"
             className={INPUT + ' resize-y text-[12.5px] leading-relaxed'}
           />
-        </label>
+        </div>
 
         <div className="flex items-center gap-2">
           <button type="button" onClick={check} disabled={busy} className={BTN + ' py-1.5 disabled:opacity-50'}>
@@ -473,11 +583,28 @@ function ProfileEditor({
 
 // ── config: app presets ──────────────────────────────────────────────────────
 
-function AppsManager({ apps, profiles }: { apps: AppPreset[]; profiles: ProfileView[] }) {
+function AppsManager({
+  apps,
+  profiles,
+  releaseProducts,
+}: {
+  apps: AppPreset[]
+  profiles: ProfileView[]
+  releaseProducts: ReleaseProduct[]
+}) {
   const nextKey = useRef(1)
   const [slots, setSlots] = useState(() => apps.map((a) => ({ key: `a${nextKey.current++}`, view: a })))
 
-  const blank: AppPreset = { id: '', name: '', profileId: '', version: '', groups: [''], roomIds: '' }
+  const blank: AppPreset = {
+    id: '',
+    name: '',
+    profileId: '',
+    version: '',
+    groups: [''],
+    roomIds: '',
+    product: '',
+    environment: '',
+  }
 
   return (
     <section className={CARD}>
@@ -496,6 +623,7 @@ function AppsManager({ apps, profiles }: { apps: AppPreset[]; profiles: ProfileV
                 key={sl.key}
                 view={sl.view}
                 profiles={profiles}
+                releaseProducts={releaseProducts}
                 onSaved={(a) => setSlots((s) => s.map((x) => (x.key === sl.key ? { ...x, view: a } : x)))}
                 onRemove={() => setSlots((s) => s.filter((x) => x.key !== sl.key))}
               />
@@ -517,11 +645,13 @@ function AppsManager({ apps, profiles }: { apps: AppPreset[]; profiles: ProfileV
 function AppEditor({
   view,
   profiles,
+  releaseProducts,
   onSaved,
   onRemove,
 }: {
   view: AppPreset
   profiles: ProfileView[]
+  releaseProducts: ReleaseProduct[]
   onSaved: (a: AppPreset) => void
   onRemove: () => void
 }) {
@@ -530,13 +660,33 @@ function AppEditor({
   const [version, setVersion] = useState(view.version)
   const [groups, setGroups] = useState<string[]>(view.groups.length ? view.groups : [''])
   const [roomIds, setRoomIds] = useState(view.roomIds)
+  const [product, setProduct] = useState(view.product)
+  const [environment, setEnvironment] = useState(view.environment)
   const [note, setNote] = useState<Note>(null)
   const [saving, startSaving] = useTransition()
   const [removing, startRemoving] = useTransition()
 
+  const envs = releaseProducts.find((p) => p.name === product)?.environments ?? []
+
+  // Keep environment valid for the chosen product; default to its first env.
+  function pickProduct(name: string) {
+    setProduct(name)
+    const list = releaseProducts.find((p) => p.name === name)?.environments ?? []
+    setEnvironment(list.includes(environment) ? environment : (list[0] ?? ''))
+  }
+
   function save() {
     startSaving(async () => {
-      const res = await saveAppPresetAction({ id: view.id || undefined, name, profileId, version, groups, roomIds })
+      const res = await saveAppPresetAction({
+        id: view.id || undefined,
+        name,
+        profileId,
+        version,
+        groups,
+        roomIds,
+        product,
+        environment,
+      })
       setNote(res)
       if (res.ok && res.app) onSaved(res.app)
     })
@@ -580,6 +730,47 @@ function AppEditor({
           <input value={version} onChange={(e) => setVersion(e.target.value)} placeholder="4.12.0" className="rounded-md border border-line bg-surface px-2.5 py-1 text-[12.5px]" />
         </label>
       </div>
+
+      {releaseProducts.length > 0 && (
+        <>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <label className="flex flex-1 flex-col gap-1">
+              <span className="text-[11px] text-ink-3">Product (releases)</span>
+              <select
+                value={product}
+                onChange={(e) => pickProduct(e.target.value)}
+                className="rounded-md border border-line bg-surface px-2.5 py-1 text-[12.5px]"
+              >
+                <option value="">— Không map —</option>
+                {releaseProducts.map((p) => (
+                  <option key={p.name} value={p.name}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-1 flex-col gap-1">
+              <span className="text-[11px] text-ink-3">Môi trường</span>
+              <select
+                value={environment}
+                onChange={(e) => setEnvironment(e.target.value)}
+                disabled={!product}
+                className="rounded-md border border-line bg-surface px-2.5 py-1 text-[12.5px] disabled:opacity-50"
+              >
+                {!product && <option value="">—</option>}
+                {envs.map((en) => (
+                  <option key={en} value={en}>
+                    {en}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <p className="mt-1 text-[11px] text-ink-3">
+            Map để &quot;What to Test&quot; tự điền task <b>đã build</b> của product này ở môi trường đó trở lên.
+          </p>
+        </>
+      )}
 
       <div className="mt-2 flex flex-col gap-1">
         <span className="text-[11px] text-ink-3">External group (nhiều dòng được)</span>
