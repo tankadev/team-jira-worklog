@@ -56,34 +56,48 @@ export function renderReport(template: string, ctx: ReportContext): string {
     sprint: ctx.sprintName ?? '',
   }
 
-  // Repeated block first, so scalars inside it resolve per issue.
-  let out = template.replace(
-    /\{\{#issues\}\}\r?\n?([\s\S]*?)\{\{\/issues\}\}\r?\n?/g,
-    (_match, body: string) =>
-      ctx.issues
-        .map((issue) =>
-          (ctx.showKey
-            ? body.replace(/\{\{key\}\}/g, issue.key)
-            : body.replace(KEY_WITH_SEP, ''))
-            .replace(/\{\{summary\}\}/g, issue.summary)
-            .replace(/\{\{time\}\}/g, formatDuration(issue.seconds))
-            .replace(/\{\{hours\}\}/g, (issue.seconds / 3600).toFixed(2).replace(/\.?0+$/, '')),
-        )
-        .join(''),
-  )
+  // One row per issue, with the per-row fields substituted. Shared by the
+  // {{#issues}} and {{#today}} blocks so they format identically.
+  const renderRows = (body: string, list: ReportIssue[]) =>
+    list
+      .map((issue) =>
+        (ctx.showKey
+          ? body.replace(/\{\{key\}\}/g, issue.key)
+          : body.replace(KEY_WITH_SEP, ''))
+          .replace(/\{\{summary\}\}/g, issue.summary)
+          .replace(/\{\{time\}\}/g, formatDuration(issue.seconds))
+          .replace(/\{\{hours\}\}/g, (issue.seconds / 3600).toFixed(2).replace(/\.?0+$/, '')),
+      )
+      .join('')
+
+  const hasTodayBlock = /\{\{#today\}\}/.test(template)
+
+  // Repeated blocks first, so scalars inside them resolve per row.
+  let out = template
+    .replace(/\{\{#issues\}\}\r?\n?([\s\S]*?)\{\{\/issues\}\}\r?\n?/g, (_m, body: string) =>
+      renderRows(body, ctx.issues),
+    )
+    .replace(/\{\{#today\}\}\r?\n?([\s\S]*?)\{\{\/today\}\}\r?\n?/g, (_m, body: string) =>
+      renderRows(body, ctx.todayIssues ?? []),
+    )
 
   for (const [key, value] of Object.entries(scalars)) {
     out = out.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), value)
   }
 
-  // Append the in-progress tasks under "Today". The template ends with an empty
-  // "- " bullet there; drop it so the tasks sit cleanly, then list them in the
-  // same line style as the day's issues.
-  if (ctx.todayIssues?.length) {
+  // Fallback for templates written before {{#today}} existed: append the
+  // in-progress tasks after the last line. Only a *trailing empty bullet*
+  // ("- ", however it is indented or spaced) is dropped so they sit cleanly
+  // under "Today:" — a bullet that already has text is left alone, so editing
+  // whitespace around the dash can no longer corrupt the output. The bullet's
+  // own indentation is carried onto the appended lines, so spacing the "-" in
+  // the template indents the tasks to match.
+  if (ctx.todayIssues?.length && !hasTodayBlock) {
+    const indent = out.match(/\n([ \t]*)-[ \t]*$/)?.[1] ?? ''
     const lines = ctx.todayIssues
-      .map((i) => (ctx.showKey ? `- ${i.key} | ${i.summary}` : `- ${i.summary}`))
+      .map((i) => (ctx.showKey ? `${indent}- ${i.key} | ${i.summary}` : `${indent}- ${i.summary}`))
       .join('\n')
-    const base = out.replace(/\n?-[ \t]*$/, '').replace(/\n+$/, '')
+    const base = out.replace(/\n[ \t]*-[ \t]*$/, '').replace(/\s+$/, '')
     out = `${base}\n${lines}\n`
   }
 
@@ -97,6 +111,9 @@ Previous day:
 - {{key}} | {{summary}}
 {{/issues}}
 Today:
+{{#today}}
+- {{key}} | {{summary}}
+{{/today}}
 - `
 
 export function toCsv(rows: Array<Record<string, string | number>>): string {

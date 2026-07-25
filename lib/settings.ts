@@ -71,6 +71,9 @@ Previous day:
 - {{key}} | {{summary}}
 {{/issues}}
 Today:
+{{#today}}
+- {{key}} | {{summary}}
+{{/today}}
 - `
 
 /**
