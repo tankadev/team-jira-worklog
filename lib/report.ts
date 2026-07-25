@@ -15,6 +15,12 @@ export interface ReportContext {
   sprintName?: string
   /** Show the Jira issue key on each line. Off by default. */
   showKey?: boolean
+  /**
+   * In-progress tasks to list under "Today". When present they are appended to
+   * the report as bullet lines, replacing any trailing empty bullet the template
+   * leaves under its "Today:" heading. Off by default.
+   */
+  todayIssues?: ReportIssue[]
 }
 
 // {{key}} plus the separator that usually follows it (`ABC-1 | summary`), so
@@ -68,6 +74,17 @@ export function renderReport(template: string, ctx: ReportContext): string {
 
   for (const [key, value] of Object.entries(scalars)) {
     out = out.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), value)
+  }
+
+  // Append the in-progress tasks under "Today". The template ends with an empty
+  // "- " bullet there; drop it so the tasks sit cleanly, then list them in the
+  // same line style as the day's issues.
+  if (ctx.todayIssues?.length) {
+    const lines = ctx.todayIssues
+      .map((i) => (ctx.showKey ? `- ${i.key} | ${i.summary}` : `- ${i.summary}`))
+      .join('\n')
+    const base = out.replace(/\n?-[ \t]*$/, '').replace(/\n+$/, '')
+    out = `${base}\n${lines}\n`
   }
 
   return out

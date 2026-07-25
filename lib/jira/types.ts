@@ -40,6 +40,12 @@ export interface BoardParent {
   childPointsTotal: number
   /** How many children the parent has in total, matching `childPointsTotal`. */
   childCount: number
+  /**
+   * Total time logged across *all* the parent's children, in seconds — the full
+   * figure even when the board hides Done ones, so the header total never shrinks
+   * with the status filter.
+   */
+  childTimeSpentTotal: number
   /** Creation time as epoch ms, for the board's created-date sort. 0 if unknown. */
   created: number
   /** The children shown on the board — narrowed by the status filter. */

@@ -208,6 +208,7 @@ async function groupByParent(
         storyPoints: parentPoints.get(key) ?? null,
         childPointsTotal: 0,
         childCount: 0,
+        childTimeSpentTotal: 0,
         created: info?.created ?? 0,
         subtasks: [],
       })
@@ -216,13 +217,18 @@ async function groupByParent(
     group.subtasks.push(st)
     group.childPointsTotal += st.storyPoints ?? 0
     group.childCount += 1
+    group.childTimeSpentTotal += st.timeSpentSeconds
   }
 
   // The displayed list may be missing Done children, which would undercount the
-  // rollup. Recover the true totals from a lightweight all-status query over the
-  // same parents (same assignee scope as the board), leaving the shown rows as-is.
-  if (childrenFiltered && storyPointsFieldId && keys.length) {
-    const totals = new Map<string, { points: number; count: number }>()
+  // header totals — points, child count and logged time. Recover the true totals
+  // from a lightweight all-status query over the same parents (same assignee
+  // scope as the board), leaving the shown rows as-is.
+  if (childrenFiltered && keys.length) {
+    const fields = ['parent', 'timespent']
+    if (storyPointsFieldId) fields.push(storyPointsFieldId)
+
+    const totals = new Map<string, { points: number; count: number; time: number }>()
     const CHUNK = 50
     const batches: Promise<JiraIssue[]>[] = []
     for (let i = 0; i < keys.length; i += CHUNK) {
@@ -231,7 +237,7 @@ async function groupByParent(
         searchJql<JiraIssue>(
           `project = "${escapeJql(projectKey)}" AND assignee = currentUser() AND ` +
             `issuetype in subTaskIssueTypes() AND parent in (${chunk})`,
-          ['parent', storyPointsFieldId],
+          fields,
           { limit: 200 },
         ),
       )
@@ -239,9 +245,10 @@ async function groupByParent(
     for (const child of (await Promise.all(batches)).flat()) {
       const pk = child.fields.parent?.key
       if (!pk) continue
-      const agg = totals.get(pk) ?? { points: 0, count: 0 }
-      agg.points += num(child.fields[storyPointsFieldId]) ?? 0
+      const agg = totals.get(pk) ?? { points: 0, count: 0, time: 0 }
+      agg.points += storyPointsFieldId ? (num(child.fields[storyPointsFieldId]) ?? 0) : 0
       agg.count += 1
+      agg.time += child.fields.timespent ?? 0
       totals.set(pk, agg)
     }
     for (const group of groups.values()) {
@@ -249,6 +256,7 @@ async function groupByParent(
       if (agg) {
         group.childPointsTotal = agg.points
         group.childCount = agg.count
+        group.childTimeSpentTotal = agg.time
       }
     }
   }
@@ -303,6 +311,46 @@ export async function getSprintTasks(
       epicKey: issue.fields.parent?.key ?? null,
       epicName: issue.fields.parent?.fields?.summary ?? null,
     }))
+}
+
+/**
+ * The current user's subtasks in a sprint that sit in the "In Progress" status
+ * category — what they are actively working on now. Feeds the daily report's
+ * optional "today" list, returning just key + summary, newest activity first.
+ *
+ * Sprint membership is resolved on the parents first (JQL cannot filter subtasks
+ * by sprint — see {@link sprintParentKeys}), then subtasks are matched by
+ * `parent in (…)`, same as {@link getBoard}.
+ */
+export async function getInProgressSubtasks(
+  sprintId: number | null,
+): Promise<Array<{ key: string; summary: string }>> {
+  if (!sprintId) return []
+  const projectKey = requireProjectKey()
+  const parentKeys = await sprintParentKeys(sprintId, projectKey)
+  if (!parentKeys.length) return []
+
+  const base = [
+    `project = "${escapeJql(projectKey)}"`,
+    'assignee = currentUser()',
+    'issuetype in subTaskIssueTypes()',
+    'statusCategory = "In Progress"',
+  ]
+
+  const CHUNK = 50
+  const batches: Promise<JiraIssue[]>[] = []
+  for (let i = 0; i < parentKeys.length; i += CHUNK) {
+    const chunk = parentKeys.slice(i, i + CHUNK).map((k) => `"${k}"`).join(',')
+    batches.push(
+      searchJql<JiraIssue>(
+        `${[...base, `parent in (${chunk})`].join(' AND ')} ORDER BY updated DESC`,
+        ['summary'],
+        { limit: 100 },
+      ),
+    )
+  }
+  const issues = (await Promise.all(batches)).flat()
+  return issues.map((i) => ({ key: i.key, summary: i.fields.summary ?? '' }))
 }
 
 export interface IssueDetail {

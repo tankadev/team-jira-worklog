@@ -10,6 +10,7 @@ export function ReportOutput({
   templates,
   templateId,
   showKey,
+  withInProgress,
   empty,
 }: {
   body: string
@@ -17,6 +18,7 @@ export function ReportOutput({
   templates: Array<{ id: number; name: string; isDefault: boolean }>
   templateId: number
   showKey: boolean
+  withInProgress: boolean
   empty: boolean
 }) {
   const params = useSearchParams()
@@ -33,6 +35,14 @@ export function ReportOutput({
     const q = new URLSearchParams(params.toString())
     if (next) q.set('key', '1')
     else q.delete('key')
+    navigate(`/report?${q}`)
+  }
+
+  function toggleInProgress(next: boolean) {
+    const q = new URLSearchParams(params.toString())
+    // On is the default, so pin the opt-out and drop the param when back on.
+    if (next) q.delete('today')
+    else q.set('today', '0')
     navigate(`/report?${q}`)
   }
 
@@ -71,6 +81,19 @@ export function ReportOutput({
               className="accent-accent disabled:opacity-60"
             />
             Mã task
+          </label>
+          <label
+            className="flex items-center gap-1.5 text-[12.5px] text-ink-2 select-none"
+            title="Đưa các task đang In Progress của bạn vào phần Today"
+          >
+            <input
+              type="checkbox"
+              checked={withInProgress}
+              disabled={pending}
+              onChange={(e) => toggleInProgress(e.target.checked)}
+              className="accent-accent disabled:opacity-60"
+            />
+            Task đang làm
           </label>
           <select
             value={templateId || ''}

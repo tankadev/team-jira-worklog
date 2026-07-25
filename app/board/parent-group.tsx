@@ -40,7 +40,9 @@ export function ParentGroup({
   }
 
   const isOrphan = group.key === '__orphan__'
-  const loggedTotal = group.subtasks.reduce((n, s) => n + s.timeSpentSeconds, 0)
+  // Full logged time across every child, not just the ones the filter leaves
+  // visible, so the header total doesn't shrink when Done subtasks are hidden.
+  const loggedTotal = group.childTimeSpentTotal
 
   return (
     <article className="rounded-[9px] border border-line bg-surface">

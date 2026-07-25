@@ -56,11 +56,10 @@ export function EpicHeader({
   boardSprintId: number | null
 }) {
   const taskCount = group.parents.length
-  const subtaskCount = group.parents.reduce((n, p) => n + p.subtasks.length, 0)
-  const logged = group.parents.reduce(
-    (n, p) => n + p.subtasks.reduce((m, s) => m + s.timeSpentSeconds, 0),
-    0,
-  )
+  // Full child counts and logged time — not the filtered `subtasks` — so hiding
+  // Done subtasks doesn't shrink the epic's totals.
+  const subtaskCount = group.parents.reduce((n, p) => n + p.childCount, 0)
+  const logged = group.parents.reduce((n, p) => n + p.childTimeSpentTotal, 0)
 
   return (
     <div className="mb-2 mt-1 flex flex-wrap items-center gap-2 border-l-2 border-epic pl-2.5">

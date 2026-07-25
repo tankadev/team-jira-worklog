@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { connection } from 'next/server'
 
 import { getMyself } from '@/lib/jira/client'
+import { getInProgressSubtasks } from '@/lib/jira/issues'
 import { getSprints } from '@/lib/jira/sprints'
 import { getWorklogs, sumByDate } from '@/lib/jira/worklog'
 import { type ReportIssue, renderReport } from '@/lib/report'
@@ -39,6 +40,8 @@ export default async function ReportPage(props: PageProps<'/report'>) {
   const templateId = one(sp.template) ? Number(one(sp.template)) : undefined
   // Task keys are hidden unless explicitly turned on.
   const showKey = one(sp.key) === '1'
+  // On by default: list the in-progress subtasks under "Today". `today=0` opts out.
+  const withInProgress = one(sp.today) !== '0'
 
   const templates = listTemplates()
   const template = getTemplate(templateId)
@@ -56,11 +59,12 @@ export default async function ReportPage(props: PageProps<'/report'>) {
 
   // prevDate falls in the previous week when `date` is a Monday, so the fetch
   // reaches back to it; the extra day is harmless to the week table and stats.
-  const [weekEntries, sprintEntries] = await Promise.all([
+  const [weekEntries, sprintEntries, inProgress] = await Promise.all([
     getWorklogs(prevDate < days[0] ? prevDate : days[0], days[6], me.accountId, tz),
     sprintFrom && sprintTo
       ? getWorklogs(sprintFrom, min(sprintTo, todayIn(tz)), me.accountId, tz)
       : Promise.resolve([]),
+    withInProgress ? getInProgressSubtasks(current?.id ?? null) : Promise.resolve([]),
   ])
 
   const dayEntries = weekEntries.filter((e) => e.date === date)
@@ -97,6 +101,7 @@ export default async function ReportPage(props: PageProps<'/report'>) {
     displayName: me.displayName,
     sprintName: current?.name,
     showKey,
+    todayIssues: inProgress.map((t) => ({ key: t.key, summary: t.summary, seconds: 0 })),
   })
 
   const byDate = sumByDate(weekEntries)
@@ -136,6 +141,7 @@ export default async function ReportPage(props: PageProps<'/report'>) {
             templates={templates.map((t) => ({ id: t.id, name: t.name, isDefault: t.isDefault }))}
             templateId={template?.id ?? 0}
             showKey={showKey}
+            withInProgress={withInProgress}
             empty={issues.length === 0}
           />
 
