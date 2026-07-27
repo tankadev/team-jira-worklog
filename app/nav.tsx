@@ -2,7 +2,7 @@
 
 import Link, { useLinkStatus } from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { useEffect, useState, useTransition } from 'react'
+import { useEffect, useTransition } from 'react'
 
 import { refreshDataAction } from './refresh-actions'
 
@@ -136,16 +136,17 @@ function RefreshButton() {
 /**
  * Writes data-theme on <html>, which the CSS treats as the highest-priority
  * override so it wins over prefers-color-scheme in both directions.
+ *
+ * Both glyphs are rendered every time and CSS hides one (.theme-icon-*). The
+ * active theme can come from the OS, which the server has no way of knowing, so
+ * choosing here — in JS, during render — produced markup that disagreed with
+ * the server's on every load under a dark OS, and React reported it as a
+ * hydration failure.
  */
 function ThemeToggle() {
-  const [theme, setTheme] = useState<string | null>(null)
-
   useEffect(() => {
     const stored = localStorage.getItem('theme')
-    if (stored === 'light' || stored === 'dark') {
-      document.documentElement.dataset.theme = stored
-      setTheme(stored)
-    }
+    if (stored === 'light' || stored === 'dark') document.documentElement.dataset.theme = stored
   }, [])
 
   function toggle() {
@@ -155,31 +156,24 @@ function ThemeToggle() {
     const next = current === 'dark' ? 'light' : 'dark'
     document.documentElement.dataset.theme = next
     localStorage.setItem('theme', next)
-    setTheme(next)
   }
-
-  const isDark =
-    theme === 'dark' ||
-    (theme === null && typeof window !== 'undefined' &&
-      window.matchMedia('(prefers-color-scheme: dark)').matches)
 
   return (
     <button
       onClick={toggle}
-      title={isDark ? 'Chuyển sang nền sáng' : 'Chuyển sang nền tối'}
-      aria-label={isDark ? 'Chuyển sang nền sáng' : 'Chuyển sang nền tối'}
+      title="Đổi nền sáng / tối"
+      aria-label="Đổi nền sáng / tối"
       className="grid size-7 shrink-0 place-items-center rounded-md border border-line text-ink-3 hover:border-line-strong hover:text-ink"
     >
-      {isDark ? (
-        <svg viewBox="0 0 16 16" className="size-[15px]" fill="none" stroke="currentColor" strokeWidth="1.3">
-          <circle cx="8" cy="8" r="3.1" />
-          <path d="M8 1.4v1.7M8 12.9v1.7M14.6 8h-1.7M3.1 8H1.4M12.67 3.33l-1.2 1.2M4.53 11.47l-1.2 1.2M12.67 12.67l-1.2-1.2M4.53 4.53l-1.2-1.2" strokeLinecap="round" />
-        </svg>
-      ) : (
-        <svg viewBox="0 0 16 16" className="size-[15px]" fill="none" stroke="currentColor" strokeWidth="1.3">
-          <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5a5.8 5.8 0 1 0 6.9 6.9Z" strokeLinejoin="round" />
-        </svg>
-      )}
+      {/* sun — shown while the dark theme is on, i.e. "go light" */}
+      <svg viewBox="0 0 16 16" aria-hidden className="theme-icon-dark size-[15px]" fill="none" stroke="currentColor" strokeWidth="1.3">
+        <circle cx="8" cy="8" r="3.1" />
+        <path d="M8 1.4v1.7M8 12.9v1.7M14.6 8h-1.7M3.1 8H1.4M12.67 3.33l-1.2 1.2M4.53 11.47l-1.2 1.2M12.67 12.67l-1.2-1.2M4.53 4.53l-1.2-1.2" strokeLinecap="round" />
+      </svg>
+      {/* moon — shown while the light theme is on, i.e. "go dark" */}
+      <svg viewBox="0 0 16 16" aria-hidden className="theme-icon-light size-[15px]" fill="none" stroke="currentColor" strokeWidth="1.3">
+        <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5a5.8 5.8 0 1 0 6.9 6.9Z" strokeLinejoin="round" />
+      </svg>
     </button>
   )
 }

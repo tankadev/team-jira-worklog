@@ -166,3 +166,40 @@ body {
 .tabular {
   font-variant-numeric: tabular-nums;
 }
+
+/*
+ * Which glyph the theme toggle shows, decided in CSS along the same three steps
+ * as the palette above.
+ *
+ * It has to be CSS: the active theme can come from prefers-color-scheme, which
+ * the server cannot know. Picking the icon in JS meant the first client render
+ * disagreed with the server HTML whenever the OS was in dark mode, and React
+ * answered that hydration mismatch by throwing the whole tree away and
+ * re-rendering it.
+ */
+.theme-icon-dark {
+  display: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  .theme-icon-light {
+    display: none;
+  }
+  .theme-icon-dark {
+    display: block;
+  }
+}
+
+:root[data-theme="light"] .theme-icon-light {
+  display: block;
+}
+:root[data-theme="light"] .theme-icon-dark {
+  display: none;
+}
+
+:root[data-theme="dark"] .theme-icon-light {
+  display: none;
+}
+:root[data-theme="dark"] .theme-icon-dark {
+  display: block;
+}
