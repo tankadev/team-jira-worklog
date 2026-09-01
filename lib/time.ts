@@ -67,19 +67,110 @@ export function endOfDay(date: string, tz = DEFAULT_TZ): number {
 }
 
 /**
+ * A working day: when it starts and ends, and the break in the middle.
+ * All values are minutes from local midnight — `09:00` is `540`.
+ */
+export interface WorkSchedule {
+  start: number
+  end: number
+  /** Null when the day has no break. */
+  breakStart: number | null
+  breakEnd: number | null
+}
+
+export const DEFAULT_SCHEDULE: WorkSchedule = {
+  start: 9 * 60,
+  end: 18 * 60,
+  breakStart: 12 * 60,
+  breakEnd: 13 * 60,
+}
+
+/** `09:00` → 540. Returns null on anything that is not HH:MM in range. */
+export function parseClock(value: string | undefined | null): number | null {
+  const m = (value ?? '').trim().match(/^(\d{1,2}):(\d{2})$/)
+  if (!m) return null
+  const h = Number(m[1])
+  const min = Number(m[2])
+  if (h > 23 || min > 59) return null
+  return h * 60 + min
+}
+
+/** 540 → `09:00`. Minutes past the end of the day wrap into the next one. */
+export function formatClock(minutes: number): string {
+  const m = ((Math.round(minutes) % 1440) + 1440) % 1440
+  return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
+}
+
+/** Minutes of actual work between the day's start and the break. */
+function minutesBeforeBreak(schedule: WorkSchedule): number | null {
+  const { start, breakStart, breakEnd } = schedule
+  // A break that does not sit inside the working day is no break at all —
+  // rather than producing a nonsensical placement, the day is treated as solid.
+  if (breakStart === null || breakEnd === null) return null
+  if (breakEnd <= breakStart || breakStart <= start) return null
+  return breakStart - start
+}
+
+/**
+ * Where on the clock the Nth minute of work falls.
+ *
+ * The day is a ribbon of working minutes with the break cut out of it, so on a
+ * 09:00 day with a 12:00–13:00 break the 240th working minute is 14:00.
+ *
+ * The 180th minute — the break boundary exactly — is the one place where a
+ * start and an end disagree, and both readings are right: work *finishing*
+ * there stops at 12:00, work *starting* there begins at 13:00, because nobody
+ * starts a task at the moment lunch does. Hence `edge`.
+ *
+ * Work past the end of the day keeps running rather than clamping: overtime is
+ * real, and pinning entries to 18:00 would recreate the pile-up this replaces.
+ */
+export function workMinuteToClock(
+  workedMinutes: number,
+  schedule: WorkSchedule,
+  edge: 'start' | 'end' = 'start',
+): number {
+  const before = minutesBeforeBreak(schedule)
+  if (before === null) return schedule.start + workedMinutes
+
+  const stillBeforeBreak = edge === 'end' ? workedMinutes <= before : workedMinutes < before
+  if (stillBeforeBreak) return schedule.start + workedMinutes
+  return schedule.breakEnd! + (workedMinutes - before)
+}
+
+/**
+ * Start and end of one entry, given how much was already logged that day.
+ *
+ * The end is where the work finishes on the clock, break included — logging 6h
+ * from 11:00 ends at 18:00, not 17:00. Used for the message the user reads back,
+ * so it has to describe the wall clock rather than the working ribbon.
+ */
+export function placeWorklog(
+  alreadyLoggedMinutes: number,
+  entryMinutes: number,
+  schedule: WorkSchedule = DEFAULT_SCHEDULE,
+): { start: number; end: number } {
+  return {
+    start: workMinuteToClock(alreadyLoggedMinutes, schedule, 'start'),
+    end: workMinuteToClock(alreadyLoggedMinutes + entryMinutes, schedule, 'end'),
+  }
+}
+
+/**
  * Builds the `started` value for a worklog.
  *
  * Format is `2026-06-17T14:40:00.000+0700`: milliseconds required, offset
  * without a colon. `Date.prototype.toISOString()` emits `…Z` and is rejected —
  * this is the single most common way worklog POSTs fail.
  *
- * The clock time carries no meaning for this team (only the daily total is
- * checked), so worklogs start at 09:00 and step forward to keep them distinct.
+ * `minuteOfDay` is an absolute local time, not an offset from the working day —
+ * the caller decides where the entry belongs, because only it knows what else
+ * has been logged.
  */
-export function jiraStarted(date: string, tz = DEFAULT_TZ, sequence = 0): string {
+export function jiraStarted(date: string, tz = DEFAULT_TZ, minuteOfDay = 9 * 60): string {
   const base = startOfDay(date, tz)
   const offset = tzOffsetMinutes(tz, new Date(base))
-  const at = base + (9 * 60 + sequence) * 60000
+  const at = base + minuteOfDay * 60000
 
   const local = new Date(at + offset * 60000)
   const pad = (n: number, w = 2) => String(n).padStart(w, '0')

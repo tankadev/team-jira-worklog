@@ -248,6 +248,7 @@ export default async function BoardPage(props: PageProps<'/'>) {
                         isToday={isToday}
                         sprintEnd={sprintEnd}
                         datesSupported={datesSupported}
+                        dayLoggedSeconds={byDate.get(date) ?? 0}
                       />
                     ))}
                   </div>

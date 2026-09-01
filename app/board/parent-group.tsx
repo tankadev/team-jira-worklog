@@ -1,6 +1,6 @@
 import { issueHygiene } from '@/lib/jira/types'
 import type { BoardParent } from '@/lib/jira/types'
-import { SETTING_KEYS, getSetting, getTeamScope } from '@/lib/settings'
+import { SETTING_KEYS, getSetting, getTeamScope, getWorkSchedule } from '@/lib/settings'
 import { formatDuration } from '@/lib/time'
 
 import { CreateIssueButton } from './create-issue'
@@ -26,6 +26,7 @@ export function ParentGroup({
   isToday,
   sprintEnd = null,
   datesSupported = true,
+  dayLoggedSeconds = 0,
 }: {
   group: BoardParent
   date: string
@@ -35,6 +36,12 @@ export function ParentGroup({
   sprintEnd?: string | null
   /** False on a project with neither date field — hides the chip entirely. */
   datesSupported?: boolean
+  /**
+   * Everything this user has logged on the selected day, across every issue.
+   * Drives the "what time will this land at" preview — the placement depends on
+   * the whole day, not on this row.
+   */
+  dayLoggedSeconds?: number
 }) {
   const step = Number(getSetting(SETTING_KEYS.logStepHours) ?? '0.5') || 0.5
   const presets = (getSetting(SETTING_KEYS.logPresets) ?? '0.5,1,2,4,8')
@@ -49,6 +56,7 @@ export function ParentGroup({
   }
 
   const team = getTeamScope()
+  const schedule = getWorkSchedule()
   const isOrphan = group.key === '__orphan__'
   // Full logged time across every child, not just the ones the filter leaves
   // visible, so the header total doesn't shrink when Done subtasks are hidden.
@@ -136,6 +144,8 @@ export function ParentGroup({
             sprintEnd={sprintEnd}
             team={team}
             datesSupported={datesSupported}
+            dayLoggedMinutes={Math.round(dayLoggedSeconds / 60)}
+            schedule={schedule}
           />
         ))}
 

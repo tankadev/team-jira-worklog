@@ -2,9 +2,9 @@
 
 import { getMyself } from '@/lib/jira/client'
 import { transitionIssue, updateDates, updateStoryPoints } from '@/lib/jira/issues'
-import { createWorklog } from '@/lib/jira/worklog'
-import { SETTING_KEYS, getSetting } from '@/lib/settings'
-import { DEFAULT_TZ } from '@/lib/time'
+import { createWorklog, loggedMinutesOnDate } from '@/lib/jira/worklog'
+import { SETTING_KEYS, getSetting, getWorkSchedule } from '@/lib/settings'
+import { DEFAULT_TZ, formatClock, placeWorklog } from '@/lib/time'
 
 export interface ActionResult {
   ok: boolean
@@ -22,7 +22,6 @@ export async function logWorkAction(input: {
   hours: number
   date: string
   comment?: string
-  sequence?: number
 }): Promise<ActionResult> {
   const step = Number(getSetting(SETTING_KEYS.logStepHours) ?? '0.5') || 0.5
 
@@ -38,17 +37,30 @@ export async function logWorkAction(input: {
 
   try {
     const me = await getMyself()
+    const tz = me.timeZone ?? DEFAULT_TZ
+
+    // Where the entry lands is decided here, from what the day already holds —
+    // never by the client. Entries used to be stamped 09:00 every time, so a
+    // full day arrived in Jira as six overlapping blocks all starting together.
+    const already = await loggedMinutesOnDate(input.date, me.accountId, tz, input.issueKey)
+    const placed = placeWorklog(already, input.hours * 60, getWorkSchedule())
+
     await createWorklog({
       issueKey: input.issueKey,
       hours: input.hours,
       date: input.date,
       comment: input.comment,
-      sequence: input.sequence ?? 0,
-      tz: me.timeZone ?? DEFAULT_TZ,
+      startMinute: placed.start,
+      tz,
     })
     // No revalidatePath here: the board is fully dynamic, so there is nothing
     // cached to expire. The caller refreshes the router instead.
-    return { ok: true, message: `Đã log ${input.hours}h cho ${input.issueKey}` }
+    return {
+      ok: true,
+      message:
+        `Đã log ${input.hours}h cho ${input.issueKey} · ` +
+        `${formatClock(placed.start)}–${formatClock(placed.end)}`,
+    }
   } catch (error) {
     return {
       ok: false,

@@ -57,6 +57,16 @@ export async function getWorklogs(
    * ids forces Jira to reconcile them first.
    */
   reconcileIds: string[] = [],
+  /**
+   * Issue keys to read directly, on top of whatever the JQL finds.
+   *
+   * `worklogDate` is an index query, so an issue whose first worklog of the day
+   * was written seconds ago is missing from the result. Reading its worklogs
+   * straight from `/issue/{key}/worklog` is index-free and always current —
+   * which is what makes "how much have I logged today" correct immediately
+   * after logging, rather than one refresh later.
+   */
+  alwaysInclude: string[] = [],
 ): Promise<WorklogEntry[]> {
   const projectKey = requireProjectKey()
 
@@ -70,6 +80,17 @@ export async function getWorklogs(
     limit: 200,
     reconcileIssues: reconcileIds,
   })
+
+  const extra = alwaysInclude.filter((key) => key && !issues.some((i) => i.key === key))
+  if (extra.length) {
+    const found = await searchJql<JiraIssue>(
+      `key in (${extra.map((k) => `"${escapeJql(k)}"`).join(',')})`,
+      ['summary'],
+      { limit: extra.length },
+    )
+    issues.push(...found)
+  }
+
   if (!issues.length) return []
 
   const after = startOfDay(fromDate, tz) - 1
@@ -80,6 +101,10 @@ export async function getWorklogs(
       const res = await jiraFetch<{ worklogs?: RawWorklog[] }>(
         `/rest/api/3/issue/${encodeURIComponent(issue.key)}/worklog` +
           `?startedAfter=${after}&startedBefore=${before}&maxResults=200`,
+        // `fresh` skips the short read cache. Only the placement query asks for
+        // it: that read decides where the next entry starts, and a copy cached
+        // seconds ago is precisely the one missing the entry just written.
+        { fresh: alwaysInclude.length > 0 },
       )
       return (res.worklogs ?? [])
         .filter((w) => w.author?.accountId === accountId && w.started)
@@ -95,7 +120,27 @@ export async function getWorklogs(
     }),
   )
 
-  return entries.flat()
+  // One issue can arrive from both passes; a worklog counted twice would push
+  // every later entry an hour down the clock.
+  const seen = new Set<string>()
+  return entries.flat().filter((e) => !seen.has(e.id) && seen.add(e.id))
+}
+
+/**
+ * Working minutes this user has already logged on `date`.
+ *
+ * This is what decides where the next worklog starts, so `issueKey` is read
+ * directly rather than through the index — see `alwaysInclude`.
+ */
+export async function loggedMinutesOnDate(
+  date: string,
+  accountId: string,
+  tz: string,
+  issueKey: string,
+): Promise<number> {
+  const entries = await getWorklogs(date, date, accountId, tz, [], [issueKey])
+  const seconds = entries.reduce((total, e) => total + e.timeSpentSeconds, 0)
+  return Math.round(seconds / 60)
 }
 
 export function sumByDate(entries: WorklogEntry[]): Map<string, number> {
@@ -115,8 +160,8 @@ export interface CreateWorklogInput {
   hours: number
   date: string
   comment?: string
-  /** Minutes past 09:00, used to keep same-day entries from sharing a timestamp. */
-  sequence?: number
+  /** Local start time as minutes from midnight — 10:00 is 600. */
+  startMinute?: number
   tz?: string
 }
 
@@ -132,15 +177,16 @@ function toAdf(text: string) {
  * Logs work against an issue.
  *
  * `notifyUsers=false` because logging several entries in a row would otherwise
- * email every watcher once per entry. The clock time is meaningless to this team
- * (only the daily total is checked), so entries start at 09:00 and step forward.
+ * email every watcher once per entry. `startMinute` is chosen by the caller from
+ * what the day already holds, so entries lay end to end across the working day
+ * instead of every one of them landing on 09:00.
  */
 export async function createWorklog(input: CreateWorklogInput) {
   const tz = input.tz ?? DEFAULT_TZ
   const body: Record<string, unknown> = {
     // Send exactly one of timeSpent / timeSpentSeconds — Jira rejects both.
     timeSpentSeconds: hoursToSeconds(input.hours),
-    started: jiraStarted(input.date, tz, input.sequence ?? 0),
+    started: jiraStarted(input.date, tz, input.startMinute ?? 9 * 60),
   }
   if (input.comment?.trim()) body.comment = toAdf(input.comment.trim())
 

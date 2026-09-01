@@ -7,7 +7,7 @@ import { logWorkAction } from '@/app/actions'
 // would end up in the browser bundle.
 import type { BoardSubtask } from '@/lib/jira/types'
 import { issueHygiene } from '@/lib/jira/types'
-import { formatDuration } from '@/lib/time'
+import { DEFAULT_SCHEDULE, type WorkSchedule, formatClock, formatDuration, placeWorklog } from '@/lib/time'
 
 import { Spinner } from '../spinner'
 import { DatesEditor } from './dates-editor'
@@ -38,6 +38,8 @@ export function SubtaskRow({
   sprintEnd = null,
   team = { label: null, prefix: null },
   datesSupported = true,
+  dayLoggedMinutes = 0,
+  schedule = DEFAULT_SCHEDULE,
 }: {
   subtask: BoardSubtask
   date: string
@@ -52,6 +54,9 @@ export function SubtaskRow({
   team?: { label: string | null; prefix: string | null }
   /** False on a project with neither date field — hides the chip entirely. */
   datesSupported?: boolean
+  /** Logged across the whole day, which is what decides where this entry lands. */
+  dayLoggedMinutes?: number
+  schedule?: WorkSchedule
 }) {
   const [hours, setHours] = useState(step)
   const [comment, setComment] = useState('')
@@ -74,6 +79,12 @@ export function SubtaskRow({
   const today = subtask.loggedTodaySeconds
   const total = subtask.timeSpentSeconds
   const hygiene = issueHygiene(subtask, team)
+
+  // Where this entry will land, worked out with the same function the server
+  // uses. Shown before the click, because "log 6h" reading back as 11:00–18:00
+  // is the difference between trusting the timesheet and re-checking it in Jira.
+  const slot = placeWorklog(dayLoggedMinutes, hours * 60, schedule)
+  const slotLabel = `${formatClock(slot.start)}–${formatClock(slot.end)}`
 
   return (
     <div className="border-b border-line last:border-b-0 hover:bg-surface-2/60">
@@ -143,13 +154,23 @@ export function SubtaskRow({
             onChange={setHours}
           />
 
+          {/* Directly after the stepper that determines it: the slot is the one
+              thing about a log that used to be invisible and wrong at the same
+              time, and seeing it move as the hours change is the explanation. */}
+          <span
+            className="min-w-[76px] text-right font-mono text-[10.5px] tabular text-ink-3"
+            title={`Worklog sẽ bắt đầu lúc ${formatClock(slot.start)} — xếp nối tiếp trong ngày, nhảy qua giờ nghỉ`}
+          >
+            {slotLabel}
+          </span>
+
           <NoteButton value={comment} onChange={setComment} issueKey={subtask.key} />
 
           <button
             type="button"
             onClick={submit}
             disabled={pending}
-            title={`Ghi ${hours}h vào ${dateLabel}`}
+            title={`Ghi ${hours}h vào ${dateLabel}, ${slotLabel}`}
             className={
               'h-[26px] rounded-md px-2.5 text-[12px] font-medium text-white disabled:opacity-60 ' +
               (isToday ? 'bg-accent hover:bg-accent-2' : 'bg-ot hover:brightness-110')
@@ -157,6 +178,7 @@ export function SubtaskRow({
           >
             {pending ? <Spinner className="size-3 border-white/40 border-t-white" /> : 'Log'}
           </button>
+
         </span>
       </div>
 

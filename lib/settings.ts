@@ -4,6 +4,7 @@ import { eq, sql } from 'drizzle-orm'
 
 import { db } from './db'
 import { jqlPresets, prefixes, reportTemplates, settings } from './db/schema'
+import { DEFAULT_SCHEDULE, type WorkSchedule, parseClock } from './time'
 
 /**
  * SQLite is the source of truth for settings. .env.local only seeds the first
@@ -23,6 +24,10 @@ export const SETTING_KEYS = {
   logStepHours: 'log_step_hours',
   logPresets: 'log_presets',
   weekendCountsToQuota: 'weekend_counts_to_quota',
+  workDayStart: 'work_day_start',
+  workDayEnd: 'work_day_end',
+  breakStart: 'break_start',
+  breakEnd: 'break_end',
   sprintPrefixPattern: 'sprint_prefix_pattern',
   teamLabel: 'team_label',
   teamPrefix: 'team_prefix',
@@ -47,6 +52,13 @@ const DEFAULTS: Record<string, string> = {
   [SETTING_KEYS.logStepHours]: '0.5',
   [SETTING_KEYS.logPresets]: '0.5,1,2,4,8',
   [SETTING_KEYS.weekendCountsToQuota]: 'false',
+  // The working day worklogs are laid out on. Entries stack from `start`,
+  // skipping the break, so a day reads as a real timeline instead of six
+  // entries all stamped 09:00.
+  [SETTING_KEYS.workDayStart]: '09:00',
+  [SETTING_KEYS.workDayEnd]: '18:00',
+  [SETTING_KEYS.breakStart]: '12:00',
+  [SETTING_KEYS.breakEnd]: '13:00',
   [SETTING_KEYS.sprintPrefixPattern]: '[spt {n}]',
   // Team scoping. All three are empty by default — a board with no team split
   // must keep behaving exactly as before, so every rule they drive is opt-in.
@@ -238,6 +250,29 @@ export function getTeamScope(): TeamScope {
     label: label || null,
     prefix: prefix || null,
     sprintFilter: sprintFilter || null,
+  }
+}
+
+/**
+ * The working day, read from settings and falling back per-field.
+ *
+ * A single bad value must not take the whole schedule down with it: a typo in
+ * the break would otherwise push every worklog to a wrong hour, which is
+ * tedious to unpick issue by issue in Jira.
+ */
+export function getWorkSchedule(): WorkSchedule {
+  const at = (key: SettingKey, fallback: number) => parseClock(getSetting(key)) ?? fallback
+
+  const breakStart = getSetting(SETTING_KEYS.breakStart)?.trim()
+  const breakEnd = getSetting(SETTING_KEYS.breakEnd)?.trim()
+  // Clearing either field means "no break", which is a legitimate setup.
+  const noBreak = !breakStart || !breakEnd
+
+  return {
+    start: at(SETTING_KEYS.workDayStart, DEFAULT_SCHEDULE.start),
+    end: at(SETTING_KEYS.workDayEnd, DEFAULT_SCHEDULE.end),
+    breakStart: noBreak ? null : (parseClock(breakStart) ?? DEFAULT_SCHEDULE.breakStart),
+    breakEnd: noBreak ? null : (parseClock(breakEnd) ?? DEFAULT_SCHEDULE.breakEnd),
   }
 }
 

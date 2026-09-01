@@ -25,6 +25,10 @@ const K = {
   logStepHours: 'log_step_hours',
   logPresets: 'log_presets',
   weekendCountsToQuota: 'weekend_counts_to_quota',
+  workDayStart: 'work_day_start',
+  workDayEnd: 'work_day_end',
+  breakStart: 'break_start',
+  breakEnd: 'break_end',
   sprintPrefixPattern: 'sprint_prefix_pattern',
   teamLabel: 'team_label',
   teamPrefix: 'team_prefix',
@@ -98,6 +102,22 @@ export function SettingsForm({ initial }: { initial: Record<string, string> }) {
           </label>
           <p className="text-[11.5px] leading-relaxed text-ink-3">
             Mặc định T7 và CN không có định mức — giờ log vào vẫn cộng tổng nhưng không bị cảnh báo thiếu.
+          </p>
+        </Card>
+
+        <Card title="Giờ làm việc">
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Bắt đầu" name={K.workDayStart} defaultValue={initial[K.workDayStart]} mono />
+            <Field label="Kết thúc" name={K.workDayEnd} defaultValue={initial[K.workDayEnd]} mono />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Nghỉ trưa từ" name={K.breakStart} defaultValue={initial[K.breakStart]} mono />
+            <Field label="Đến" name={K.breakEnd} defaultValue={initial[K.breakEnd]} mono />
+          </div>
+          <p className="text-[11.5px] leading-relaxed text-ink-3">
+            Định dạng <code className="font-mono">HH:MM</code>. Worklog xếp nối tiếp nhau từ giờ bắt
+            đầu và nhảy qua giờ nghỉ: log 1h rồi 1h rồi 6h sẽ thành 09:00–10:00, 10:00–11:00,
+            11:00–18:00. Để trống hai ô nghỉ trưa nếu ngày làm liền mạch.
           </p>
         </Card>
 
