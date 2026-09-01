@@ -88,7 +88,10 @@ export function SubtaskRow({
 
   return (
     <div className="border-b border-line last:border-b-0 hover:bg-surface-2/60">
-      <div className="grid h-[42px] grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2.5 px-3">
+      {/* Height follows the title rather than fixing it: the row carries eight
+          controls now, so a single truncated line left most summaries unreadable
+          — and the summary is what you actually pick a task by. */}
+      <div className="grid min-h-[42px] grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2.5 px-3 py-1.5">
         <button
           type="button"
           onClick={() => setDetailOpen(true)}
@@ -101,18 +104,22 @@ export function SubtaskRow({
           </span>
         </button>
 
-        {/* Truncated to keep the row one line; the full text is in the tooltip. */}
-        <span className="flex min-w-0 items-center gap-1.5">
+        {/* Two lines, then ellipsis. Anything longer is still in the tooltip and
+            in the detail panel; three lines would push the controls apart enough
+            to lose the scannable grid. */}
+        <span className="flex min-w-0 items-start gap-1.5">
           <button
             type="button"
             onClick={() => setDetailOpen(true)}
             title={subtask.summary}
-            className="min-w-0 truncate text-left text-[13px] hover:text-accent-ink"
+            className="line-clamp-2 min-w-0 text-left text-[13px] leading-[1.35] hover:text-accent-ink"
           >
             {subtask.summary}
           </button>
           {(hygiene.missingLabel || hygiene.missingPrefix) && (
-            <HygieneBadge hygiene={hygiene} />
+            <span className="shrink-0 pt-px">
+              <HygieneBadge hygiene={hygiene} />
+            </span>
           )}
         </span>
 

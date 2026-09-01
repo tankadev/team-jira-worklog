@@ -7,6 +7,7 @@ import { createIssueAction, generateAction } from '@/app/new/actions'
 import { sprintPrefix, withoutSprintPrefix } from '@/lib/sprint-name'
 import { todayIn } from '@/lib/time'
 
+import { DateInput } from '../date-input'
 import { Spinner, Working } from '../spinner'
 import { useNav } from './navigation'
 
@@ -561,21 +562,21 @@ function CreateIssueModal({
                   <div className="flex flex-col gap-1.5">
                     <label className="flex items-center gap-2">
                       <span className="w-[34px] shrink-0 text-[11.5px] text-ink-3">Start</span>
-                      <input
-                        type="date"
+                      <DateInput
                         value={startDate}
                         max={dueDate || undefined}
-                        onChange={(e) => setStartDate(e.target.value)}
+                        aria-label="Start date"
+                        onChange={setStartDate}
                         className="min-w-0 flex-1 rounded-md border border-line bg-ground px-2 py-1 font-mono text-[12px]"
                       />
                     </label>
                     <label className="flex items-center gap-2">
                       <span className="w-[34px] shrink-0 text-[11.5px] text-ink-3">Due</span>
-                      <input
-                        type="date"
+                      <DateInput
                         value={dueDate}
                         min={startDate || undefined}
-                        onChange={(e) => setDueDate(e.target.value)}
+                        aria-label="Due date"
+                        onChange={setDueDate}
                         className="min-w-0 flex-1 rounded-md border border-line bg-ground px-2 py-1 font-mono text-[12px]"
                       />
                     </label>

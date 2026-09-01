@@ -5,6 +5,7 @@ import { useEffect, useState, useTransition } from 'react'
 import { setDatesAction } from '@/app/actions'
 import { addDays, todayIn } from '@/lib/time'
 
+import { DateInput } from '../date-input'
 import { Spinner } from '../spinner'
 import { useNav } from './navigation'
 import { Popover, PopoverTitle } from './popover'
@@ -207,12 +208,12 @@ function DateField({
   return (
     <label className="flex items-center gap-2">
       <span className="w-[34px] shrink-0 text-[11.5px] text-ink-3">{label}</span>
-      <input
-        type="date"
+      <DateInput
         value={value ?? ''}
         min={min}
         max={max}
-        onChange={(e) => onChange(e.target.value || null)}
+        aria-label={label}
+        onChange={(v) => onChange(v || null)}
         className="min-w-0 flex-1 rounded-md border border-line bg-ground px-2 py-1 font-mono text-[12px]"
       />
     </label>
