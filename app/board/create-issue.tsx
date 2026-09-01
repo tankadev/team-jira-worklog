@@ -4,7 +4,8 @@ import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { createPortal } from 'react-dom'
 
 import { createIssueAction, generateAction } from '@/app/new/actions'
-import { sprintPrefix } from '@/lib/sprint-name'
+import { sprintPrefix, withoutSprintPrefix } from '@/lib/sprint-name'
+import { todayIn } from '@/lib/time'
 
 import { Spinner, Working } from '../spinner'
 import { useNav } from './navigation'
@@ -23,8 +24,19 @@ interface ComposeContext {
   mode: 'subtask' | 'task'
   issueTypeId: string | null
   issueTypeName: string | null
-  sprints: Array<{ id: number; name: string; current: boolean }>
+  sprints: Array<{
+    id: number
+    name: string
+    current: boolean
+    start: string | null
+    end: string | null
+  }>
   currentSprintId: number | null
+  parentSprintEnd: string | null
+  /** Mandatory label and summary prefix for this team; both may be null. */
+  team: { label: string | null; prefix: string | null }
+  /** Which date fields this project actually has on its create screen. */
+  supports: { startDate: boolean; dueDate: boolean }
   prefixes: string[]
   sprintPrefixPattern: string
   budgets: Record<number, string>
@@ -36,6 +48,8 @@ interface ComposeContext {
     epicKey: string | null
     epicSummary: string | null
     sprintName: string | null
+    startDate: string | null
+    dueDate: string | null
   }
 }
 
@@ -115,6 +129,10 @@ function CreateIssueModal({
   const [pointsPicked, setPointsPicked] = useState(false)
   const [sprintId, setSprintId] = useState<number | null>(null)
   const [templateId, setTemplateId] = useState<number | undefined>()
+  // Left empty on purpose. The team fills these per task, and pre-filling
+  // today's date would let a wrong-but-plausible pair sail through unread.
+  const [startDate, setStartDate] = useState('')
+  const [dueDate, setDueDate] = useState('')
 
   const [note, setNote] = useState<{ ok: boolean; message: string } | null>(null)
   const [created, setCreated] = useState<Array<{ key: string; url: string; id: string }>>([])
@@ -123,7 +141,11 @@ function CreateIssueModal({
    * one. Drives the prominent success banner so a finished create is impossible
    * to miss — the reason a second, accidental click used to slip through.
    */
-  const [justCreated, setJustCreated] = useState<{ key: string; url: string } | null>(null)
+  const [justCreated, setJustCreated] = useState<{
+    key: string
+    url: string
+    warning?: string
+  } | null>(null)
   const ideaRef = useRef<HTMLTextAreaElement>(null)
   const [generating, startGenerating] = useTransition()
   const [creating, startCreating] = useTransition()
@@ -162,10 +184,20 @@ function CreateIssueModal({
     if (justCreated) ideaRef.current?.focus()
   }, [justCreated])
 
+  /**
+   * The team prefix always leads, ahead of every chip the user picks.
+   *
+   * It is not offered as a chip because it is not a choice: `[CTALK]` is what
+   * marks the task as this team's, and `createIssue` puts it back anyway. Making
+   * it a chip would just invite someone to turn it off and wonder why it
+   * reappeared.
+   */
+  const teamPrefix = ctx?.team.prefix ?? null
+
   const fullTitle = useMemo(() => {
-    const px = picked.join('')
+    const px = [...(teamPrefix ? [teamPrefix] : []), ...picked].join('')
     return px ? `${px} ${title.trim()}`.trim() : title.trim()
-  }, [picked, title])
+  }, [teamPrefix, picked, title])
 
   const isTask = mode === 'task'
 
@@ -174,9 +206,10 @@ function CreateIssueModal({
    * Either way it is that sprint's number in the prefix — using today's running
    * sprint mislabels anything created while reviewing an earlier one.
    */
-  const targetSprintName = isTask
-    ? (ctx?.sprints.find((s) => s.id === sprintId)?.name ?? null)
-    : (ctx?.parent.sprintName ?? null)
+  const targetSprint = isTask ? (ctx?.sprints.find((s) => s.id === sprintId) ?? null) : null
+  const targetSprintName = isTask ? (targetSprint?.name ?? null) : (ctx?.parent.sprintName ?? null)
+  // A subtask has no sprint of its own; its horizon is the parent's sprint.
+  const targetSprintEnd = isTask ? (targetSprint?.end ?? null) : (ctx?.parentSprintEnd ?? null)
 
   const currentPrefix = ctx ? sprintPrefix(targetSprintName, ctx.sprintPrefixPattern) : null
   const allPrefixes = ctx ? [...(currentPrefix ? [currentPrefix] : []), ...ctx.prefixes] : []
@@ -186,7 +219,10 @@ function CreateIssueModal({
   useEffect(() => {
     if (!ctx) return
     setPicked((list) => {
-      const withoutSprint = list.filter((p) => !/^\[spt\s/i.test(p))
+      // Matched against the configured pattern, not a fixed `[spt …]` shape — a
+      // team writing `[SPT-69]` would otherwise keep the stale chip and end up
+      // with two sprint numbers in one title.
+      const withoutSprint = withoutSprintPrefix(list, ctx.sprintPrefixPattern)
       return currentPrefix ? [currentPrefix, ...withoutSprint] : withoutSprint
     })
   }, [ctx, currentPrefix])
@@ -236,12 +272,14 @@ function CreateIssueModal({
         // A parent's estimate is the sum of children that do not exist yet.
         storyPoints: isTask ? null : points,
         assignToMe: true,
+        startDate,
+        dueDate,
       })
       if (res.ok && res.key && res.url) {
         // The banner carries success now; a duplicate green note in the footer
         // would just compete with it.
         setNote(null)
-        setJustCreated({ key: res.key, url: res.url })
+        setJustCreated({ key: res.key, url: res.url, warning: res.warning })
         const next = [...created, { key: res.key, url: res.url, id: res.id ?? '' }]
         setCreated(next)
         setTitle('')
@@ -249,6 +287,10 @@ function CreateIssueModal({
         setDod('')
         setIdea('')
         setTemplateId(undefined)
+        // Dates are per task, like the title — carrying them over would silently
+        // date the next subtask to the last one's schedule.
+        setStartDate('')
+        setDueDate('')
 
         // Re-render carrying the new ids so the board query forces Jira to
         // include them; a plain refresh would race the search index.
@@ -270,7 +312,15 @@ function CreateIssueModal({
   // title clears but the sprint prefix stays, so keying `canCreate` off the
   // combined string would leave the button armed to fire a prefix-only issue on
   // an accidental second click.
-  const canCreate = Boolean(title.trim() && ctx?.issueTypeId && !creating)
+  // Only the dates this project actually supports are required, and the panel
+  // hides entirely on a project that has neither.
+  const wantsDates = Boolean(ctx?.supports.startDate || ctx?.supports.dueDate)
+  const datesOk =
+    !ctx ||
+    ((!ctx.supports.startDate || Boolean(startDate)) &&
+      (!ctx.supports.dueDate || Boolean(dueDate)) &&
+      !(startDate && dueDate && dueDate < startDate))
+  const canCreate = Boolean(title.trim() && ctx?.issueTypeId && datesOk && !creating)
 
   // Rendered through the body, not inline: the button lives inside the board's
   // NavDimmer, so a plain child would fade to opacity-40 the moment a successful
@@ -335,6 +385,12 @@ function CreateIssueModal({
                   {justCreated.key}
                 </a>{' '}
                 thành công. Form đã xoá trắng, sẵn sàng cho task tiếp theo.
+                {/* The issue is real, so the banner stays green — but a field
+                    that did not land has to be said out loud, not left for the
+                    user to spot as an empty chip on the board later. */}
+                {justCreated.warning && (
+                  <span className="mt-1 block text-warn">⚠ {justCreated.warning}</span>
+                )}
               </div>
             </div>
           )}
@@ -379,6 +435,7 @@ function CreateIssueModal({
                   />
                   {fullTitle && (
                     <div className="mt-1.5 rounded-md bg-surface-2 px-2.5 py-1.5 font-mono text-[12px] leading-relaxed text-ink-2">
+                      {teamPrefix && <span className="font-semibold text-blue">{teamPrefix}</span>}
                       {picked.length > 0 && (
                         <span className="font-semibold text-accent-ink">{picked.join('')}</span>
                       )}{' '}
@@ -450,6 +507,17 @@ function CreateIssueModal({
 
                 <Field label="Tiền tố" hint="thứ tự bấm là thứ tự ghép">
                   <div className="flex flex-wrap gap-1.5">
+                    {/* Locked, not toggleable: the team tag is a rule, not a
+                        preference, and the server re-applies it regardless. */}
+                    {teamPrefix && (
+                      <span
+                        title="Bắt buộc cho task của team — luôn đứng đầu title"
+                        className="inline-flex items-center gap-1 rounded-full border border-blue bg-blue-soft px-[10px] py-[3px] font-mono text-[11.5px] font-semibold text-blue"
+                      >
+                        <span className="text-[9px]">🔒</span>
+                        {teamPrefix}
+                      </span>
+                    )}
                     {allPrefixes.map((label) => {
                       const index = picked.indexOf(label)
                       const on = index !== -1
@@ -479,7 +547,62 @@ function CreateIssueModal({
                       )
                     })}
                   </div>
+                  {ctx.team.label && (
+                    <p className="text-[11px] leading-relaxed text-ink-3">
+                      Tự gắn label{' '}
+                      <b className="font-mono text-ink-2">{ctx.team.label}</b> — thiếu label này
+                      task sẽ không hiện trên board của team.
+                    </p>
+                  )}
                 </Field>
+
+                {wantsDates && (
+                <Field label="Ngày" hint="bắt buộc">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="flex items-center gap-2">
+                      <span className="w-[34px] shrink-0 text-[11.5px] text-ink-3">Start</span>
+                      <input
+                        type="date"
+                        value={startDate}
+                        max={dueDate || undefined}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        className="min-w-0 flex-1 rounded-md border border-line bg-ground px-2 py-1 font-mono text-[12px]"
+                      />
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <span className="w-[34px] shrink-0 text-[11.5px] text-ink-3">Due</span>
+                      <input
+                        type="date"
+                        value={dueDate}
+                        min={startDate || undefined}
+                        onChange={(e) => setDueDate(e.target.value)}
+                        className="min-w-0 flex-1 rounded-md border border-line bg-ground px-2 py-1 font-mono text-[12px]"
+                      />
+                    </label>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    <DatePreset
+                      label="Hôm nay"
+                      onClick={() => {
+                        setStartDate(todayIn())
+                        setDueDate(todayIn())
+                      }}
+                    />
+                    {targetSprintEnd && (
+                      <DatePreset
+                        label="Hôm nay → hết sprint"
+                        onClick={() => {
+                          setStartDate(todayIn())
+                          setDueDate(targetSprintEnd)
+                        }}
+                      />
+                    )}
+                  </div>
+                  {startDate && dueDate && dueDate < startDate && (
+                    <p className="text-[11px] text-crit">Due date đang sớm hơn start date.</p>
+                  )}
+                </Field>
+                )}
 
                 {isTask ? (
                   <Field label="Sprint">
@@ -563,6 +686,9 @@ function CreateIssueModal({
               {note.message}
             </span>
           )}
+          {!note && ctx && !datesOk && title.trim() && (
+            <span className="text-[12px] text-warn">Chọn start date và due date trước khi tạo</span>
+          )}
           <span className="ml-auto flex items-center gap-2">
             <button
               type="button"
@@ -584,6 +710,18 @@ function CreateIssueModal({
       </div>
     </div>,
     document.body,
+  )
+}
+
+function DatePreset({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded-full border border-line px-2 py-[2px] text-[11px] text-ink-2 hover:border-accent hover:text-accent-ink"
+    >
+      {label}
+    </button>
   )
 }
 

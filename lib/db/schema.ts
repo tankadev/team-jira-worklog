@@ -44,6 +44,9 @@ export const drafts = sqliteTable('drafts', {
   parentKey: text('parent_key'),
   sprintId: integer('sprint_id'),
   storyPoints: integer('story_points'),
+  /** YYYY-MM-DD, kept so a draft resumes with the schedule it was given. */
+  startDate: text('start_date'),
+  dueDate: text('due_date'),
   createdAt: integer('created_at').notNull().default(now),
   updatedAt: integer('updated_at').notNull().default(now),
 })

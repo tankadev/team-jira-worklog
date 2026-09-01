@@ -21,11 +21,20 @@ function normalise(raw: string): string {
 export function PrefixPicker({
   library,
   sprintPrefix,
+  teamPrefix = null,
+  teamLabel = null,
   picked,
   onChange,
 }: {
   library: string[]
   sprintPrefix: string | null
+  /**
+   * The team's mandatory tag. Shown locked rather than as a chip: it is a rule,
+   * not a choice, and `createIssue` re-applies it whatever the UI says.
+   */
+  teamPrefix?: string | null
+  /** The label every issue gets, mentioned so its effect is not invisible. */
+  teamLabel?: string | null
   picked: string[]
   onChange: (next: string[]) => void
 }) {
@@ -60,6 +69,15 @@ export function PrefixPicker({
       </span>
 
       <div className="flex flex-wrap gap-1.5">
+        {teamPrefix && (
+          <span
+            title="Bắt buộc cho task của team — luôn đứng đầu title"
+            className="inline-flex items-center gap-1 rounded-full border border-blue bg-blue-soft px-[11px] py-[3px] font-mono text-[11.5px] font-semibold text-blue"
+          >
+            <span className="text-[9px]">🔒</span>
+            {teamPrefix}
+          </span>
+        )}
         {all.map((label) => {
           const index = picked.indexOf(label)
           const on = index !== -1
@@ -97,7 +115,21 @@ export function PrefixPicker({
       </div>
 
       <p className="text-[11.5px] leading-relaxed text-ink-3">
-        Bỏ chọn hết thì title không có tiền tố.
+        {teamPrefix ? (
+          <>
+            <code className="font-mono text-blue">{teamPrefix}</code> là bắt buộc, không bỏ được
+            {teamLabel && (
+              <>
+                {' '}
+                — task cũng tự gắn label{' '}
+                <code className="font-mono text-blue">{teamLabel}</code> để lên board team
+              </>
+            )}
+            .{' '}
+          </>
+        ) : (
+          'Bỏ chọn hết thì title không có tiền tố. '
+        )}
         {sprintPrefix && (
           <>
             {' '}

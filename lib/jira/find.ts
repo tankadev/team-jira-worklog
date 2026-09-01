@@ -4,7 +4,7 @@ import { eq } from 'drizzle-orm'
 
 import { db } from '../db'
 import { jqlPresets } from '../db/schema'
-import { ensureSeeded, requireProjectKey } from '../settings'
+import { ensureSeeded, getTeamScope, requireProjectKey } from '../settings'
 import { type JiraIssue, jiraFetch, searchJql } from './client'
 import { getProjectMeta } from './meta'
 
@@ -112,15 +112,22 @@ export interface Preset {
 }
 
 /**
- * Presets store `{project}` and `{sp}` rather than literal values: a preset
- * containing a hardcoded `cf[10016]` would work here and silently break on any
- * other project, since that id differs per instance.
+ * Presets store `{project}`, `{sp}` and `{team}` rather than literal values: a
+ * preset containing a hardcoded `cf[10016]` would work here and silently break
+ * on any other project, since that id differs per instance.
+ *
+ * `{team}` expands to the team label clause, or to nothing at all when no team
+ * is configured — so one preset text serves both a shared board and a private
+ * one. It carries its own leading `AND`, which is why it sits at the end of the
+ * where-clause in every built-in preset.
  */
 export async function listPresets(): Promise<Preset[]> {
   ensureSeeded()
   const meta = await getProjectMeta()
   const projectKey = requireProjectKey()
   const spId = meta.storyPointsFieldId?.replace('customfield_', '') ?? ''
+  const teamLabel = getTeamScope().label
+  const teamClause = teamLabel ? ` AND labels = "${escapeJql(teamLabel)}"` : ''
 
   return db
     .select()
@@ -130,7 +137,10 @@ export async function listPresets(): Promise<Preset[]> {
       id: p.id,
       name: p.name,
       builtin: p.builtin,
-      jql: p.jql.replace(/\{project\}/g, projectKey).replace(/\{sp\}/g, spId),
+      jql: p.jql
+        .replace(/\{project\}/g, projectKey)
+        .replace(/\{sp\}/g, spId)
+        .replace(/\s*\{team\}/g, teamClause),
     }))
 }
 

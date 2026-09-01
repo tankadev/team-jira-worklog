@@ -1,12 +1,13 @@
 import 'server-only'
 
-import { SETTING_KEYS, getSetting, requireProjectKey } from '../settings'
+import { SETTING_KEYS, getSetting, getTeamScope, requireProjectKey } from '../settings'
+import { getBoardConfig } from './board-config'
 import { type JiraIssue, jiraFetch, searchJql } from './client'
 import { getProjectMeta } from './meta'
 import type { BoardParent, BoardSubtask, SprintTask, Transition } from './types'
 
 export type { BoardParent, BoardSubtask, SprintTask, Transition } from './types'
-export { statusTone } from './types'
+export { issueHygiene, statusTone } from './types'
 
 function num(v: unknown): number | null {
   return typeof v === 'number' ? v : null
@@ -19,6 +20,28 @@ function ms(v: unknown): number {
 
 function escapeJql(value: string): string {
   return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+}
+
+function str(v: unknown): string | null {
+  return typeof v === 'string' && v ? v : null
+}
+
+function strings(v: unknown): string[] {
+  return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []
+}
+
+/**
+ * The clause that narrows every read to the team's own issues.
+ *
+ * One project can host several teams' boards, told apart by nothing but a label
+ * — VipTalk splits CTALK-TEAM from HIR-TEAM that way. Without this the app shows
+ * issues that do not appear on the board the user actually works from. Returns
+ * an empty array when no team label is configured, leaving single-team setups
+ * exactly as they were.
+ */
+function teamClauses(): string[] {
+  const { label } = getTeamScope()
+  return label ? [`labels = "${escapeJql(label)}"`] : []
 }
 
 export interface BoardQuery {
@@ -70,6 +93,7 @@ export async function getBoard(query: BoardQuery = {}): Promise<BoardParent[]> {
     `project = "${escapeJql(projectKey)}"`,
     'assignee = currentUser()',
     'issuetype in subTaskIssueTypes()',
+    ...teamClauses(),
   ]
 
   if (query.status !== 'all') base.push('statusCategory != Done')
@@ -78,8 +102,18 @@ export async function getBoard(query: BoardQuery = {}): Promise<BoardParent[]> {
     base.push(`(summary ~ "${term}*" OR key = "${term}")`)
   }
 
-  const fields = ['summary', 'status', 'parent', 'issuetype', 'timespent', 'created']
+  const fields = [
+    'summary',
+    'status',
+    'parent',
+    'issuetype',
+    'timespent',
+    'created',
+    'duedate',
+    'labels',
+  ]
   if (meta.storyPointsFieldId) fields.push(meta.storyPointsFieldId)
+  if (meta.startDateFieldId) fields.push(meta.startDateFieldId)
 
   let issues: JiraIssue[]
 
@@ -120,6 +154,9 @@ export async function getBoard(query: BoardQuery = {}): Promise<BoardParent[]> {
     timeSpentSeconds: issue.fields.timespent ?? 0,
     loggedTodaySeconds: 0,
     created: ms(issue.fields.created),
+    startDate: meta.startDateFieldId ? str(issue.fields[meta.startDateFieldId]) : null,
+    dueDate: str(issue.fields.duedate),
+    labels: strings(issue.fields.labels),
   }))
 
   // When the board hides Done subtasks, the fetched list is a subset of each
@@ -127,17 +164,24 @@ export async function getBoard(query: BoardQuery = {}): Promise<BoardParent[]> {
   // otherwise the "save" suggestion would offer to overwrite the parent with a
   // filtered subtotal.
   const childrenFiltered = query.status !== 'all'
-  return groupByParent(subtasks, issues, meta.storyPointsFieldId, projectKey, childrenFiltered)
+  return groupByParent(
+    subtasks,
+    issues,
+    { storyPointsFieldId: meta.storyPointsFieldId, startDateFieldId: meta.startDateFieldId },
+    projectKey,
+    childrenFiltered,
+  )
 }
 
 async function groupByParent(
   subtasks: BoardSubtask[],
   issues: JiraIssue[],
-  storyPointsFieldId: string | null,
+  fieldIds: { storyPointsFieldId: string | null; startDateFieldId: string | null },
   projectKey: string,
   /** True when Done children were excluded from `subtasks` by the status filter. */
   childrenFiltered: boolean,
 ): Promise<BoardParent[]> {
+  const { storyPointsFieldId, startDateFieldId } = fieldIds
   const parentInfo = new Map<
     string,
     {
@@ -147,6 +191,9 @@ async function groupByParent(
       epicKey: string | null
       epicName: string | null
       created: number
+      startDate: string | null
+      dueDate: string | null
+      labels: string[]
     }
   >()
   for (const issue of issues) {
@@ -158,9 +205,12 @@ async function groupByParent(
         statusName: '',
         epicKey: null,
         epicName: null,
-        // A child's `parent` object carries no created date — the direct fetch
-        // below fills it in.
+        // A child's `parent` object carries no created date, dates or labels —
+        // the direct fetch below fills them in.
         created: 0,
+        startDate: null,
+        dueDate: null,
+        labels: [],
       })
     }
   }
@@ -171,8 +221,9 @@ async function groupByParent(
   const parentPoints = new Map<string, number | null>()
   const keys = [...parentInfo.keys()]
   if (keys.length) {
-    const fields = ['summary', 'issuetype', 'parent', 'status', 'created']
+    const fields = ['summary', 'issuetype', 'parent', 'status', 'created', 'duedate', 'labels']
     if (storyPointsFieldId) fields.push(storyPointsFieldId)
+    if (startDateFieldId) fields.push(startDateFieldId)
     const fetched = await searchJql<JiraIssue>(
       `key in (${keys.map((k) => `"${k}"`).join(',')})`,
       fields,
@@ -187,6 +238,9 @@ async function groupByParent(
         epicKey: p.fields.parent?.key ?? null,
         epicName: p.fields.parent?.fields?.summary ?? null,
         created: ms(p.fields.created),
+        startDate: startDateFieldId ? str(p.fields[startDateFieldId]) : null,
+        dueDate: str(p.fields.duedate),
+        labels: strings(p.fields.labels),
       })
     }
   }
@@ -210,6 +264,9 @@ async function groupByParent(
         childCount: 0,
         childTimeSpentTotal: 0,
         created: info?.created ?? 0,
+        startDate: info?.startDate ?? null,
+        dueDate: info?.dueDate ?? null,
+        labels: info?.labels ?? [],
         subtasks: [],
       })
     }
@@ -283,14 +340,16 @@ export async function getSprintTasks(
     `project = "${escapeJql(projectKey)}"`,
     'assignee = currentUser()',
     'issuetype not in subTaskIssueTypes()',
+    ...teamClauses(),
   ]
   // Done issues still matter here: QC files Bug and Improve already closed, and
   // the work on them may not be logged yet.
   if (status === 'open') clauses.push('statusCategory != Done')
   if (sprintId) clauses.push(`sprint = ${sprintId}`)
 
-  const fields = ['summary', 'status', 'issuetype', 'subtasks', 'parent']
+  const fields = ['summary', 'status', 'issuetype', 'subtasks', 'parent', 'duedate', 'labels']
   if (meta.storyPointsFieldId) fields.push(meta.storyPointsFieldId)
+  if (meta.startDateFieldId) fields.push(meta.startDateFieldId)
 
   const issues = await searchJql<JiraIssue>(
     `${clauses.join(' AND ')} ORDER BY created DESC`,
@@ -310,6 +369,9 @@ export async function getSprintTasks(
       // On a standard-level issue, `parent` points one level up — at the Epic.
       epicKey: issue.fields.parent?.key ?? null,
       epicName: issue.fields.parent?.fields?.summary ?? null,
+      startDate: meta.startDateFieldId ? str(issue.fields[meta.startDateFieldId]) : null,
+      dueDate: str(issue.fields.duedate),
+      labels: strings(issue.fields.labels),
     }))
 }
 
@@ -335,6 +397,7 @@ export async function getInProgressSubtasks(
     'assignee = currentUser()',
     'issuetype in subTaskIssueTypes()',
     'statusCategory = "In Progress"',
+    ...teamClauses(),
   ]
 
   const CHUNK = 50
@@ -364,6 +427,9 @@ export interface IssueDetail {
   parentSummary: string | null
   sprintName: string | null
   assigneeName: string | null
+  startDate: string | null
+  dueDate: string | null
+  labels: string[]
   /** Raw ADF; the client turns it into blocks. */
   description: unknown
   url: string
@@ -374,9 +440,20 @@ export async function getIssueDetail(issueKey: string): Promise<IssueDetail> {
   const meta = await getProjectMeta()
   const baseUrl = getSetting(SETTING_KEYS.jiraBaseUrl)?.replace(/\/+$/, '') ?? ''
 
-  const fields = ['summary', 'status', 'issuetype', 'parent', 'assignee', 'description', 'timespent']
+  const fields = [
+    'summary',
+    'status',
+    'issuetype',
+    'parent',
+    'assignee',
+    'description',
+    'timespent',
+    'duedate',
+    'labels',
+  ]
   if (meta.storyPointsFieldId) fields.push(meta.storyPointsFieldId)
   if (meta.sprintFieldId) fields.push(meta.sprintFieldId)
+  if (meta.startDateFieldId) fields.push(meta.startDateFieldId)
 
   const issue = await jiraFetch<JiraIssue>(
     `/rest/api/3/issue/${encodeURIComponent(issueKey)}?fields=${fields.join(',')}`,
@@ -396,6 +473,9 @@ export async function getIssueDetail(issueKey: string): Promise<IssueDetail> {
     parentSummary: issue.fields.parent?.fields?.summary ?? null,
     sprintName: sprints[sprints.length - 1]?.name ?? null,
     assigneeName: issue.fields.assignee?.displayName ?? null,
+    startDate: meta.startDateFieldId ? str(issue.fields[meta.startDateFieldId]) : null,
+    dueDate: str(issue.fields.duedate),
+    labels: strings(issue.fields.labels),
     description: issue.fields.description ?? null,
     url: `${baseUrl}/browse/${issue.key}`,
   }
@@ -428,9 +508,77 @@ export async function updateStoryPoints(issueKey: string, points: number | null)
   const meta = await getProjectMeta()
   if (!meta.storyPointsFieldId) throw new Error('Không tìm thấy field story point')
 
+  // The plain field write is tried first even when createmeta never mentioned
+  // the field. That sounds wrong and is not: on this instance `customfield_10033`
+  // appears on no create or edit screen, yet a direct PUT sets it — verified by
+  // writing a different value and reading it back. It is also the only path that
+  // does not depend on the search index, which matters most right after a create.
+  try {
+    await jiraFetch(`/rest/api/3/issue/${encodeURIComponent(issueKey)}`, {
+      method: 'PUT',
+      body: { fields: { [meta.storyPointsFieldId]: points } },
+    })
+    return
+  } catch (error) {
+    // Where the field IS on the screen there is no second route to try, so the
+    // failure is the answer. Elsewhere Jira may refuse with "Field cannot be
+    // set. It is not on the appropriate screen, or unknown." — and the board
+    // still knows how to estimate.
+    if (meta.storyPointsOnScreen) throw error
+    await setEstimateViaBoard(issueKey, points, error)
+  }
+}
+
+/**
+ * Writes the estimate through the board instead of the issue.
+ *
+ * This is how the backlog's own inline estimate works, and it is the only way in
+ * when Story Points is off every screen — which is the case on the VipTalk
+ * project, where the field holds real values that no issue-edit call can touch.
+ * The board id is required: it is what tells Jira which field it means.
+ */
+async function setEstimateViaBoard(
+  issueKey: string,
+  points: number | null,
+  /** Why the plain field write failed, reported when there is no board to try. */
+  fieldError: unknown,
+): Promise<void> {
+  const board = await getBoardConfig()
+  // Nothing left to try — the field write's own error is more useful than any
+  // sentence about a board the user has not configured.
+  if (!board) throw fieldError
+
+  await jiraFetch(
+    `/rest/agile/1.0/issue/${encodeURIComponent(issueKey)}/estimation?boardId=${encodeURIComponent(board.id)}`,
+    // An empty string clears the estimate; the endpoint rejects null.
+    { method: 'PUT', body: { value: points === null ? '' : String(points) } },
+  )
+}
+
+/**
+ * Sets planned start and/or due date.
+ *
+ * Both are ordinary fields on the edit screen, so one PUT does the job. Passing
+ * `null` clears a date — distinct from omitting the key, which leaves it alone.
+ */
+export async function updateDates(
+  issueKey: string,
+  dates: { startDate?: string | null; dueDate?: string | null },
+): Promise<void> {
+  const meta = await getProjectMeta()
+  const fields: Record<string, unknown> = {}
+
+  if ('startDate' in dates) {
+    if (!meta.startDateFieldId) throw new Error('Không tìm thấy field Start date trên project này')
+    fields[meta.startDateFieldId] = dates.startDate ?? null
+  }
+  if ('dueDate' in dates) fields.duedate = dates.dueDate ?? null
+
+  if (!Object.keys(fields).length) return
+
   await jiraFetch(`/rest/api/3/issue/${encodeURIComponent(issueKey)}`, {
     method: 'PUT',
-    body: { fields: { [meta.storyPointsFieldId]: points } },
+    body: { fields },
   })
 }
 

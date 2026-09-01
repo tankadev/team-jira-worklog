@@ -6,9 +6,12 @@ import { logWorkAction } from '@/app/actions'
 // Import from types.ts, never issues.ts — the latter pulls in the DB layer and
 // would end up in the browser bundle.
 import type { BoardSubtask } from '@/lib/jira/types'
+import { issueHygiene } from '@/lib/jira/types'
 import { formatDuration } from '@/lib/time'
 
 import { Spinner } from '../spinner'
+import { DatesEditor } from './dates-editor'
+import { HygieneBadge } from './hygiene-badge'
 import { IssueDetail } from './issue-detail'
 import { useNav } from './navigation'
 import { PointsEditor } from './points-editor'
@@ -32,6 +35,9 @@ export function SubtaskRow({
   step,
   presets,
   budgets,
+  sprintEnd = null,
+  team = { label: null, prefix: null },
+  datesSupported = true,
 }: {
   subtask: BoardSubtask
   date: string
@@ -40,6 +46,12 @@ export function SubtaskRow({
   step: number
   presets: number[]
   budgets: Record<number, string>
+  /** End of the sprint on screen, offered as a one-click due date. */
+  sprintEnd?: string | null
+  /** The team's filing rules, for the warning badge. */
+  team?: { label: string | null; prefix: string | null }
+  /** False on a project with neither date field — hides the chip entirely. */
+  datesSupported?: boolean
 }) {
   const [hours, setHours] = useState(step)
   const [comment, setComment] = useState('')
@@ -61,6 +73,7 @@ export function SubtaskRow({
 
   const today = subtask.loggedTodaySeconds
   const total = subtask.timeSpentSeconds
+  const hygiene = issueHygiene(subtask, team)
 
   return (
     <div className="border-b border-line last:border-b-0 hover:bg-surface-2/60">
@@ -78,17 +91,32 @@ export function SubtaskRow({
         </button>
 
         {/* Truncated to keep the row one line; the full text is in the tooltip. */}
-        <button
-          type="button"
-          onClick={() => setDetailOpen(true)}
-          title={subtask.summary}
-          className="min-w-0 truncate text-left text-[13px] hover:text-accent-ink"
-        >
-          {subtask.summary}
-        </button>
+        <span className="flex min-w-0 items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setDetailOpen(true)}
+            title={subtask.summary}
+            className="min-w-0 truncate text-left text-[13px] hover:text-accent-ink"
+          >
+            {subtask.summary}
+          </button>
+          {(hygiene.missingLabel || hygiene.missingPrefix) && (
+            <HygieneBadge hygiene={hygiene} />
+          )}
+        </span>
 
         <span className="flex items-center gap-1.5 whitespace-nowrap">
           <StatusPill issueKey={subtask.key} statusName={subtask.statusName} compact />
+
+          {datesSupported && (
+          <DatesEditor
+            issueKey={subtask.key}
+            startDate={subtask.startDate}
+            dueDate={subtask.dueDate}
+            sprintEnd={sprintEnd}
+            isDone={subtask.statusName.trim().toUpperCase() === 'DONE'}
+          />
+          )}
 
           <PointsEditor
             issueKey={subtask.key}

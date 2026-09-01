@@ -2,7 +2,7 @@ import { getIssueDetail } from '@/lib/jira/issues'
 import { getProjectMeta } from '@/lib/jira/meta'
 import { getSprints } from '@/lib/jira/sprints'
 import { listPrefixes } from '@/lib/drafts'
-import { SETTING_KEYS, getSetting } from '@/lib/settings'
+import { SETTING_KEYS, getSetting, getTeamScope } from '@/lib/settings'
 import { listTaskTemplates } from '@/lib/task-templates'
 
 export const runtime = 'nodejs'
@@ -36,17 +36,37 @@ export async function GET(request: Request) {
         : meta.issueTypes.find((t) => t.subtask)
 
     const pattern = getSetting(SETTING_KEYS.sprintPrefixPattern) ?? '[spt {n}]'
+    const team = getTeamScope()
 
     return Response.json({
       mode,
       issueTypeId: type?.id ?? null,
       issueTypeName: type?.name ?? null,
-      // Only a standard-level issue carries its own sprint.
+      // Only a standard-level issue carries its own sprint. Dates ride along
+      // because the composer offers "hết sprint" as a one-click due date, and
+      // that is the *target* sprint's end, not today's.
       sprints:
         mode === 'task'
-          ? sprints.map((s) => ({ id: s.id, name: s.name, current: Boolean(s.current) }))
+          ? sprints.map((s) => ({
+              id: s.id,
+              name: s.name,
+              current: Boolean(s.current),
+              start: s.startDate?.slice(0, 10) ?? null,
+              end: s.endDate?.slice(0, 10) ?? null,
+            }))
           : [],
       currentSprintId: current?.id ?? null,
+      // A subtask has no sprint of its own, so its "hết sprint" is the parent's.
+      parentSprintEnd:
+        sprints.find((s) => s.name === detail.sprintName)?.endDate?.slice(0, 10) ?? null,
+      team: { label: team.label, prefix: team.prefix },
+      // Not every project has these on its create screen. The composer asks for
+      // a date only where Jira will accept one, rather than blocking a create it
+      // could have made.
+      supports: {
+        startDate: meta.startDateFieldId !== null,
+        dueDate: meta.dueDateOnScreen,
+      },
       prefixes: listPrefixes(),
       // The raw pattern, not a finished prefix: the client knows which sprint the
       // issue will land in — the parent's for a subtask, the chosen one for a
@@ -74,6 +94,8 @@ export async function GET(request: Request) {
         epicKey: detail.parentKey,
         epicSummary: detail.parentSummary,
         sprintName: detail.sprintName,
+        startDate: detail.startDate,
+        dueDate: detail.dueDate,
       },
     })
   } catch (error) {

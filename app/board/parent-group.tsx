@@ -1,8 +1,11 @@
+import { issueHygiene } from '@/lib/jira/types'
 import type { BoardParent } from '@/lib/jira/types'
-import { SETTING_KEYS, getSetting } from '@/lib/settings'
+import { SETTING_KEYS, getSetting, getTeamScope } from '@/lib/settings'
 import { formatDuration } from '@/lib/time'
 
 import { CreateIssueButton } from './create-issue'
+import { DatesEditor } from './dates-editor'
+import { HygieneBadge } from './hygiene-badge'
 import { PointsEditor, PointsRollup } from './points-editor'
 import { StatusPill } from './status-pill'
 import { SubtaskRow } from './subtask-row'
@@ -21,11 +24,17 @@ export function ParentGroup({
   date,
   dateLabel,
   isToday,
+  sprintEnd = null,
+  datesSupported = true,
 }: {
   group: BoardParent
   date: string
   dateLabel: string
   isToday: boolean
+  /** End of the sprint on screen, offered as a one-click due date. */
+  sprintEnd?: string | null
+  /** False on a project with neither date field — hides the chip entirely. */
+  datesSupported?: boolean
 }) {
   const step = Number(getSetting(SETTING_KEYS.logStepHours) ?? '0.5') || 0.5
   const presets = (getSetting(SETTING_KEYS.logPresets) ?? '0.5,1,2,4,8')
@@ -39,6 +48,7 @@ export function ParentGroup({
     3: getSetting(SETTING_KEYS.pointBudget3) ?? '1d-2d',
   }
 
+  const team = getTeamScope()
   const isOrphan = group.key === '__orphan__'
   // Full logged time across every child, not just the ones the filter leaves
   // visible, so the header total doesn't shrink when Done subtasks are hidden.
@@ -72,11 +82,21 @@ export function ParentGroup({
             <StatusPill issueKey={group.key} statusName={group.statusName} />
           )}
 
+          {!isOrphan && <HygieneBadge hygiene={issueHygiene(group, team)} />}
+
           <span className="ml-auto flex flex-wrap items-center gap-2">
             {loggedTotal > 0 && (
               <span className="font-mono text-[11px] text-ink-3">
                 đã log {formatDuration(loggedTotal)}
               </span>
+            )}
+            {!isOrphan && datesSupported && (
+              <DatesEditor
+                issueKey={group.key}
+                startDate={group.startDate}
+                dueDate={group.dueDate}
+                sprintEnd={sprintEnd}
+              />
             )}
             {!isOrphan && (
               <PointsEditor
@@ -113,6 +133,9 @@ export function ParentGroup({
             step={step}
             presets={presets}
             budgets={budgets}
+            sprintEnd={sprintEnd}
+            team={team}
+            datesSupported={datesSupported}
           />
         ))}
 

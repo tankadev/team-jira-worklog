@@ -3,8 +3,10 @@
 import { useActionState, useState, useTransition } from 'react'
 
 import {
+  type DetectResult,
   type SaveResult,
   type TestResult,
+  detectTeamAction,
   saveSettings,
   testGeminiConnection,
   testJiraConnection,
@@ -24,6 +26,9 @@ const K = {
   logPresets: 'log_presets',
   weekendCountsToQuota: 'weekend_counts_to_quota',
   sprintPrefixPattern: 'sprint_prefix_pattern',
+  teamLabel: 'team_label',
+  teamPrefix: 'team_prefix',
+  teamSprintFilter: 'team_sprint_filter',
   pointBudget1: 'point_budget_1',
   pointBudget2: 'point_budget_2',
   pointBudget3: 'point_budget_3',
@@ -54,6 +59,8 @@ export function SettingsForm({ initial }: { initial: Record<string, string> }) {
           </div>
           <ConnectionTest label="Test connection" run={testJiraConnection} />
         </Card>
+
+        <TeamCard initial={initial} />
 
         <Card title="Google Gemini">
           <Field
@@ -124,7 +131,7 @@ export function SettingsForm({ initial }: { initial: Record<string, string> }) {
             name={K.sprintPrefixPattern}
             defaultValue={initial[K.sprintPrefixPattern]}
             mono
-            hint="{n} lấy số cuối trong tên sprint — VT Sprint 66 → [spt 66]. Để trống nếu không dùng."
+            hint="{n} lấy số cuối trong tên sprint — CTALK-TEAM Sprint 69 → [SPT-69] nếu mẫu là [SPT-{n}]. Để trống nếu không dùng."
           />
         </Card>
 
@@ -144,6 +151,99 @@ export function SettingsForm({ initial }: { initial: Record<string, string> }) {
         </div>
       </div>
     </form>
+  )
+}
+
+/**
+ * The team's slice of a shared board.
+ *
+ * One Jira project can host several teams whose boards differ only by a label —
+ * VipTalk splits CTALK-TEAM from HIR-TEAM that way. These three values are what
+ * the app needs to stay inside one team's lane: what to filter reads by, what
+ * to stamp on every issue it creates, and which sprints are actually this
+ * team's. Leave them empty on a single-team board and nothing changes.
+ *
+ * Controlled inputs rather than defaultValue, because "Dò từ board" fills them
+ * in — the user then reads what was found and saves it, or does not.
+ */
+function TeamCard({ initial }: { initial: Record<string, string> }) {
+  const [label, setLabel] = useState(initial[K.teamLabel] ?? '')
+  const [prefix, setPrefix] = useState(initial[K.teamPrefix] ?? '')
+  const [sprintFilter, setSprintFilter] = useState(initial[K.teamSprintFilter] ?? '')
+  const [result, setResult] = useState<DetectResult | null>(null)
+  const [pending, startTransition] = useTransition()
+
+  function detect() {
+    startTransition(async () => {
+      const res = await detectTeamAction()
+      setResult(res)
+      if (res.ok && res.scope) {
+        setLabel(res.scope.label ?? '')
+        setPrefix(res.scope.prefix ?? '')
+        setSprintFilter(res.scope.sprintFilter ?? '')
+      }
+    })
+  }
+
+  return (
+    <Card title="Team trên board">
+      <ControlledField
+        label="Label của team"
+        name={K.teamLabel}
+        value={label}
+        onChange={setLabel}
+        mono
+        hint="Board của team là một filter theo label này. Mọi task app tạo ra đều được gắn — thiếu nó task sẽ không hiện trên board."
+      />
+      <ControlledField
+        label="Tiền tố bắt buộc"
+        name={K.teamPrefix}
+        value={prefix}
+        onChange={setPrefix}
+        mono
+        hint="Luôn đứng đầu title, không bỏ chọn được. Ví dụ [CTALK]."
+      />
+      <ControlledField
+        label="Lọc sprint theo tên"
+        name={K.teamSprintFilter}
+        value={sprintFilter}
+        onChange={setSprintFilter}
+        mono
+        hint="Board chung liệt kê cả sprint của team khác. Chuỗi này giữ lại đúng sprint của bạn — ví dụ CTALK."
+      />
+
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          disabled={pending}
+          onClick={detect}
+          className="rounded-md border border-line-strong bg-surface px-[9px] py-1 text-[12.5px] hover:bg-surface-2 disabled:opacity-60"
+        >
+          {pending ? 'Đang dò…' : 'Dò từ board'}
+        </button>
+        {result && (
+          <span className="flex min-w-0 items-center gap-2 font-mono text-[11px]">
+            <i
+              className={
+                'inline-block size-[6px] shrink-0 rounded-full ' +
+                (result.ok ? 'bg-good' : 'bg-crit')
+              }
+            />
+            <span className={result.ok ? 'text-ink-2' : 'text-crit'}>{result.message}</span>
+          </span>
+        )}
+      </div>
+      {result?.detail && (
+        <code className="block overflow-x-auto rounded-md bg-surface-2 px-2 py-1.5 font-mono text-[11px] text-ink-3">
+          {result.detail}
+        </code>
+      )}
+      {result?.ok && (
+        <p className="text-[11.5px] leading-relaxed text-ink-3">
+          Đã điền sẵn — kiểm tra lại rồi bấm <b className="text-ink-2">Lưu settings</b>.
+        </p>
+      )}
+    </Card>
   )
 }
 
@@ -180,6 +280,38 @@ function Field({
         name={name}
         type={type}
         defaultValue={defaultValue ?? ''}
+        className={
+          'w-full rounded-md border border-line bg-ground px-[10px] py-[7px] text-[13.5px] ' +
+          (mono ? 'font-mono' : '')
+        }
+      />
+      {hint && <span className="text-[11.5px] leading-relaxed text-ink-3">{hint}</span>}
+    </label>
+  )
+}
+
+function ControlledField({
+  label,
+  name,
+  value,
+  onChange,
+  mono,
+  hint,
+}: {
+  label: string
+  name: string
+  value: string
+  onChange: (value: string) => void
+  mono?: boolean
+  hint?: string
+}) {
+  return (
+    <label className="flex flex-col gap-[5px]">
+      <span className="text-xs font-medium text-ink-2">{label}</span>
+      <input
+        name={name}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
         className={
           'w-full rounded-md border border-line bg-ground px-[10px] py-[7px] text-[13.5px] ' +
           (mono ? 'font-mono' : '')

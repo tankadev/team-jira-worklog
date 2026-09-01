@@ -18,6 +18,8 @@ export interface DraftInput {
   parentKey?: string | null
   sprintId?: number | null
   storyPoints?: number | null
+  startDate?: string | null
+  dueDate?: string | null
 }
 
 export function listDrafts() {
@@ -41,6 +43,8 @@ export function saveDraft(input: DraftInput) {
     parentKey: input.parentKey ?? null,
     sprintId: input.sprintId ?? null,
     storyPoints: input.storyPoints ?? null,
+    startDate: input.startDate || null,
+    dueDate: input.dueDate || null,
     updatedAt: sql`(strftime('%s','now'))` as unknown as number,
   }
 

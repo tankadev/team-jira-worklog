@@ -4,6 +4,8 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useMemo, useState, useTransition } from 'react'
 
+import { todayIn } from '@/lib/time'
+
 import { createIssueAction, generateAction, saveDraftAction } from './actions'
 import { LinkPending } from '../link-pending'
 import { type DraftSummary, DraftList } from './draft-list'
@@ -40,6 +42,8 @@ interface Draft {
   parentKey: string | null
   sprintId: number | null
   storyPoints: number | null
+  startDate: string | null
+  dueDate: string | null
 }
 
 /**
@@ -59,6 +63,8 @@ export function Composer({
   sprints,
   currentSprintId,
   sprintPrefix,
+  team,
+  supportsDates,
   prefixLibrary,
   budgets,
   fieldIds,
@@ -70,9 +76,13 @@ export function Composer({
   issueTypes: IssueType[]
   parents: ParentOption[]
   epics: Array<{ key: string; summary: string }>
-  sprints: Array<{ id: number; name: string; current: boolean }>
+  sprints: Array<{ id: number; name: string; current: boolean; end: string | null }>
   currentSprintId: number | null
   sprintPrefix: string | null
+  /** Mandatory label and title prefix for the team; both may be null. */
+  team: { label: string | null; prefix: string | null }
+  /** Which date fields this project actually has on its create screen. */
+  supportsDates: { startDate: boolean; dueDate: boolean }
   prefixLibrary: string[]
   budgets: Record<number, string>
   fieldIds: { sprint: string | null; storyPoints: string | null; project: string }
@@ -101,6 +111,10 @@ export function Composer({
   const [pointsSuggested, setPointsSuggested] = useState<number | null>(null)
   const [draftId, setDraftId] = useState<number | undefined>(draft?.id)
   const [templateId, setTemplateId] = useState<number | undefined>()
+  // Never pre-filled: the team decides a task's schedule per task, and a default
+  // of "today" is exactly the kind of plausible value nobody re-reads.
+  const [startDate, setStartDate] = useState(draft?.startDate ?? '')
+  const [dueDate, setDueDate] = useState(draft?.dueDate ?? '')
 
   const [note, setNote] = useState<{ ok: boolean; message: string } | null>(null)
   const [created, setCreated] = useState<{ key: string; url: string } | null>(null)
@@ -112,10 +126,12 @@ export function Composer({
   const isSubtask = Boolean(type?.subtask)
   const parent = parents.find((p) => p.key === parentKey) ?? null
 
+  // The team tag always leads and is never a chip — see the create modal for
+  // why it is not offered as a choice.
   const fullTitle = useMemo(() => {
-    const px = picked.join('')
+    const px = [...(team.prefix ? [team.prefix] : []), ...picked].join('')
     return px ? `${px} ${title.trim()}`.trim() : title.trim()
-  }, [picked, title])
+  }, [team.prefix, picked, title])
 
   // A subtask has neither its own epic nor its own sprint: Jira derives both
   // from the parent Task and rejects an explicit sprint outright.
@@ -168,6 +184,8 @@ export function Composer({
         parentKey,
         sprintId,
         storyPoints: points,
+        startDate,
+        dueDate,
       })
       setNote(
         res.ok
@@ -193,8 +211,12 @@ export function Composer({
         // rather than seeding a number that will be wrong immediately.
         storyPoints: isSubtask ? points : null,
         assignToMe: true,
+        startDate,
+        dueDate,
       })
-      setNote(res)
+      // A warning outranks the plain success line: the issue exists either way,
+      // and the part that did not land is the only thing left to act on.
+      setNote(res.warning ? { ok: false, message: res.warning } : res)
       if (res.ok && res.key && res.url) {
         setCreated({ key: res.key, url: res.url })
         setDraftId(undefined)
@@ -203,7 +225,19 @@ export function Composer({
   }
 
   // Both levels need a parent: a Subtask needs its Task, a Task needs its Epic.
-  const canCreate = Boolean(fullTitle && typeId && parentKey)
+  // Only the dates this project actually supports are required — the panel is
+  // hidden altogether on a project that carries neither field.
+  const wantsDates = supportsDates.startDate || supportsDates.dueDate
+  const datesOk =
+    (!supportsDates.startDate || Boolean(startDate)) &&
+    (!supportsDates.dueDate || Boolean(dueDate)) &&
+    !(startDate && dueDate && dueDate < startDate)
+  const canCreate = Boolean(fullTitle && typeId && parentKey && datesOk)
+
+  /** End of the sprint this issue will land in — the parent's for a subtask. */
+  const targetSprintEnd = isSubtask
+    ? (sprints.find((s) => s.id === parent?.sprintId)?.end ?? null)
+    : (sprints.find((s) => s.id === sprintId)?.end ?? null)
 
   return (
     <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
@@ -250,6 +284,8 @@ export function Composer({
         <PrefixPicker
           library={prefixLibrary}
           sprintPrefix={sprintPrefix}
+          teamPrefix={team.prefix}
+          teamLabel={team.label}
           picked={picked}
           onChange={setPicked}
         />
@@ -262,6 +298,7 @@ export function Composer({
           />
           {fullTitle && (
             <div className="mt-1.5 rounded-md bg-surface-2 px-[10px] py-[7px] font-mono text-[12.5px] leading-[1.5] text-ink-2">
+              {team.prefix && <span className="font-semibold text-blue">{team.prefix}</span>}
               {picked.length > 0 && (
                 <span className="font-semibold text-accent-ink">{picked.join('')}</span>
               )}{' '}
@@ -454,12 +491,75 @@ export function Composer({
             </div>
           )}
 
+          {wantsDates && (
+          <Field label="Ngày" required hint="start date & due date">
+            <div className="flex flex-col gap-1.5">
+              <label className="flex items-center gap-2">
+                <span className="w-[36px] shrink-0 text-[12px] text-ink-3">Start</span>
+                <input
+                  type="date"
+                  value={startDate}
+                  max={dueDate || undefined}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="min-w-0 flex-1 rounded-md border border-line bg-ground px-[9px] py-[6px] font-mono text-[12.5px]"
+                />
+              </label>
+              <label className="flex items-center gap-2">
+                <span className="w-[36px] shrink-0 text-[12px] text-ink-3">Due</span>
+                <input
+                  type="date"
+                  value={dueDate}
+                  min={startDate || undefined}
+                  onChange={(e) => setDueDate(e.target.value)}
+                  className="min-w-0 flex-1 rounded-md border border-line bg-ground px-[9px] py-[6px] font-mono text-[12.5px]"
+                />
+              </label>
+            </div>
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setStartDate(todayIn())
+                  setDueDate(todayIn())
+                }}
+                className="rounded-full border border-line px-2 py-[2px] text-[11px] text-ink-2 hover:border-accent hover:text-accent-ink"
+              >
+                Hôm nay
+              </button>
+              {targetSprintEnd && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStartDate(todayIn())
+                    setDueDate(targetSprintEnd)
+                  }}
+                  className="rounded-full border border-line px-2 py-[2px] text-[11px] text-ink-2 hover:border-accent hover:text-accent-ink"
+                >
+                  Hôm nay → hết sprint
+                </button>
+              )}
+            </div>
+            {startDate && dueDate && dueDate < startDate ? (
+              <p className="mt-1.5 text-[11.5px] text-crit">Due date đang sớm hơn start date.</p>
+            ) : (
+              <p className="mt-1.5 text-[11.5px] leading-relaxed text-ink-3">
+                Board mới yêu cầu mọi task đều có start date và due date.
+              </p>
+            )}
+          </Field>
+          )}
+
           <div className="mb-3.5 border-t border-line" />
 
           <div className="flex flex-wrap items-center justify-end gap-2">
             {note && (
               <span className={'mr-auto text-[12px] ' + (note.ok ? 'text-good' : 'text-crit')}>
                 {note.message}
+              </span>
+            )}
+            {!note && !datesOk && fullTitle && (
+              <span className="mr-auto text-[12px] text-warn">
+                Chọn start date và due date trước khi tạo
               </span>
             )}
             <button

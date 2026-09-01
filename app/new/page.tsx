@@ -4,7 +4,7 @@ import { connection } from 'next/server'
 import { listEpics, listParentCandidates } from '@/lib/jira/create'
 import { getProjectMeta } from '@/lib/jira/meta'
 import { getSprints, sprintPrefix } from '@/lib/jira/sprints'
-import { SETTING_KEYS, getSetting } from '@/lib/settings'
+import { SETTING_KEYS, getSetting, getTeamScope } from '@/lib/settings'
 import { getDraft, listDrafts, listPrefixes } from '@/lib/drafts'
 import { listTaskTemplates } from '@/lib/task-templates'
 
@@ -74,9 +74,15 @@ export default async function NewTaskPage(props: PageProps<'/new'>) {
           id: s.id,
           name: s.name,
           current: Boolean(s.current),
+          end: s.endDate?.slice(0, 10) ?? null,
         }))}
         currentSprintId={current?.id ?? null}
         sprintPrefix={sprintPx}
+        team={getTeamScope()}
+        supportsDates={{
+          startDate: meta.startDateFieldId !== null,
+          dueDate: meta.dueDateOnScreen,
+        }}
         prefixLibrary={listPrefixes()}
         budgets={budgets}
         fieldIds={{
@@ -98,6 +104,8 @@ export default async function NewTaskPage(props: PageProps<'/new'>) {
                 parentKey: draft.parentKey,
                 sprintId: draft.sprintId,
                 storyPoints: draft.storyPoints,
+                startDate: draft.startDate,
+                dueDate: draft.dueDate,
               }
             : null
         }

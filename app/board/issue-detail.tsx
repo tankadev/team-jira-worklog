@@ -29,6 +29,9 @@ interface Detail {
   parentSummary: string | null
   sprintName: string | null
   assigneeName: string | null
+  startDate: string | null
+  dueDate: string | null
+  labels: string[]
   description: unknown
   url: string
 }
@@ -137,6 +140,22 @@ export function IssueDetail({ issueKey, onClose }: { issueKey: string; onClose: 
                 {detail.assigneeName && <Row label="Giao cho">{detail.assigneeName}</Row>}
                 <Row label="Story point">
                   {detail.storyPoints ?? <span className="text-ink-3">chưa đặt</span>}
+                </Row>
+                <Row label="Ngày">
+                  {detail.startDate || detail.dueDate ? (
+                    <span className="font-mono">
+                      {detail.startDate ?? '—'} → {detail.dueDate ?? '—'}
+                    </span>
+                  ) : (
+                    <span className="text-warn">chưa đặt start/due</span>
+                  )}
+                </Row>
+                <Row label="Label">
+                  {detail.labels.length ? (
+                    <span className="font-mono text-ink-2">{detail.labels.join(', ')}</span>
+                  ) : (
+                    <span className="text-warn">chưa có label</span>
+                  )}
                 </Row>
                 <Row label="Đã log">
                   {detail.timeSpentSeconds ? (

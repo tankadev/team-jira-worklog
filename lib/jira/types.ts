@@ -20,6 +20,11 @@ export interface BoardSubtask {
   loggedTodaySeconds: number
   /** Creation time as epoch ms, for the board's created-date sort. 0 if unknown. */
   created: number
+  /** Planned start, YYYY-MM-DD. Null when the team has not filled it in. */
+  startDate: string | null
+  /** Due date, YYYY-MM-DD. */
+  dueDate: string | null
+  labels: string[]
 }
 
 export interface BoardParent {
@@ -48,6 +53,9 @@ export interface BoardParent {
   childTimeSpentTotal: number
   /** Creation time as epoch ms, for the board's created-date sort. 0 if unknown. */
   created: number
+  startDate: string | null
+  dueDate: string | null
+  labels: string[]
   /** The children shown on the board — narrowed by the status filter. */
   subtasks: BoardSubtask[]
 }
@@ -62,6 +70,9 @@ export interface SprintTask {
   /** The epic this sits under. `parent` on a standard issue IS the epic. */
   epicKey: string | null
   epicName: string | null
+  startDate: string | null
+  dueDate: string | null
+  labels: string[]
 }
 
 export interface Transition {
@@ -87,4 +98,55 @@ export function statusTone(name: string): StatusTone {
   if (s.startsWith('READY FOR TEST')) return 'test'
   if (s === 'TO DO' || s === 'TODO') return 'todo'
   return 'prog'
+}
+
+
+/**
+ * What a team requires of every issue it owns, checked against one issue.
+ *
+ * The board's saved filter is `labels in (ctalk)`, so an issue missing that
+ * label is not merely untidy — it is invisible on the team's own board while
+ * still being perfectly visible here, which is the confusing half. The prefix
+ * and the two dates are the team's own conventions, unenforced by Jira.
+ *
+ * Pure and free of server imports so a row can call it while rendering.
+ */
+export interface IssueHygiene {
+  missingLabel: boolean
+  missingPrefix: boolean
+  missingStartDate: boolean
+  missingDueDate: boolean
+  /** True when anything above is true — the badge's on/off switch. */
+  any: boolean
+  /** One short Vietnamese phrase per problem, for the tooltip. */
+  problems: string[]
+}
+
+export function issueHygiene(
+  issue: { summary: string; labels: string[]; startDate: string | null; dueDate: string | null },
+  team: { label: string | null; prefix: string | null },
+): IssueHygiene {
+  const missingLabel = Boolean(
+    team.label && !issue.labels.some((l) => l.toLowerCase() === team.label!.toLowerCase()),
+  )
+  const missingPrefix = Boolean(
+    team.prefix && !issue.summary.trim().toLowerCase().startsWith(team.prefix.toLowerCase()),
+  )
+  const missingStartDate = !issue.startDate
+  const missingDueDate = !issue.dueDate
+
+  const problems: string[] = []
+  if (missingLabel) problems.push(`thiếu label ${team.label}`)
+  if (missingPrefix) problems.push(`thiếu tiền tố ${team.prefix}`)
+  if (missingStartDate) problems.push('chưa có start date')
+  if (missingDueDate) problems.push('chưa có due date')
+
+  return {
+    missingLabel,
+    missingPrefix,
+    missingStartDate,
+    missingDueDate,
+    any: problems.length > 0,
+    problems,
+  }
 }

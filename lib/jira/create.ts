@@ -1,7 +1,8 @@
 import 'server-only'
 
-import { SETTING_KEYS, getSetting, requireProjectKey } from '../settings'
-import { type JiraIssue, jiraFetch, searchJql } from './client'
+import { SETTING_KEYS, getSetting, getTeamScope, requireProjectKey } from '../settings'
+import { type JiraIssue, JiraError, jiraFetch, searchJql } from './client'
+import { updateStoryPoints } from './issues'
 import { getProjectMeta } from './meta'
 
 /** Markdown-ish bullet text → ADF. Only bullets and paragraphs, nothing more. */
@@ -60,12 +61,110 @@ export interface CreateIssueInput {
   sprintId?: number | null
   storyPoints?: number | null
   assignToMe?: boolean
+  /** YYYY-MM-DD. The team requires both on every issue it files. */
+  startDate?: string | null
+  dueDate?: string | null
+  /** Extra labels beyond the team label, which is always added. */
+  labels?: string[]
+}
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
+
+/**
+ * Guarantees the team's mandatory tag leads the summary.
+ *
+ * The UI locks the chip on, but this is the last gate before Jira and the rule
+ * matters: a summary without `[CTALK]` is a task the team cannot recognise as
+ * theirs at a glance. Idempotent — an already-prefixed title is left alone.
+ */
+function withTeamPrefix(summary: string, prefix: string | null): string {
+  const value = summary.trim()
+  if (!prefix || value.toLowerCase().startsWith(prefix.toLowerCase())) return value
+  // Tags run together (`[CTALK][SPT-69]`) but a tag never runs into words, so
+  // the separator depends on what it is being glued to.
+  return value.startsWith('[') ? `${prefix}${value}` : `${prefix} ${value}`
+}
+
+/**
+ * `AND labels = "ctalk"`, or nothing when no team label is set.
+ *
+ * The pickers must offer the same issues the team's board shows. Without this a
+ * subtask can be hung off another team's task, which is invisible on the board
+ * it was created for.
+ */
+function teamLabelClause(): string {
+  const { label } = getTeamScope()
+  return label ? ` AND labels = "${label.replace(/"/g, '\\"')}"` : ''
+}
+
+/** Team label first, de-duplicated case-insensitively. */
+function composeLabels(extra: string[] | undefined, teamLabel: string | null): string[] {
+  const out: string[] = []
+  const seen = new Set<string>()
+  for (const label of [...(teamLabel ? [teamLabel] : []), ...(extra ?? [])]) {
+    // Jira rejects a label containing a space; the UI never produces one, but a
+    // template or a draft from an older version might.
+    const value = label.trim().replace(/\s+/g, '-')
+    if (!value || seen.has(value.toLowerCase())) continue
+    seen.add(value.toLowerCase())
+    out.push(value)
+  }
+  return out
 }
 
 export interface CreatedIssue {
   id: string
   key: string
   url: string
+  /**
+   * True when the issue was created but its estimate could not be written. The
+   * caller must say so: the issue is real and correct in every other way, and a
+   * silent miss is how a whole sprint ends up unestimated.
+   */
+  storyPointsPending?: boolean
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+/** Jira's wording when the board's filter has not yet seen the issue. */
+const NOT_ON_BOARD = /does not exist on the board/i
+
+/**
+ * Writes the estimate on an issue created moments ago.
+ *
+ * Normally instant: {@link updateStoryPoints} writes the field directly, which
+ * needs no index. The ladder below is for the instances where that write is
+ * refused and the estimate has to go through the board instead — the board
+ * resolves an issue through its saved filter, that filter runs on the search
+ * index, and the index lags creation by a second or two. So a write issued
+ * immediately after a create is answered with `Issue 'VT-431' does not exist on
+ * the board 'CTALK-TEAM'` for an issue that plainly exists. Same eventual
+ * consistency the board queries work around with `reconcileIssues`; here the
+ * only remedy is to wait and try again.
+ *
+ * Returns false if it never landed, so the caller can report it instead of
+ * leaving the user to notice an empty point chip later.
+ */
+async function setPointsAfterCreate(issueKey: string, points: number): Promise<boolean> {
+  // The first attempt carries the usual case and costs no delay; the rest only
+  // run on the board fallback, where the index needs a moment.
+  const delays = [700, 1500, 3000]
+
+  for (let attempt = 0; attempt <= delays.length; attempt++) {
+    if (attempt > 0) await sleep(delays[attempt - 1])
+    try {
+      await updateStoryPoints(issueKey, points)
+      return true
+    } catch (error) {
+      const indexLag =
+        error instanceof JiraError && error.status === 404 && NOT_ON_BOARD.test(error.message)
+      // Anything else — a bad field, no permission — will fail identically on
+      // every retry, so stop rather than making the user wait out the ladder.
+      if (!indexLag) return false
+    }
+  }
+
+  return false
 }
 
 /**
@@ -95,14 +194,37 @@ export async function createIssue(input: CreateIssueInput): Promise<CreatedIssue
     )
   }
 
+  const team = getTeamScope()
+
   const fields: Record<string, unknown> = {
     project: { key: projectKey },
     issuetype: { id: input.issueTypeId },
-    summary: input.summary,
+    summary: withTeamPrefix(input.summary, team.prefix),
     description: toAdf(input.description, input.dod),
   }
 
   if (input.parentKey) fields.parent = { key: input.parentKey }
+
+  // The label is what puts the issue on the team's board — its saved filter is
+  // `labels in (ctalk)`. Without it the issue exists, is assigned, and is
+  // nowhere to be seen, which is the hardest kind of missing.
+  const labels = composeLabels(input.labels, team.label)
+  if (labels.length && meta.labelsOnScreen) fields.labels = labels
+
+  if (input.startDate) {
+    if (!ISO_DATE.test(input.startDate)) throw new Error('Start date không hợp lệ')
+    if (!meta.startDateFieldId) throw new Error('Project này không có field Start date')
+    fields[meta.startDateFieldId] = input.startDate
+  }
+
+  if (input.dueDate) {
+    if (!ISO_DATE.test(input.dueDate)) throw new Error('Due date không hợp lệ')
+    fields.duedate = input.dueDate
+  }
+
+  if (input.startDate && input.dueDate && input.dueDate < input.startDate) {
+    throw new Error('Due date không được sớm hơn start date')
+  }
 
   // Never send a sprint on a subtask. Reading one back makes it look settable —
   // a subtask does carry its parent's sprint — but writing it is rejected:
@@ -114,8 +236,12 @@ export async function createIssue(input: CreateIssueInput): Promise<CreatedIssue
     fields[meta.sprintFieldId] = input.sprintId
   }
 
-  if (input.storyPoints != null && meta.storyPointsFieldId) {
-    fields[meta.storyPointsFieldId] = input.storyPoints
+  // Only inline when the field is on the create screen. Where it is not — a
+  // company-managed project estimating through the backlog — sending it fails
+  // the whole create, so it goes in a second call once the issue exists.
+  const inlinePoints = input.storyPoints != null && meta.storyPointsFieldId && meta.storyPointsOnScreen
+  if (inlinePoints) {
+    fields[meta.storyPointsFieldId!] = input.storyPoints
   }
 
   if (input.assignToMe) {
@@ -128,7 +254,20 @@ export async function createIssue(input: CreateIssueInput): Promise<CreatedIssue
     body: { fields },
   })
 
-  return { id: created.id, key: created.key, url: `${baseUrl}/browse/${created.key}` }
+  // Not fatal: the issue exists and is correct in every other way, so failing
+  // the whole create over an estimate would be the worse outcome — but it is
+  // reported, not swallowed.
+  let storyPointsPending = false
+  if (input.storyPoints != null && !inlinePoints && meta.storyPointsFieldId) {
+    storyPointsPending = !(await setPointsAfterCreate(created.key, input.storyPoints))
+  }
+
+  return {
+    id: created.id,
+    key: created.key,
+    url: `${baseUrl}/browse/${created.key}`,
+    storyPointsPending,
+  }
 }
 
 export interface ParentOption {
@@ -163,7 +302,8 @@ export async function listEpics(): Promise<EpicOption[]> {
   if (!epic) return []
 
   const issues = await searchJql<JiraIssue>(
-    `project = "${projectKey}" AND issuetype = ${epic.id} AND statusCategory != Done ORDER BY created DESC`,
+    `project = "${projectKey}" AND issuetype = ${epic.id} AND statusCategory != Done` +
+      `${teamLabelClause()} ORDER BY created DESC`,
     ['summary'],
     { limit: 100 },
   )
@@ -194,7 +334,8 @@ export async function listParentCandidates(
   if (meta.sprintFieldId) fields.push(meta.sprintFieldId)
 
   const issues = await searchJql<JiraIssue>(
-    `project = "${projectKey}" AND issuetype not in subTaskIssueTypes() ORDER BY created DESC`,
+    `project = "${projectKey}" AND issuetype not in subTaskIssueTypes()` +
+      `${teamLabelClause()} ORDER BY created DESC`,
     fields,
     { limit: 150 },
   )

@@ -4,7 +4,10 @@ import { revalidatePath } from 'next/cache'
 
 import { type GenerateOutcome, generateTask, pointRulesText } from '@/lib/ai/gemini'
 import { createIssue } from '@/lib/jira/create'
+import { getProjectMeta } from '@/lib/jira/meta'
 import { deleteDraft, saveDraft } from '@/lib/drafts'
+import { SETTING_KEYS, getSetting } from '@/lib/settings'
+import { withoutSprintPrefix } from '@/lib/sprint-name'
 import {
   deleteTaskTemplate,
   markTemplateUsed,
@@ -49,6 +52,12 @@ export interface CreateResult {
   url?: string
   /** Numeric issue id — needed to force Jira's search index to include it. */
   id?: string
+  /**
+   * Set when the issue was created but something after it was not — today only
+   * the story point estimate. `ok` stays true: the issue is real, and treating
+   * this as a failure would invite a duplicate create.
+   */
+  warning?: string
 }
 
 /**
@@ -67,9 +76,27 @@ export async function createIssueAction(input: {
   sprintId?: number | null
   storyPoints?: number | null
   assignToMe: boolean
+  /** YYYY-MM-DD. Empty means the field was left blank in the form. */
+  startDate?: string
+  dueDate?: string
 }): Promise<CreateResult> {
   if (!input.summary.trim()) return { ok: false, message: 'Title đang trống' }
   if (!input.issueTypeId) return { ok: false, message: 'Chưa chọn issue type' }
+
+  // The team requires both on every issue it files, so this is a create-time
+  // rule rather than something to clean up on the board afterwards — but only
+  // where the project actually carries the fields. Demanding a date Jira would
+  // reject anyway would block creates on projects that never had them.
+  const meta = await getProjectMeta()
+  if (meta.startDateFieldId && !input.startDate) {
+    return { ok: false, message: 'Cần chọn start date' }
+  }
+  if (meta.dueDateOnScreen && !input.dueDate) {
+    return { ok: false, message: 'Cần chọn due date' }
+  }
+  if (input.startDate && input.dueDate && input.dueDate < input.startDate) {
+    return { ok: false, message: 'Due date không được sớm hơn start date' }
+  }
 
   try {
     const created = await createIssue({
@@ -81,6 +108,8 @@ export async function createIssueAction(input: {
       sprintId: input.sprintId,
       storyPoints: input.storyPoints,
       assignToMe: input.assignToMe,
+      startDate: input.startDate,
+      dueDate: input.dueDate,
     })
 
     // The draft has become a real issue, so drop the local copy — Jira is the
@@ -96,6 +125,9 @@ export async function createIssueAction(input: {
       key: created.key,
       url: created.url,
       id: created.id,
+      warning: created.storyPointsPending
+        ? `${created.key} tạo xong nhưng chưa ghi được story point — bấm ô point trên board để đặt lại`
+        : undefined,
     }
   } catch (error) {
     return { ok: false, message: error instanceof Error ? error.message : 'Không tạo được issue' }
@@ -119,6 +151,8 @@ export async function saveDraftAction(input: {
   parentKey?: string | null
   sprintId?: number | null
   storyPoints?: number | null
+  startDate?: string | null
+  dueDate?: string | null
 }): Promise<DraftResult> {
   try {
     const row = saveDraft(input)
@@ -163,7 +197,9 @@ export async function saveTaskTemplateAction(input: {
   try {
     // The sprint prefix is stripped before saving: it belongs to whichever
     // sprint is current when the template is used, not the one it was saved in.
-    const prefixes = input.prefixes.filter((p) => !/^\[spt\s/i.test(p))
+    // Matched against the configured pattern so `[SPT-69]` is caught too.
+    const pattern = getSetting(SETTING_KEYS.sprintPrefixPattern) ?? '[spt {n}]'
+    const prefixes = withoutSprintPrefix(input.prefixes, pattern)
     const row = saveTaskTemplate({ ...input, name: input.name.trim(), prefixes })
     revalidatePath('/new')
     return { ok: true, message: `Đã lưu mẫu "${row.name}"`, id: row.id }

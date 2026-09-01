@@ -1,7 +1,7 @@
 'use server'
 
 import { getMyself } from '@/lib/jira/client'
-import { transitionIssue, updateStoryPoints } from '@/lib/jira/issues'
+import { transitionIssue, updateDates, updateStoryPoints } from '@/lib/jira/issues'
 import { createWorklog } from '@/lib/jira/worklog'
 import { SETTING_KEYS, getSetting } from '@/lib/settings'
 import { DEFAULT_TZ } from '@/lib/time'
@@ -80,6 +80,38 @@ export async function setStoryPointsAction(
     return {
       ok: false,
       message: error instanceof Error ? error.message : 'Không đổi được story point',
+    }
+  }
+}
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
+
+/**
+ * Writes start and/or due date on an existing issue.
+ *
+ * Both arrive as `undefined` when untouched and `null` when cleared — the two
+ * mean different things to Jira, so they must survive the trip separately. The
+ * ordering rule is checked here because the popover can send one date while the
+ * other stays as it is on the issue; the caller passes both for that reason.
+ */
+export async function setDatesAction(
+  issueKey: string,
+  dates: { startDate?: string | null; dueDate?: string | null },
+): Promise<ActionResult> {
+  for (const value of [dates.startDate, dates.dueDate]) {
+    if (value != null && !ISO_DATE.test(value)) return { ok: false, message: 'Ngày không hợp lệ' }
+  }
+  if (dates.startDate && dates.dueDate && dates.dueDate < dates.startDate) {
+    return { ok: false, message: 'Due date không được sớm hơn start date' }
+  }
+
+  try {
+    await updateDates(issueKey, dates)
+    return { ok: true, message: `Đã cập nhật ngày cho ${issueKey}` }
+  } catch (error) {
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : 'Không đổi được ngày',
     }
   }
 }

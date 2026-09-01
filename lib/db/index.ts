@@ -41,6 +41,8 @@ CREATE TABLE IF NOT EXISTS drafts (
   parent_key    TEXT,
   sprint_id     INTEGER,
   story_points  INTEGER,
+  start_date    TEXT,
+  due_date      TEXT,
   created_at    INTEGER NOT NULL DEFAULT (strftime('%s','now')),
   updated_at    INTEGER NOT NULL DEFAULT (strftime('%s','now'))
 );
@@ -160,7 +162,17 @@ function ensureColumn(sqlite: Database.Database, table: string, column: string, 
   const cols = (sqlite.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>).map(
     (c) => c.name,
   )
-  if (!cols.includes(column)) sqlite.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`)
+  if (cols.includes(column)) return
+
+  try {
+    sqlite.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`)
+  } catch (error) {
+    // `next build` collects page data across several worker processes, each
+    // opening this database at once. They all read the same "column missing"
+    // and all try to add it; the losers get "duplicate column name", which
+    // means the column now exists — exactly the goal.
+    if (!/duplicate column name/i.test(String(error))) throw error
+  }
 }
 
 function open() {
@@ -171,6 +183,8 @@ function open() {
   sqlite.exec(CREATE_TABLES)
   ensureColumn(sqlite, 'release_tasks', 'no_branch', 'no_branch INTEGER NOT NULL DEFAULT 0')
   ensureColumn(sqlite, 'release_tasks', 'ref_id', 'ref_id INTEGER')
+  ensureColumn(sqlite, 'drafts', 'start_date', 'start_date TEXT')
+  ensureColumn(sqlite, 'drafts', 'due_date', 'due_date TEXT')
   return drizzle(sqlite, { schema })
 }
 

@@ -3,12 +3,13 @@ import { connection } from 'next/server'
 
 import { JiraError, getMyself } from '@/lib/jira/client'
 import { getBoard, getSprintTasks } from '@/lib/jira/issues'
+import { getProjectMeta } from '@/lib/jira/meta'
 import type { SprintTask } from '@/lib/jira/types'
 import { getSprints } from '@/lib/jira/sprints'
 import { getWorklogs, sumByDate, sumByIssue } from '@/lib/jira/worklog'
 import { listDaysOff } from '@/lib/days-off'
 import { type QuotaRules, quotaForDate } from '@/lib/quota'
-import { SETTING_KEYS, getSetting } from '@/lib/settings'
+import { SETTING_KEYS, getSetting, getTeamScope } from '@/lib/settings'
 import { DEFAULT_TZ, formatDateVi, isWeekend, todayIn, weekOf } from '@/lib/time'
 
 import { LinkPending } from './link-pending'
@@ -79,6 +80,11 @@ export default async function BoardPage(props: PageProps<'/'>) {
   const rangeTo = sprintEnd ?? weekDays[6]
 
   const board = noSprintMatch ? [] : await getBoard({ sprintId, status, search, reconcileIds })
+
+  // A project without these fields must not offer a date chip that can only
+  // fail on save. Cached with the rest of the project meta, so this is free.
+  const projectMeta = await getProjectMeta()
+  const datesSupported = projectMeta.startDateFieldId !== null || projectMeta.dueDateOnScreen
 
   // Ids of everything on screen, so a worklog written seconds ago is guaranteed
   // to be reflected rather than lost to Jira's eventually-consistent search.
@@ -225,6 +231,7 @@ export default async function BoardPage(props: PageProps<'/'>) {
               hasTasks={uncovered.length > 0}
               noSprintMatch={noSprintMatch}
               dateLabel={dateLabel}
+              teamLabel={getTeamScope().label}
             />
           ) : (
             <div className="flex flex-col gap-4">
@@ -239,6 +246,8 @@ export default async function BoardPage(props: PageProps<'/'>) {
                         date={date}
                         dateLabel={dateLabel}
                         isToday={isToday}
+                        sprintEnd={sprintEnd}
+                        datesSupported={datesSupported}
                       />
                     ))}
                   </div>
@@ -296,12 +305,16 @@ function EmptyBoard({
   hasTasks,
   noSprintMatch,
   dateLabel,
+  teamLabel,
 }: {
   sprintName?: string
   status: string
   hasTasks: boolean
   noSprintMatch: boolean
   dateLabel: string
+  /** Set when the board is narrowed to one team — the likeliest reason for an
+      empty screen, and invisible unless said out loud. */
+  teamLabel: string | null
 }) {
   if (noSprintMatch) {
     return (
@@ -323,8 +336,22 @@ function EmptyBoard({
       <p className="text-[13.5px]">
         Không có task con nào đang giao cho bạn
         {sprintName ? ` trong ${sprintName}` : ''}
-        {status === 'open' ? ' và chưa Done' : ''}.
+        {status === 'open' ? ' và chưa Done' : ''}
+        {teamLabel ? (
+          <>
+            {' '}
+            với label <b className="font-mono font-semibold">{teamLabel}</b>
+          </>
+        ) : null}
+        .
       </p>
+      {teamLabel && (
+        <p className="mx-auto mt-2 max-w-lg text-[12.5px] leading-relaxed text-ink-3">
+          Board đang lọc theo team — task thiếu label{' '}
+          <b className="font-mono text-ink-2">{teamLabel}</b> sẽ không hiện ở đây, kể cả khi được
+          giao cho bạn. Bỏ trống ô label trong Settings để xem tất cả.
+        </p>
+      )}
       <p className="mx-auto mt-2 max-w-lg text-[12.5px] leading-relaxed text-ink-3">
         {hasTasks ? (
           'Bạn có task cấp trên ở sprint này — xem danh sách bên dưới để tạo task con rồi log giờ.'

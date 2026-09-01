@@ -1,6 +1,6 @@
 import 'server-only'
 
-import { requireBoardId } from '../settings'
+import { getTeamScope, requireBoardId } from '../settings'
 import { jiraFetch } from './client'
 
 export interface Sprint {
@@ -96,16 +96,36 @@ export interface SprintList {
 }
 
 /**
+ * Keeps only the sprints belonging to the configured team.
+ *
+ * A board shared by several teams lists all of their sprints: CTALK-TEAM's board
+ * returns "HIR-TEAM Kanban" alongside "CTALK-TEAM Sprint 69", because an issue
+ * carrying both labels drags the other team's sprint in with it. Since the
+ * foreign sprint can easily be the `active` one, {@link pickCurrentSprint} would
+ * name it "the sprint running now" and the whole board would follow it.
+ *
+ * Matching is a case-insensitive substring on the sprint name — the same token
+ * the team already puts in every sprint title. Falls back to the full list when
+ * nothing matches, so a mistyped filter empties no screen.
+ */
+export function filterTeamSprints(sprints: Sprint[], token: string | null): Sprint[] {
+  if (!token) return sprints
+  const needle = token.toLowerCase()
+  const mine = sprints.filter((s) => s.name.toLowerCase().includes(needle))
+  return mine.length ? mine : sprints
+}
+
+/**
  * Completed sprints are excluded: this board carries 66 of them and a picker
  * that long is unusable. Because the PM never completes sprints, everything
  * still relevant remains `active` anyway — so `active,future` is both shorter
  * and a better match for what people actually log against.
  */
 export async function getSprints(): Promise<SprintList> {
-  const all = await listSprints('active,future')
+  const all = filterTeamSprints(await listSprints('active,future'), getTeamScope().sprintFilter)
   const current = pickCurrentSprint(all)
   const sprints = sortSprints(all).map((s) => ({ ...s, current: s.id === current?.id }))
   return { sprints, current: current ? { ...current, current: true } : null }
 }
 
-export { sprintNumber, sprintPrefix } from '../sprint-name'
+export { sprintNumber, sprintPrefix, sprintPrefixRegex, withoutSprintPrefix } from '../sprint-name'

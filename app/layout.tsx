@@ -3,7 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Nav } from "./nav";
 import { enabledModuleNav } from "@/lib/modules/state";
-import { SETTING_KEYS, getSetting } from "@/lib/settings";
+import { SETTING_KEYS, getSetting, getTeamScope } from "@/lib/settings";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -31,7 +31,13 @@ export default async function RootLayout({
   // reads correctly for whoever runs it.
   const project = getSetting(SETTING_KEYS.jiraProjectKey)
   const board = getSetting(SETTING_KEYS.jiraBoardId)
-  const label = project ? `${project}${board ? ` · board ${board}` : ''}` : undefined
+  // The team label is part of the identity of what is on screen: with it set,
+  // every list is narrowed to that team, and "nothing here" needs to be
+  // readable as "nothing here for CTALK" rather than "nothing here at all".
+  const team = getTeamScope().label
+  const label = project
+    ? `${project}${board ? ` · board ${board}` : ''}${team ? ` · ${team}` : ''}`
+    : undefined
   const modules = enabledModuleNav()
 
   return (

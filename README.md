@@ -61,9 +61,32 @@ npm start
 - **Định mức 8h/ngày thường**, T7 và CN không tính định mức nhưng giờ log vào vẫn cộng tổng.
 - **Point 1 = 1–2h, 2 = 4h, 3 = 1–2 ngày.** Tối đa 3 point. App chỉ cảnh báo khi vượt, không bao giờ chặn.
 - **Task cha không tự cộng point** — app tính sẵn tổng point các task con để bạn tự điền vào cha.
-- **Tiền tố title** `[Mobile]` `[BE]` … chọn được nhiều cái, thứ tự bấm là thứ tự ghép. `[spt 66]` tự suy từ sprint.
+- **Tiền tố title** `[Mobile]` `[BE]` … chọn được nhiều cái, thứ tự bấm là thứ tự ghép. `[SPT-69]` tự suy từ sprint.
+- **Start date và due date là bắt buộc** khi tạo task — nút *Tạo trên Jira* không bật cho tới khi chọn đủ.
 
 Tất cả sửa được trong Settings.
+
+## Board dùng chung cho nhiều team
+
+Một project Jira có thể chứa nhiều board, mỗi board là một filter theo label — ví dụ project
+`VT` có `CTALK-TEAM` (`labels in (ctalk)`) và `HIR-TEAM` cạnh nhau. Khi đó vào
+**Settings → Team trên board** bấm **Dò từ board**; app đọc filter của board rồi điền sẵn ba giá trị:
+
+| Giá trị | Tác dụng |
+|---|---|
+| **Label của team** | Lọc mọi màn hình theo label này, và tự gắn vào mọi task app tạo ra. Thiếu label thì task không hiện trên board của team. |
+| **Tiền tố bắt buộc** | Luôn đứng đầu title, không bỏ chọn được — ví dụ `[CTALK]`. |
+| **Lọc sprint theo tên** | Danh sách sprint của board chung có cả sprint team khác. Không lọc thì "sprint đang chạy" có thể trỏ nhầm sang sprint của team bạn. |
+
+Task sai quy ước (thiếu label, thiếu tiền tố, thiếu ngày) hiện badge cảnh báo ngay trên board,
+và sửa ngày được tại chỗ bằng chip ngày trên mỗi dòng.
+
+Để trống cả ba nếu board chỉ có một team — app chạy y như cũ.
+
+> **Story point khi field không nằm trên screen.** Có project company-managed để Story Points
+> ngoài mọi screen và ước lượng qua backlog. Lúc đó `createmeta` không khai báo field, nên app
+> lấy field ước lượng từ chính cấu hình board và ghi qua endpoint estimation của board — cần
+> **Board id** trong Settings mới ghi được point.
 
 ## Cấu trúc
 
@@ -103,6 +126,15 @@ Kiểm tra ở https://id.atlassian.com/manage-profile/security/api-tokens, và 
 
 **Board trống** — mặc định lọc theo sprint đang chạy. Nếu sprint đó bạn chưa có subtask nào,
 board sẽ chỉ ra các Task cấp trên kèm nút **+ Task con**. Hoặc đổi bộ lọc sang *Mọi sprint*.
+Nếu đã đặt **Label của team**, board còn lọc theo label đó — task được giao cho bạn nhưng thiếu
+label sẽ không hiện. Xoá ô label trong Settings để xem tất cả.
+
+**Sprint "đang chạy" sai team** — board dùng chung liệt kê cả sprint của team khác, và sprint đó
+có thể đang `active` trong khi sprint của bạn còn `future`. Điền **Lọc sprint theo tên** trong
+Settings (ví dụ `CTALK`).
+
+**Đổi board mà màn hình vẫn như cũ** — field id và issue type được cache 24h theo project.
+Bấm *Lưu settings* sẽ xoá cache đó; nếu vẫn lạ thì bấm **Làm mới** trên board.
 
 **Kiểm tra nhanh toàn hệ thống** — http://localhost:3000/api/health trả về trạng thái DB,
 cấu hình và kết nối Jira.

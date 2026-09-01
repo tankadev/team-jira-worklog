@@ -5,6 +5,7 @@ import { and, eq } from 'drizzle-orm'
 import { db } from '../db'
 import { jiraMetaCache } from '../db/schema'
 import { SETTING_KEYS, getSetting, requireProjectKey } from '../settings'
+import { getBoardConfig } from './board-config'
 import { jiraFetch } from './client'
 
 export interface IssueTypeMeta {
@@ -27,6 +28,17 @@ export interface ProjectMeta {
   sprintFieldId: string | null
   storyPointsFieldId: string | null
   storyPointsFieldName: string | null
+  /**
+   * False when the estimate field exists but is absent from the create/edit
+   * screens — the VipTalk case. Points then have to travel through the board's
+   * estimation endpoint instead of the issue's own fields.
+   */
+  storyPointsOnScreen: boolean
+  /** `customfield_10015` on Jira Cloud, but discovered rather than assumed. */
+  startDateFieldId: string | null
+  /** Whether `duedate` and `labels` are on the create screen for this project. */
+  dueDateOnScreen: boolean
+  labelsOnScreen: boolean
 }
 
 /**
@@ -34,7 +46,7 @@ export interface ProjectMeta {
  * shape, so without a version a new field stays undefined for a whole TTL and
  * looks like Jira simply did not return it.
  */
-const CACHE_VERSION = 2
+const CACHE_VERSION = 3
 const CACHE_KEY = `project_meta_v${CACHE_VERSION}`
 const CACHE_TTL_SECONDS = 60 * 60 * 24
 
@@ -100,6 +112,25 @@ function findSprintField(fields: CreateMetaField[]) {
   return fields.find((f) => f.schema?.custom === 'com.pyxis.greenhopper.jira:gh-sprint') ?? null
 }
 
+/**
+ * The sprint's planned start, which is a plain date picker — there is nothing in
+ * its schema to tell it apart from any other date custom field, so the name is
+ * the only signal. Matched exactly rather than by substring: "Actual start date"
+ * and "Target start" are different fields that must not win.
+ */
+function findStartDateField(fields: CreateMetaField[]) {
+  const isDatePicker = (f: CreateMetaField) =>
+    f.schema?.custom?.endsWith(':datepicker') || f.schema?.type === 'date'
+  return (
+    fields.find((f) => isDatePicker(f) && (f.name ?? '').trim().toLowerCase() === 'start date') ??
+    null
+  )
+}
+
+function hasField(fields: CreateMetaField[], id: string) {
+  return fields.some((f) => (f.fieldId ?? f.key) === id)
+}
+
 async function fetchProjectMeta(projectKey: string): Promise<ProjectMeta> {
   const project = await jiraFetch<{ id: string; key: string; style?: string; simplified?: boolean }>(
     `/rest/api/3/project/${encodeURIComponent(projectKey)}`,
@@ -125,15 +156,40 @@ async function fetchProjectMeta(projectKey: string): Promise<ProjectMeta> {
   let storyPointsFieldId: string | null = null
   let storyPointsFieldName: string | null = null
 
+  let startDateFieldId: string | null = null
+  let dueDateOnScreen = false
+  let labelsOnScreen = false
+  let storyPointsOnScreen = false
+
   if (probeType) {
     const fieldsPage = await jiraFetch<{ fields?: CreateMetaField[] }>(
       `/rest/api/3/issue/createmeta/${encodeURIComponent(projectKey)}/issuetypes/${probeType.id}?maxResults=200`,
     )
     const fields = fieldsPage.fields ?? []
-    sprintFieldId = findSprintField(fields)?.key ?? findSprintField(fields)?.fieldId ?? null
+    const sprint = findSprintField(fields)
+    sprintFieldId = sprint?.fieldId ?? sprint?.key ?? null
     const sp = findStoryPointsField(fields)
-    storyPointsFieldId = sp?.key ?? sp?.fieldId ?? null
+    storyPointsFieldId = sp?.fieldId ?? sp?.key ?? null
     storyPointsFieldName = sp?.name ?? null
+    storyPointsOnScreen = Boolean(storyPointsFieldId)
+
+    const start = findStartDateField(fields)
+    startDateFieldId = start?.fieldId ?? start?.key ?? null
+    dueDateOnScreen = hasField(fields, 'duedate')
+    labelsOnScreen = hasField(fields, 'labels')
+  }
+
+  // createmeta only lists what is on a *screen*. A company-managed project can
+  // estimate entirely through the backlog, leaving Story Points off every screen
+  // — which is how the whole points feature came back empty on this board. The
+  // board itself names the field it estimates with, so ask it.
+  if (!storyPointsFieldId) {
+    const board = await getBoardConfig()
+    if (board?.estimationFieldId && board.estimationFieldId !== 'none') {
+      storyPointsFieldId = board.estimationFieldId
+      storyPointsFieldName = board.estimationFieldName ?? 'Story Points'
+      storyPointsOnScreen = false
+    }
   }
 
   return {
@@ -145,6 +201,10 @@ async function fetchProjectMeta(projectKey: string): Promise<ProjectMeta> {
     sprintFieldId,
     storyPointsFieldId,
     storyPointsFieldName,
+    storyPointsOnScreen,
+    startDateFieldId,
+    dueDateOnScreen,
+    labelsOnScreen,
   }
 }
 

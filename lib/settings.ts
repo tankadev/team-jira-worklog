@@ -24,6 +24,9 @@ export const SETTING_KEYS = {
   logPresets: 'log_presets',
   weekendCountsToQuota: 'weekend_counts_to_quota',
   sprintPrefixPattern: 'sprint_prefix_pattern',
+  teamLabel: 'team_label',
+  teamPrefix: 'team_prefix',
+  teamSprintFilter: 'team_sprint_filter',
   pointBudget1: 'point_budget_1',
   pointBudget2: 'point_budget_2',
   pointBudget3: 'point_budget_3',
@@ -45,6 +48,12 @@ const DEFAULTS: Record<string, string> = {
   [SETTING_KEYS.logPresets]: '0.5,1,2,4,8',
   [SETTING_KEYS.weekendCountsToQuota]: 'false',
   [SETTING_KEYS.sprintPrefixPattern]: '[spt {n}]',
+  // Team scoping. All three are empty by default — a board with no team split
+  // must keep behaving exactly as before, so every rule they drive is opt-in.
+  // "Detect" on the settings screen fills them from the board's own filter.
+  [SETTING_KEYS.teamLabel]: '',
+  [SETTING_KEYS.teamPrefix]: '',
+  [SETTING_KEYS.teamSprintFilter]: '',
   // Point budgets are advisory only — they drive a soft warning, never a block.
   [SETTING_KEYS.pointBudget1]: '1-2h',
   [SETTING_KEYS.pointBudget2]: '4h',
@@ -60,6 +69,9 @@ const ENV_SEED: Partial<Record<string, string>> = {
   [SETTING_KEYS.jiraBoardId]: 'JIRA_BOARD_ID',
   [SETTING_KEYS.googleApiKey]: 'GOOGLE_API_KEY',
   [SETTING_KEYS.geminiModel]: 'GEMINI_MODEL',
+  [SETTING_KEYS.teamLabel]: 'JIRA_TEAM_LABEL',
+  [SETTING_KEYS.teamPrefix]: 'JIRA_TEAM_PREFIX',
+  [SETTING_KEYS.teamSprintFilter]: 'JIRA_TEAM_SPRINT_FILTER',
 }
 
 const DEFAULT_PREFIXES = ['[Support]', '[Mobile]', '[BE]', '[Web]', '[Desktop]']
@@ -81,12 +93,13 @@ Today:
  * point field id — hardcoding cf[10016] would break on any other project.
  */
 const DEFAULT_JQL_PRESETS: Array<{ name: string; jql: string }> = [
-  { name: 'của tôi, chưa Done', jql: 'project = {project} AND assignee = currentUser() AND statusCategory != Done ORDER BY created DESC' },
-  { name: 'chưa ai nhận', jql: 'project = {project} AND assignee IS EMPTY AND statusCategory != Done ORDER BY created DESC' },
-  { name: 'sprint đang mở', jql: 'project = {project} AND sprint IN openSprints() AND assignee = currentUser() ORDER BY created DESC' },
-  { name: 'tôi tạo', jql: 'project = {project} AND reporter = currentUser() ORDER BY created DESC' },
-  { name: 'subtask chưa có point', jql: 'project = {project} AND type = Subtask AND "cf[{sp}]" IS EMPTY ORDER BY created DESC' },
-  { name: 'tôi log 7 ngày qua', jql: 'project = {project} AND worklogAuthor = currentUser() AND worklogDate >= -7d ORDER BY updated DESC' },
+  { name: 'của tôi, chưa Done', jql: 'project = {project} AND assignee = currentUser() AND statusCategory != Done{team} ORDER BY created DESC' },
+  { name: 'chưa ai nhận', jql: 'project = {project} AND assignee IS EMPTY AND statusCategory != Done{team} ORDER BY created DESC' },
+  { name: 'sprint đang mở', jql: 'project = {project} AND sprint IN openSprints() AND assignee = currentUser(){team} ORDER BY created DESC' },
+  { name: 'tôi tạo', jql: 'project = {project} AND reporter = currentUser(){team} ORDER BY created DESC' },
+  { name: 'subtask chưa có point', jql: 'project = {project} AND type = Subtask AND "cf[{sp}]" IS EMPTY{team} ORDER BY created DESC' },
+  { name: 'tôi log 7 ngày qua', jql: 'project = {project} AND worklogAuthor = currentUser() AND worklogDate >= -7d{team} ORDER BY updated DESC' },
+  { name: 'thiếu ngày (start/due)', jql: 'project = {project} AND assignee = currentUser() AND statusCategory != Done AND (duedate IS EMPTY OR "Start date" IS EMPTY){team} ORDER BY created DESC' },
 ]
 
 let seeded = false
@@ -123,6 +136,26 @@ export function ensureSeeded() {
     db.insert(jqlPresets)
       .values(DEFAULT_JQL_PRESETS.map((p, i) => ({ ...p, builtin: true, position: i })))
       .run()
+  } else {
+    refreshBuiltinPresets()
+  }
+}
+
+/**
+ * Keeps the built-in presets current without resurrecting deleted ones.
+ *
+ * They are seeded once, so a preset whose text changes in a later version — the
+ * team-label clause, say — would stay on the old text forever in an existing
+ * install. Matching by name updates what is there and adds nothing back: a
+ * built-in the user deleted stays deleted.
+ */
+function refreshBuiltinPresets() {
+  const existing = db.select().from(jqlPresets).all().filter((p) => p.builtin)
+  for (const preset of DEFAULT_JQL_PRESETS) {
+    const row = existing.find((p) => p.name === preset.name)
+    if (row && row.jql !== preset.jql) {
+      db.update(jqlPresets).set({ jql: preset.jql }).where(eq(jqlPresets.id, row.id)).run()
+    }
   }
 }
 
@@ -175,6 +208,37 @@ export function requireProjectKey(): string {
   const key = getSetting(SETTING_KEYS.jiraProjectKey)?.trim()
   if (!key) throw new Error('Chưa chọn project — vào Settings điền Project key')
   return key
+}
+
+/**
+ * The three team settings, read together.
+ *
+ * One board can be shared by several teams — CTALK-TEAM and HIR-TEAM sit on the
+ * same VipTalk project, split only by a label. Every one of these is optional:
+ * with all three empty the app behaves as it did on a single-team board.
+ *
+ *   label   — the Jira label that puts an issue on the team's board, and which
+ *             every issue this app creates must carry. Also narrows every read.
+ *   prefix  — mandatory leading tag on the summary, e.g. `[CTALK]`.
+ *   sprint  — substring that identifies the team's own sprints, e.g. `CTALK`.
+ *             Without it the board's sprint list mixes in other teams' sprints
+ *             and "the sprint running now" resolves to the wrong one.
+ */
+export interface TeamScope {
+  label: string | null
+  prefix: string | null
+  sprintFilter: string | null
+}
+
+export function getTeamScope(): TeamScope {
+  const label = getSetting(SETTING_KEYS.teamLabel)?.trim()
+  const prefix = getSetting(SETTING_KEYS.teamPrefix)?.trim()
+  const sprintFilter = getSetting(SETTING_KEYS.teamSprintFilter)?.trim()
+  return {
+    label: label || null,
+    prefix: prefix || null,
+    sprintFilter: sprintFilter || null,
+  }
 }
 
 export function requireBoardId(): string {
