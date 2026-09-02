@@ -6,7 +6,7 @@ import { logWorkAction } from '@/app/actions'
 // Import from types.ts, never issues.ts — the latter pulls in the DB layer and
 // would end up in the browser bundle.
 import type { BoardSubtask } from '@/lib/jira/types'
-import { issueHygiene } from '@/lib/jira/types'
+import { issueHygiene, statusTone } from '@/lib/jira/types'
 import { DEFAULT_SCHEDULE, type WorkSchedule, formatClock, formatDuration, placeWorklog } from '@/lib/time'
 
 import { Spinner } from '../spinner'
@@ -132,7 +132,7 @@ export function SubtaskRow({
             startDate={subtask.startDate}
             dueDate={subtask.dueDate}
             sprintEnd={sprintEnd}
-            isDone={subtask.statusName.trim().toUpperCase() === 'DONE'}
+            isDone={statusTone(subtask.statusName) === 'done'}
           />
           )}
 

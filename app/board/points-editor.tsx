@@ -22,6 +22,8 @@ export function PointsEditor({
   budgets,
   spentSeconds,
   variant = 'subtask',
+  readOnly = false,
+  readOnlyReason,
 }: {
   issueKey: string
   value: number | null
@@ -31,6 +33,9 @@ export function PointsEditor({
   budgets?: Record<number, string>
   spentSeconds?: number
   variant?: 'subtask' | 'parent'
+  /** Someone else's task — show the estimate, do not offer to change it. */
+  readOnly?: boolean
+  readOnlyReason?: string
 }) {
   const [points, setPoints] = useState<number | null>(value)
   const [draft, setDraft] = useState(String(value ?? ''))
@@ -62,6 +67,17 @@ export function PointsEditor({
   }
 
   const label = variant === 'parent' ? `${points ?? '—'} SP` : (points ?? '—')
+
+  if (readOnly) {
+    return (
+      <span
+        title={readOnlyReason ?? `Story point của ${issueKey}`}
+        className="inline-flex h-6 min-w-[26px] items-center justify-center gap-1 rounded-[5px] border border-line bg-surface-2 px-1.5 font-mono text-[11.5px] text-ink-3"
+      >
+        {label}
+      </span>
+    )
+  }
 
   return (
     <Popover

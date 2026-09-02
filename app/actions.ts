@@ -1,7 +1,7 @@
 'use server'
 
 import { getMyself } from '@/lib/jira/client'
-import { transitionIssue, updateDates, updateStoryPoints } from '@/lib/jira/issues'
+import { attachToSprint, transitionIssue, updateDates, updateStoryPoints } from '@/lib/jira/issues'
 import { createWorklog, loggedMinutesOnDate } from '@/lib/jira/worklog'
 import { SETTING_KEYS, getSetting, getWorkSchedule } from '@/lib/settings'
 import { DEFAULT_TZ, formatClock, placeWorklog } from '@/lib/time'
@@ -124,6 +124,38 @@ export async function setDatesAction(
     return {
       ok: false,
       message: error instanceof Error ? error.message : 'Không đổi được ngày',
+    }
+  }
+}
+
+/**
+ * Moves a parent task into the sprint and onto the team's board, from the
+ * board's "ngoài sprint" block.
+ *
+ * The children show here regardless, but leaving the parent sprintless and
+ * unlabelled keeps it missing from Jira's own board and from the sprint report —
+ * so the fix is offered where the problem is visible.
+ */
+export async function setSprintAction(
+  issueKey: string,
+  sprintId: number,
+): Promise<ActionResult> {
+  if (!Number.isInteger(sprintId) || sprintId <= 0) {
+    return { ok: false, message: 'Sprint không hợp lệ' }
+  }
+
+  try {
+    const { labelAdded } = await attachToSprint(issueKey, sprintId)
+    return {
+      ok: true,
+      message: labelAdded
+        ? `Đã đưa ${issueKey} vào sprint và gắn label ${labelAdded}`
+        : `Đã đưa ${issueKey} vào sprint`,
+    }
+  } catch (error) {
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : 'Không gán được sprint',
     }
   }
 }

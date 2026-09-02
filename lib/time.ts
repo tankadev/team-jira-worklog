@@ -182,6 +182,19 @@ export function jiraStarted(date: string, tz = DEFAULT_TZ, minuteOfDay = 9 * 60)
   )
 }
 
+/**
+ * Whole days from `from` to `to`, both `YYYY-MM-DD`. Negative when `to` is
+ * earlier. Parsed as UTC midnights so no timezone or DST edge can shift the
+ * count — these are calendar dates, not instants.
+ */
+export function daysBetween(from: string, to: string): number {
+  const utc = (d: string) => {
+    const [y, m, day] = d.split('-').map(Number)
+    return Date.UTC(y, m - 1, day)
+  }
+  return Math.round((utc(to) - utc(from)) / 86400000)
+}
+
 export function hoursToSeconds(hours: number): number {
   return Math.round(hours * 3600)
 }

@@ -134,6 +134,12 @@ export default async function BoardPage(props: PageProps<'/'>) {
   for (const g of visibleBoard) g.subtasks.sort((a, b) => (a.created - b.created) * dir)
   const sortedParents = [...visibleBoard].sort((a, b) => (a.created - b.created) * dir)
 
+  // Parents with no sprint of their own are pulled out into their own block, so
+  // the epic grouping above keeps describing the sprint and nothing else. Their
+  // children are the user's work either way — see `sprintlessChildren`.
+  const inSprintParents = sortedParents.filter((g) => !g.outOfSprint)
+  const strayParents = sortedParents.filter((g) => g.outOfSprint)
+
   const coveredParents = new Set(board.map((g) => g.key))
   const uncovered = sprintTasks
     // Not already shown as a group above…
@@ -235,7 +241,7 @@ export default async function BoardPage(props: PageProps<'/'>) {
             />
           ) : (
             <div className="flex flex-col gap-4">
-              {groupByEpic(sortedParents, newestFirst).map((epic) => (
+              {groupByEpic(inSprintParents, newestFirst).map((epic) => (
                 <div key={epic.key ?? '__none__'}>
                   <EpicHeader group={epic} boardSprintId={sprintId} />
                   <div className="flex flex-col gap-3">
@@ -249,11 +255,49 @@ export default async function BoardPage(props: PageProps<'/'>) {
                         sprintEnd={sprintEnd}
                         datesSupported={datesSupported}
                         dayLoggedSeconds={byDate.get(date) ?? 0}
+                        myAccountId={me.accountId}
+                        currentSprint={
+                          selectedSprint ? { id: selectedSprint.id, name: selectedSprint.name } : null
+                        }
                       />
                     ))}
                   </div>
                 </div>
               ))}
+
+              {/* Below the sprint, never mixed into it: these are the user's own
+                  subtasks under a parent nobody put in a sprint. Hiding them lost
+                  real work; merging them in would make the sprint filter a lie. */}
+              {strayParents.length > 0 && (
+                <div>
+                  <div className="mb-2 flex flex-wrap items-baseline gap-2">
+                    <span className="rounded-[3px] border border-warn bg-warn-soft px-1.5 py-0.5 font-mono text-[9.5px] font-semibold uppercase tracking-[0.06em] text-warn">
+                      Ngoài sprint
+                    </span>
+                    <span className="text-[12.5px] text-ink-3">
+                      Task cha chưa được gán sprint nào — task con của bạn vẫn log giờ được ở đây.
+                    </span>
+                  </div>
+                  <div className="flex flex-col gap-3">
+                    {strayParents.map((group) => (
+                      <ParentGroup
+                        key={group.key}
+                        group={group}
+                        date={date}
+                        dateLabel={dateLabel}
+                        isToday={isToday}
+                        sprintEnd={sprintEnd}
+                        datesSupported={datesSupported}
+                        dayLoggedSeconds={byDate.get(date) ?? 0}
+                        myAccountId={me.accountId}
+                        currentSprint={
+                          selectedSprint ? { id: selectedSprint.id, name: selectedSprint.name } : null
+                        }
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
             <PendingTasks tasks={uncovered} />

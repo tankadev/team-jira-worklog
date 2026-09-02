@@ -162,6 +162,25 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/*
+ * Restores the hand cursor on anything clickable.
+ *
+ * Tailwind v4 dropped the `button { cursor: pointer }` that v3's preflight
+ * carried, so every button in the app was falling back to the browser default
+ * arrow — the same cursor as plain text. On a board built almost entirely from
+ * small chips and pills, that removes the only cue that they can be clicked.
+ *
+ * `:not(:disabled)` keeps the arrow on controls that would do nothing, and
+ * `[aria-disabled]` covers the ones disabled without the attribute.
+ */
+button:not(:disabled):not([aria-disabled='true']),
+[role='button']:not(:disabled):not([aria-disabled='true']),
+label:has(> input[type='checkbox']),
+select:not(:disabled),
+summary {
+  cursor: pointer;
+}
+
 /* Digits that sit in columns — hours, story points, issue keys — must line up. */
 .tabular {
   font-variant-numeric: tabular-nums;

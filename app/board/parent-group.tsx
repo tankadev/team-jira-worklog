@@ -1,4 +1,4 @@
-import { issueHygiene } from '@/lib/jira/types'
+import { isOwnedByOther, issueHygiene, statusTone } from '@/lib/jira/types'
 import type { BoardParent } from '@/lib/jira/types'
 import { SETTING_KEYS, getSetting, getTeamScope, getWorkSchedule } from '@/lib/settings'
 import { formatDuration } from '@/lib/time'
@@ -7,6 +7,7 @@ import { CreateIssueButton } from './create-issue'
 import { DatesEditor } from './dates-editor'
 import { HygieneBadge } from './hygiene-badge'
 import { PointsEditor, PointsRollup } from './points-editor'
+import { SprintFixButton } from './sprint-fix'
 import { StatusPill } from './status-pill'
 import { SubtaskRow } from './subtask-row'
 import { TypeIcon } from './type-icon'
@@ -27,6 +28,8 @@ export function ParentGroup({
   sprintEnd = null,
   datesSupported = true,
   dayLoggedSeconds = 0,
+  myAccountId = null,
+  currentSprint = null,
 }: {
   group: BoardParent
   date: string
@@ -42,6 +45,10 @@ export function ParentGroup({
    * the whole day, not on this row.
    */
   dayLoggedSeconds?: number
+  /** Whose board this is, for deciding what may be edited on the parent. */
+  myAccountId?: string | null
+  /** The sprint on screen, so a sprintless parent can be put into it. */
+  currentSprint?: { id: number; name: string } | null
 }) {
   const step = Number(getSetting(SETTING_KEYS.logStepHours) ?? '0.5') || 0.5
   const presets = (getSetting(SETTING_KEYS.logPresets) ?? '0.5,1,2,4,8')
@@ -58,6 +65,17 @@ export function ParentGroup({
   const team = getTeamScope()
   const schedule = getWorkSchedule()
   const isOrphan = group.key === '__orphan__'
+
+  /**
+   * A parent someone else owns is shown but not touched: the subtask under it is
+   * the user's work, its status, dates and estimate are not. An unassigned
+   * parent stays editable — nobody's plan is being overwritten.
+   */
+  const ownedByOther = isOwnedByOther(group.assigneeAccountId, myAccountId)
+  const hygiene = issueHygiene(group, team)
+  const lockReason = ownedByOther
+    ? `${group.key} do ${group.assigneeName} phụ trách — chỉ xem, không sửa được từ đây`
+    : undefined
   // Full logged time across every child, not just the ones the filter leaves
   // visible, so the header total doesn't shrink when Done subtasks are hidden.
   const loggedTotal = group.childTimeSpentTotal
@@ -87,10 +105,41 @@ export function ParentGroup({
           </span>
 
           {!isOrphan && group.statusName && (
-            <StatusPill issueKey={group.key} statusName={group.statusName} />
+            <StatusPill
+              issueKey={group.key}
+              statusName={group.statusName}
+              readOnly={ownedByOther}
+              readOnlyReason={lockReason}
+            />
           )}
 
-          {!isOrphan && <HygieneBadge hygiene={issueHygiene(group, team)} />}
+          {!isOrphan && <HygieneBadge hygiene={hygiene} />}
+
+          {group.outOfSprint && (
+            <span
+              title={`${group.key} không thuộc sprint nào — task con của bạn vẫn hiện ở đây để log giờ`}
+              className="inline-flex h-[18px] items-center rounded-[3px] border border-warn bg-warn-soft px-1.5 font-mono text-[9.5px] font-semibold uppercase tracking-[0.06em] text-warn"
+            >
+              ⚠ chưa gán sprint
+            </span>
+          )}
+          {group.outOfSprint && currentSprint && !ownedByOther && (
+            <SprintFixButton
+              issueKey={group.key}
+              sprintId={currentSprint.id}
+              sprintName={currentSprint.name}
+              addsLabel={hygiene.missingLabel ? team.label : null}
+            />
+          )}
+
+          {ownedByOther && group.assigneeName && (
+            <span
+              title={lockReason}
+              className="inline-flex h-[18px] items-center gap-1 rounded-[3px] border border-line-strong px-1.5 font-mono text-[9.5px] uppercase tracking-[0.06em] text-ink-3"
+            >
+              🔒 {group.assigneeName}
+            </span>
+          )}
 
           <span className="ml-auto flex flex-wrap items-center gap-2">
             {loggedTotal > 0 && (
@@ -104,6 +153,11 @@ export function ParentGroup({
                 startDate={group.startDate}
                 dueDate={group.dueDate}
                 sprintEnd={sprintEnd}
+                // Was missing, so a finished parent went red the day after its
+                // due date and stayed that way — the one alarm nobody can act on.
+                isDone={statusTone(group.statusName) === 'done'}
+                readOnly={ownedByOther}
+                readOnlyReason={lockReason}
               />
             )}
             {!isOrphan && (
@@ -112,6 +166,8 @@ export function ParentGroup({
                 value={group.storyPoints}
                 suggestion={group.childPointsTotal || null}
                 variant="parent"
+                readOnly={ownedByOther}
+                readOnlyReason={lockReason}
               />
             )}
           </span>

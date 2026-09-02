@@ -81,6 +81,66 @@ async function sprintParentKeys(sprintId: number, projectKey: string): Promise<s
 }
 
 /**
+ * The user's own subtasks whose parent belongs to no sprint at all.
+ *
+ * Sprint membership is resolved through the parent, so a task nobody remembered
+ * to put in the sprint takes its children down with it — the work is assigned,
+ * logged against, and invisible on the board it belongs to. That is a data slip
+ * rather than a decision, so those children are pulled back in.
+ *
+ * A parent sitting in a *different* sprint is deliberate and stays hidden: that
+ * set only grows as sprints go by, and showing it would empty the sprint filter
+ * of meaning.
+ *
+ * Costs one extra search over the user's own subtasks — a small set, since it is
+ * bounded by what one person has been assigned rather than by the project.
+ */
+async function sprintlessChildren(
+  base: string[],
+  fields: string[],
+  alreadyShown: JiraIssue[],
+  query: BoardQuery,
+): Promise<{ issues: JiraIssue[]; parents: Set<string> }> {
+  const meta = await getProjectMeta()
+  const empty = { issues: [], parents: new Set<string>() }
+  if (!meta.sprintFieldId) return empty
+
+  const mine = await searchJql<JiraIssue>(
+    `${base.join(' AND ')} ORDER BY created DESC`,
+    fields,
+    { limit: 200, reconcileIssues: query.reconcileIds },
+  )
+
+  const shown = new Set(alreadyShown.map((i) => i.key))
+  const candidates = mine.filter((i) => !shown.has(i.key) && i.fields.parent?.key)
+  if (!candidates.length) return empty
+
+  // The child's own sprint field mirrors its parent's, but reading the parents
+  // directly is what distinguishes "no sprint" from "a sprint we did not ask
+  // for" — and it is the parent the fix button has to write to.
+  const parentKeys = [...new Set(candidates.map((i) => i.fields.parent!.key))]
+  const parents = await searchJql<JiraIssue>(
+    `key in (${parentKeys.map((k) => `"${escapeJql(k)}"`).join(',')})`,
+    ['summary', meta.sprintFieldId],
+    { limit: parentKeys.length },
+  )
+
+  const sprintless = new Set(
+    parents
+      .filter((p) => {
+        const raw = p.fields[meta.sprintFieldId!]
+        return !Array.isArray(raw) || raw.length === 0
+      })
+      .map((p) => p.key),
+  )
+
+  return {
+    issues: candidates.filter((i) => sprintless.has(i.fields.parent!.key)),
+    parents: sprintless,
+  }
+}
+
+/**
  * The board shows subtasks assigned to the current user — nothing cleverer.
  * Narrowing is the filters' job, and picking up someone else's work belongs to
  * the search screen instead.
@@ -116,10 +176,11 @@ export async function getBoard(query: BoardQuery = {}): Promise<BoardParent[]> {
   if (meta.startDateFieldId) fields.push(meta.startDateFieldId)
 
   let issues: JiraIssue[]
+  /** Parents that carry no sprint, whose children are shown in their own block. */
+  let sprintlessParents = new Set<string>()
 
   if (query.sprintId) {
     const parentKeys = await sprintParentKeys(query.sprintId, projectKey)
-    if (!parentKeys.length) return []
 
     // `parent in (…)` with hundreds of keys makes an unwieldy query, so chunk it.
     const CHUNK = 50
@@ -135,6 +196,10 @@ export async function getBoard(query: BoardQuery = {}): Promise<BoardParent[]> {
       )
     }
     issues = (await Promise.all(batches)).flat()
+
+    const stray = await sprintlessChildren(base, fields, issues, query)
+    issues = issues.concat(stray.issues)
+    sprintlessParents = stray.parents
   } else {
     issues = await searchJql<JiraIssue>(
       `${base.join(' AND ')} ORDER BY created DESC`,
@@ -170,6 +235,7 @@ export async function getBoard(query: BoardQuery = {}): Promise<BoardParent[]> {
     { storyPointsFieldId: meta.storyPointsFieldId, startDateFieldId: meta.startDateFieldId },
     projectKey,
     childrenFiltered,
+    sprintlessParents,
   )
 }
 
@@ -180,6 +246,8 @@ async function groupByParent(
   projectKey: string,
   /** True when Done children were excluded from `subtasks` by the status filter. */
   childrenFiltered: boolean,
+  /** Parents carrying no sprint, rendered in their own block on the board. */
+  sprintlessParents: Set<string> = new Set(),
 ): Promise<BoardParent[]> {
   const { storyPointsFieldId, startDateFieldId } = fieldIds
   const parentInfo = new Map<
@@ -194,6 +262,8 @@ async function groupByParent(
       startDate: string | null
       dueDate: string | null
       labels: string[]
+      assigneeAccountId: string | null
+      assigneeName: string | null
     }
   >()
   for (const issue of issues) {
@@ -211,6 +281,8 @@ async function groupByParent(
         startDate: null,
         dueDate: null,
         labels: [],
+        assigneeAccountId: null,
+        assigneeName: null,
       })
     }
   }
@@ -221,7 +293,17 @@ async function groupByParent(
   const parentPoints = new Map<string, number | null>()
   const keys = [...parentInfo.keys()]
   if (keys.length) {
-    const fields = ['summary', 'issuetype', 'parent', 'status', 'created', 'duedate', 'labels']
+    const fields = [
+      'summary',
+      'issuetype',
+      'parent',
+      'status',
+      'created',
+      'duedate',
+      'labels',
+      // Who owns the parent decides whether its controls are editable here.
+      'assignee',
+    ]
     if (storyPointsFieldId) fields.push(storyPointsFieldId)
     if (startDateFieldId) fields.push(startDateFieldId)
     const fetched = await searchJql<JiraIssue>(
@@ -241,6 +323,8 @@ async function groupByParent(
         startDate: startDateFieldId ? str(p.fields[startDateFieldId]) : null,
         dueDate: str(p.fields.duedate),
         labels: strings(p.fields.labels),
+        assigneeAccountId: p.fields.assignee?.accountId ?? null,
+        assigneeName: p.fields.assignee?.displayName ?? null,
       })
     }
   }
@@ -267,6 +351,9 @@ async function groupByParent(
         startDate: info?.startDate ?? null,
         dueDate: info?.dueDate ?? null,
         labels: info?.labels ?? [],
+        assigneeAccountId: info?.assigneeAccountId ?? null,
+        assigneeName: info?.assigneeName ?? null,
+        outOfSprint: sprintlessParents.has(key),
         subtasks: [],
       })
     }
@@ -580,6 +667,55 @@ export async function updateDates(
     method: 'PUT',
     body: { fields },
   })
+}
+
+/**
+ * Makes a parent task visible on the team's board: sprint and label together.
+ *
+ * The two gaps hide it in different places and neither is enough on its own —
+ * the sprint is what this app and the burndown filter by, the label is what the
+ * board's own saved filter (`labels in (ctalk)`) matches. VT-325 was missing
+ * both, so fixing only the sprint would have moved it from invisible-here to
+ * invisible-on-Jira, and the user would have had to discover the second gap
+ * afterwards.
+ *
+ * One PUT, so the task never sits half-fixed.
+ *
+ * Two shapes to be careful with: the sprint field takes a bare integer on write
+ * though it reads back as an array of objects, and `labels` is a whole-array
+ * write — so existing labels are read first and appended to rather than lost.
+ */
+export async function attachToSprint(
+  issueKey: string,
+  sprintId: number,
+): Promise<{ labelAdded: string | null }> {
+  const meta = await getProjectMeta()
+  if (!meta.sprintFieldId) throw new Error('Không tìm thấy field Sprint trên project này')
+
+  const fields: Record<string, unknown> = { [meta.sprintFieldId]: sprintId }
+  const { label } = getTeamScope()
+  let labelAdded: string | null = null
+
+  if (label && meta.labelsOnScreen) {
+    // Read fresh: a cached copy from seconds ago could drop a label someone
+    // else just added, and this write replaces the whole array.
+    const issue = await jiraFetch<JiraIssue>(
+      `/rest/api/3/issue/${encodeURIComponent(issueKey)}?fields=labels`,
+      { fresh: true },
+    )
+    const current = strings(issue.fields.labels)
+    if (!current.some((l) => l.toLowerCase() === label.toLowerCase())) {
+      fields.labels = [...current, label]
+      labelAdded = label
+    }
+  }
+
+  await jiraFetch(`/rest/api/3/issue/${encodeURIComponent(issueKey)}`, {
+    method: 'PUT',
+    body: { fields },
+  })
+
+  return { labelAdded }
 }
 
 export async function transitionIssue(issueKey: string, transitionId: string): Promise<void> {

@@ -56,6 +56,18 @@ export interface BoardParent {
   startDate: string | null
   dueDate: string | null
   labels: string[]
+  /**
+   * Who owns the parent. Null when nobody has taken it, which is treated as
+   * editable — an unowned task blocks nobody.
+   */
+  assigneeAccountId: string | null
+  assigneeName: string | null
+  /**
+   * True when this parent carries no sprint at all, while the board is filtered
+   * to one. Its children would otherwise be invisible here despite being the
+   * user's own work — see {@link getBoard}.
+   */
+  outOfSprint: boolean
   /** The children shown on the board — narrowed by the status filter. */
   subtasks: BoardSubtask[]
 }
@@ -149,4 +161,23 @@ export function issueHygiene(
     any: problems.length > 0,
     problems,
   }
+}
+
+/**
+ * Whether a parent task belongs to somebody else, and so must not be edited
+ * from this board.
+ *
+ * Three cases collapse into "editable": the task is mine, nobody has taken it,
+ * or we do not know who is looking. Only a task explicitly assigned to another
+ * person is locked — an unowned task blocks nobody, and failing open keeps a
+ * missing account id from freezing every control on the board.
+ *
+ * Pure and server-free so the row can call it while rendering.
+ */
+export function isOwnedByOther(
+  assigneeAccountId: string | null,
+  myAccountId: string | null | undefined,
+): boolean {
+  if (!assigneeAccountId || !myAccountId) return false
+  return assigneeAccountId !== myAccountId
 }

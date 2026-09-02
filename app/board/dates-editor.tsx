@@ -3,7 +3,7 @@
 import { useEffect, useState, useTransition } from 'react'
 
 import { setDatesAction } from '@/app/actions'
-import { addDays, todayIn } from '@/lib/time'
+import { addDays, daysBetween, todayIn } from '@/lib/time'
 
 import { DateInput } from '../date-input'
 import { Spinner } from '../spinner'
@@ -32,6 +32,8 @@ export function DatesEditor({
   dueDate,
   sprintEnd,
   isDone = false,
+  readOnly = false,
+  readOnlyReason,
 }: {
   issueKey: string
   startDate: string | null
@@ -40,6 +42,12 @@ export function DatesEditor({
   sprintEnd?: string | null
   /** A finished issue is never "overdue", however old its due date. */
   isDone?: boolean
+  /**
+   * Someone else's task. The dates still colour — a deadline is worth seeing
+   * whoever owns it — but the popover never opens.
+   */
+  readOnly?: boolean
+  readOnlyReason?: string
 }) {
   const [start, setStart] = useState(startDate)
   const [due, setDue] = useState(dueDate)
@@ -54,7 +62,20 @@ export function DatesEditor({
 
   const today = todayIn()
   const missing = !start || !due
+
+  /**
+   * Due-date pressure, in the order it matters.
+   *
+   * "Done" is the only status that silences it: on a ten-column workflow every
+   * other one — including VERIFIED ON STAGING — still has work attached to it,
+   * and a task sitting there past its date is exactly what should be noticed.
+   *
+   * Measured against the real today, not the day the board is filtered to.
+   * Looking back at last Friday must not repaint every task as overdue.
+   */
   const overdue = Boolean(!isDone && due && due < today)
+  const dueToday = Boolean(!isDone && due && due === today)
+  const daysLate = overdue && due ? daysBetween(due, today) : 0
 
   /**
    * Sends both dates on every save, never just the changed one.
@@ -86,6 +107,29 @@ export function DatesEditor({
     ? (short(start) ?? short(due) ?? '—')
     : `${short(start)}→${short(due)}`
 
+  const tone = overdue
+    ? 'border-crit bg-crit-soft text-crit'
+    : dueToday
+      ? 'border-warn bg-warn-soft font-semibold text-warn'
+      : missing
+        ? 'border-warn bg-warn-soft text-warn'
+        : null
+
+  if (readOnly) {
+    return (
+      <span
+        title={readOnlyReason ?? (start || due ? `${start ?? '—'} → ${due ?? '—'}` : 'Chưa có ngày')}
+        className={
+          'inline-flex h-6 items-center gap-1 rounded-[5px] border px-1.5 font-mono text-[10.5px] ' +
+          (tone ?? 'border-line bg-surface-2 text-ink-3')
+        }
+      >
+        <CalendarIcon />
+        {label}
+      </span>
+    )
+  }
+
   return (
     <Popover
       align="right"
@@ -96,36 +140,34 @@ export function DatesEditor({
           disabled={pending}
           title={
             overdue
-              ? `Quá hạn — due ${due}`
-              : missing
-                ? `${issueKey}: ${!start ? 'chưa có start date' : ''}${!start && !due ? ', ' : ''}${!due ? 'chưa có due date' : ''}`
-                : `${issueKey}: ${start} → ${due}`
+              ? `Quá hạn ${daysLate} ngày — due ${due}, task chưa Done`
+              : dueToday
+                ? `Đến hạn hôm nay (${due}) — task chưa Done`
+                : missing
+                  ? `${issueKey}: ${!start ? 'chưa có start date' : ''}${!start && !due ? ', ' : ''}${!due ? 'chưa có due date' : ''}`
+                  : `${issueKey}: ${start} → ${due}`
           }
           className={
             'inline-flex h-6 items-center gap-1 rounded-[5px] border px-1.5 font-mono text-[10.5px] disabled:opacity-60 ' +
             (overdue
               ? 'border-crit bg-crit-soft text-crit'
-              : missing
-                ? 'border-warn bg-warn-soft text-warn'
-                : open
-                  ? 'border-accent text-accent-ink'
-                  : 'border-line-strong bg-surface text-ink-2 hover:border-accent hover:text-accent-ink')
+              : dueToday
+                // Same amber as a missing date — both mean "this needs you
+                // today" — but bold, because one is a gap in the data and the
+                // other is a deadline landing. The dates in the chip say which.
+                ? 'border-warn bg-warn-soft font-semibold text-warn'
+                : missing
+                  ? 'border-warn bg-warn-soft text-warn'
+                  : open
+                    ? 'border-accent text-accent-ink'
+                    : 'border-line-strong bg-surface text-ink-2 hover:border-accent hover:text-accent-ink')
           }
         >
           {pending ? (
             <Spinner className="size-2.5" />
           ) : (
             <>
-              <svg
-                viewBox="0 0 16 16"
-                className="size-3 shrink-0 opacity-70"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-              >
-                <rect x="2" y="3.5" width="12" height="10.5" rx="1.5" />
-                <path d="M2 6.5h12M5.5 2v3M10.5 2v3" strokeLinecap="round" />
-              </svg>
+              <CalendarIcon />
               {label}
             </>
           )}
@@ -217,6 +259,21 @@ function DateField({
         className="min-w-0 flex-1 rounded-md border border-line bg-ground px-2 py-1 font-mono text-[12px]"
       />
     </label>
+  )
+}
+
+function CalendarIcon() {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      className="size-3 shrink-0 opacity-70"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+    >
+      <rect x="2" y="3.5" width="12" height="10.5" rx="1.5" />
+      <path d="M2 6.5h12M5.5 2v3M10.5 2v3" strokeLinecap="round" />
+    </svg>
   )
 }
 

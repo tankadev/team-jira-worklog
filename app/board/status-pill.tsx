@@ -27,12 +27,17 @@ export function StatusPill({
   statusName,
   onChanged,
   compact = false,
+  readOnly = false,
+  readOnlyReason,
 }: {
   issueKey: string
   statusName: string
   onChanged?: (name: string) => void
   /** Caps the width on the one-line board row so long statuses cannot push it wide. */
   compact?: boolean
+  /** Renders the status as a plain label — someone else's task is not ours to move. */
+  readOnly?: boolean
+  readOnlyReason?: string
 }) {
   const [open, setOpen] = useState(false)
   const [items, setItems] = useState<Transition[] | null>(null)
@@ -75,6 +80,25 @@ export function StatusPill({
         setError(res.message)
       }
     })
+  }
+
+  // A plain span, not a disabled button: a greyed-out control invites clicking
+  // and reads as broken, while the status itself is still worth showing.
+  if (readOnly) {
+    return (
+      <span
+        title={readOnlyReason ?? current}
+        className={
+          'inline-flex items-center gap-1 rounded-[4px] px-[6px] py-[3px] font-bold uppercase tracking-[0.05em] opacity-80 ' +
+          (compact ? 'max-w-[128px] text-[9.5px]' : 'text-[10px]') +
+          ' ' +
+          TONE[statusTone(current)]
+        }
+      >
+        <span className="truncate">{current}</span>
+        <em className="shrink-0 text-[8px] not-italic opacity-70">🔒</em>
+      </span>
+    )
   }
 
   return (
