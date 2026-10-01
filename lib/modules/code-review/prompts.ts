@@ -24,6 +24,11 @@ const PREVIOUS = {
       note: { type: 'string', description: 'Một câu: đã sửa thế nào / còn thiếu gì.' },
       line: { type: 'integer', description: 'Code: dòng hiện tại của vấn đề ở commit head mới (nếu còn).' },
       end_line: { type: 'integer' },
+      reply: {
+        type: 'string',
+        description:
+          'Chỉ với vấn đề đã được gửi lên PR (có ghi "đã gửi lên PR"): câu trả lời tiếp gửi member NGAY TRONG THREAD CŨ — phản hồi lại điều member đã trả lời (nếu có), nói rõ còn thiếu gì; đã sửa ổn thì một câu xác nhận ngắn. Không nhắc lại nguyên văn comment cũ.',
+      },
     },
     required: ['id', 'status', 'note'],
   },
@@ -160,15 +165,26 @@ function rulesBlock(globalRules: string, repoRules: string): string {
   return parts.length ? `\n## Quy tắc review riêng của team / repo\n${parts.join('\n\n')}\n` : ''
 }
 
-function previousBlock(prev: FindingView[], kind: 'code' | 'doc'): string {
+/**
+ * The previous round's open findings — and, for those already on GitHub, the
+ * conversation that followed in their thread, so the follow-up answers what the
+ * member actually said rather than repeating the original comment.
+ */
+export type ThreadTalk = Map<number, Array<{ author: string; body: string }>>
+
+function previousBlock(prev: FindingView[], kind: 'code' | 'doc', talk?: ThreadTalk): string {
   if (!prev.length) return ''
   const list = prev
     .map((f) => {
-      const loc = kind === 'doc' ? f.location : `${f.file}${f.line ? `:${f.line}` : ''}`
-      return `- id ${f.id} [${f.severity}] ${loc} — ${f.title}\n  ${f.body.replace(/\n+/g, ' ').slice(0, 600)}`
+      const loc = kind === 'doc' ? f.location : `${f.file}${f.line ? `:${f.line}` : ''}` || 'comment rời'
+      const posted = f.ghUrl ? ' (đã gửi lên PR)' : ''
+      const replies = (talk?.get(f.id) ?? [])
+        .map((c) => `    ↳ ${c.author}: ${c.body.replace(/\s+/g, ' ').slice(0, 400)}`)
+        .join('\n')
+      return `- id ${f.id} [${f.severity}] ${loc}${posted} — ${f.title}\n  ${f.body.replace(/\n+/g, ' ').slice(0, 600)}${replies ? `\n  Trao đổi sau đó trong thread:\n${replies}` : ''}`
     })
     .join('\n')
-  return `\n## Các vấn đề đã nêu ở vòng trước (còn mở)\n${list}\n`
+  return `\n## Các vấn đề đã nêu ở vòng trước (còn mở)\n${list}\nVới vấn đề "đã gửi lên PR", điền \`reply\` trong \`previous\`: câu trả lời tiếp trong thread cũ, theo đúng xưng hô và giọng văn ở trên.\n`
 }
 
 function commentsBlock(comments: PullComment[]): string {
@@ -249,6 +265,8 @@ export function codePrompt(input: {
   /** PRs in other repos this one goes with (SDK ↔ iOS). */
   links: RoundLink[]
   addressee: Addressee | null
+  /** Member replies in the GitHub threads of previous findings. */
+  talk?: ThreadTalk
 }): string {
   const pr = input.prNumber ? `PR #${input.prNumber}` : 'Nhánh'
   const followUp = input.round > 1
@@ -288,7 +306,7 @@ ${addressBlock(input.addressee)}
 \`\`\`
 ${input.diffStat.slice(0, 6000)}
 \`\`\`
-${linksBlock(input.links)}${docsBlock(input.docs, input.docsChanged)}${input.prBody.trim() ? `\n## Mô tả PR\n${input.prBody.trim().slice(0, 4000)}\n` : ''}${input.note.trim() ? `\n## Ghi chú của người review\n${input.note.trim()}\n` : ''}${rulesBlock(input.globalRules, input.repoRules)}${commentsBlock(input.comments)}${previousBlock(input.previous, 'code')}
+${linksBlock(input.links)}${docsBlock(input.docs, input.docsChanged)}${input.prBody.trim() ? `\n## Mô tả PR\n${input.prBody.trim().slice(0, 4000)}\n` : ''}${input.note.trim() ? `\n## Ghi chú của người review\n${input.note.trim()}\n` : ''}${rulesBlock(input.globalRules, input.repoRules)}${commentsBlock(input.comments)}${previousBlock(input.previous, 'code', input.talk)}
 Khi xong, trả kết quả qua structured output theo schema.`
 }
 

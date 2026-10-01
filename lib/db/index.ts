@@ -317,6 +317,10 @@ function open() {
     "no_branch INTEGER NOT NULL DEFAULT 0",
   );
   ensureColumn(sqlite, "release_tasks", "ref_id", "ref_id INTEGER");
+  // Bug-fix codes raised after a feature built, each with its own status and
+  // the build it went public in; and the build the feature itself went out in.
+  ensureColumn(sqlite, "release_tasks", "fixes", "fixes TEXT NOT NULL DEFAULT '[]'");
+  ensureColumn(sqlite, "release_tasks", "published_build", "published_build TEXT NOT NULL DEFAULT ''");
   ensureColumn(sqlite, "drafts", "start_date", "start_date TEXT");
   ensureColumn(sqlite, "drafts", "due_date", "due_date TEXT");
   // `origin/main` of the swift repo as it stood when the run started. The
@@ -342,6 +346,10 @@ function open() {
   ensureColumn(sqlite, "review_items", "addressee", "addressee TEXT NOT NULL DEFAULT ''");
   // Which document template (TDD iOS / TDD SDK…) a doc review is held to.
   ensureColumn(sqlite, "review_items", "template_id", "template_id TEXT NOT NULL DEFAULT ''");
+  // A later round's follow-up for a finding already on GitHub: the reply
+  // Claude drafted for its thread, and whether the reviewer sent it.
+  ensureColumn(sqlite, "review_findings", "follow_reply", "follow_reply TEXT NOT NULL DEFAULT ''");
+  ensureColumn(sqlite, "review_findings", "follow_sent_url", "follow_sent_url TEXT NOT NULL DEFAULT ''");
   return drizzle(sqlite, { schema });
 }
 

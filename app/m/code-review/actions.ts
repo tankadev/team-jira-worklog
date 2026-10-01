@@ -708,3 +708,30 @@ export async function setTemplateAction(itemId: number, templateId: string): Pro
   revalidatePath(`/m/code-review/${itemId}`)
   return { ok: true, message: templateId ? 'Đã gắn mẫu — áp dụng từ vòng review tiếp theo.' : 'Đã bỏ mẫu.' }
 }
+
+/**
+ * A later round's follow-up on a finding that is already on GitHub. An inline
+ * comment gets a reply in its own thread; a conversation comment (no thread to
+ * reply in) gets a new comment that quotes and links the original.
+ */
+export async function followUpAction(findingId: number, body: string): Promise<Result & { url?: string }> {
+  if (!enabled()) return OFF
+  const text = body.trim()
+  if (!text) return { ok: false, message: 'Nội dung trống.' }
+  const f = getFinding(findingId)
+  if (!f?.ghUrl) return { ok: false, message: 'Finding này chưa từng được gửi lên PR — dùng "Gửi lên PR".' }
+  const round = getRound(f.roundId)
+  const ctx = round ? prContext(round.itemId) : 'Không thấy vòng review.'
+  if (typeof ctx === 'string') return { ok: false, message: ctx }
+  const denied = await denyWrite(ctx)
+  if (denied) return denied
+  try {
+    const posted = f.ghCommentId
+      ? await replyToComment(ctx.repo, ctx.number, f.ghCommentId, text)
+      : await postIssueComment(ctx.repo, ctx.number, `> **${f.title}** — [comment trước](${f.ghUrl})\n\n${text}`)
+    patchFinding(findingId, { followReply: text, followSentUrl: posted.url })
+    return { ok: true, message: f.ghCommentId ? 'Đã trả lời trong thread.' : 'Đã comment tiếp (trích comment cũ).', url: posted.url }
+  } catch (err) {
+    return failure(err)
+  }
+}

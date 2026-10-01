@@ -47,7 +47,7 @@ import {
 } from '../actions'
 import { LinkPicker, useAttachments, useDocUpload } from '../review'
 import { type ChatHandle, ChatPanel, ChatShortcut } from './chat'
-import { AccessNote, DiscussionPanel, FindingGithub, GhProvider, SubmitReview, useGh } from './github'
+import { AccessNote, DiscussionPanel, FindingGithub, GhProvider, ReplyWithBody, SubmitReview, useGh } from './github'
 import {
   BTN,
   BTN_PRI,
@@ -816,6 +816,7 @@ function FindingCard({
       <div className="mt-2 flex flex-wrap items-center gap-1.5">
         <CopyButton text={findingClipboard({ ...f, body }, kind)} />
         {!f.ghUrl && f.status !== 'dismissed' && f.status !== 'fixed' && <FindingGithub f={{ ...f, body }} onPosted={onPosted} />}
+        <ReplyWithBody f={f} body={body} onSent={onPosted} />
         <button type="button" className={BTN} onClick={() => setEditing(true)}>
           Sửa
         </button>
@@ -836,7 +837,7 @@ function FindingCard({
       </div>
       {f.ghUrl && (
         <div className="mt-2">
-          <FindingGithub f={f} onPosted={onPosted} />
+          <FindingGithub f={{ ...f, body }} onPosted={onPosted} />
         </div>
       )}
     </div>

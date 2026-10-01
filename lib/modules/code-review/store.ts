@@ -118,6 +118,8 @@ const toFinding = (r: typeof reviewFindings.$inferSelect): FindingView => ({
   followNote: r.followNote,
   ghCommentId: r.ghCommentId,
   ghUrl: r.ghUrl,
+  followReply: r.followReply,
+  followSentUrl: r.followSentUrl,
 })
 
 /* ── items ──────────────────────────────────────────────────────────────── */
@@ -359,7 +361,15 @@ export function insertFindings(rows: Array<typeof reviewFindings.$inferInsert>) 
 
 export function patchFinding(
   id: number,
-  patch: { body?: string; status?: FindingStatus; title?: string; ghCommentId?: number | null; ghUrl?: string },
+  patch: {
+    body?: string
+    status?: FindingStatus
+    title?: string
+    ghCommentId?: number | null
+    ghUrl?: string
+    followReply?: string
+    followSentUrl?: string
+  },
 ) {
   db.update(reviewFindings).set(patch).where(eq(reviewFindings.id, id)).run()
 }

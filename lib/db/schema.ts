@@ -229,6 +229,10 @@ export const releaseTasks = sqliteTable("release_tasks", {
   noBranch: integer("no_branch", { mode: "boolean" }).notNull().default(false),
   /** Optional id of another release task this one is derived from (e.g. the SDK task). */
   refId: integer("ref_id"),
+  /** JSON FixCode[]: bug-fix task codes built after the feature, each tracked on its own. */
+  fixes: text("fixes").notNull().default("[]"),
+  /** Build the feature code itself went public in, e.g. "VipTalk Lite 2.3.0 (512)". */
+  publishedBuild: text("published_build").notNull().default(""),
   createdAt: integer("created_at").notNull().default(now),
   updatedAt: integer("updated_at").notNull().default(now),
 });
@@ -407,6 +411,10 @@ export const reviewFindings = sqliteTable(
     /** GitHub comment this finding was posted as (review or issue comment). */
     ghCommentId: integer("gh_comment_id"),
     ghUrl: text("gh_url").notNull().default(""),
+    /** Carried findings: reply drafted for the existing GitHub thread. */
+    followReply: text("follow_reply").notNull().default(""),
+    /** Where that reply was posted, once sent. */
+    followSentUrl: text("follow_sent_url").notNull().default(""),
     position: integer("position").notNull().default(0),
   },
   (t) => [

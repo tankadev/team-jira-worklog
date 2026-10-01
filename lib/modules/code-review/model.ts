@@ -205,6 +205,10 @@ export interface FindingView {
   /** The GitHub comment this finding was posted as — replies hang off it. */
   ghCommentId: number | null
   ghUrl: string
+  /** Carried findings already on GitHub: the reply Claude drafted for that thread. */
+  followReply: string
+  /** Set once that reply is posted. */
+  followSentUrl: string
 }
 
 export interface RoundView {

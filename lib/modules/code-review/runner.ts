@@ -23,11 +23,11 @@ import {
   withRepoLock,
 } from './git'
 import { type RawFinding, buildFreshRows } from './findings'
-import { getPull, listPullComments } from './github'
+import { getDiscussion, getPull, listPullComments } from './github'
 import { cleanupLinks, linkDirs, prepareLinks } from './links'
-import type { DocFile, FindingStatus, RoundLink } from './model'
+import type { DocFile, FindingStatus, FindingView, RoundLink } from './model'
 import { ALLOWED_TOOLS, DISALLOWED_TOOLS, ISOLATION_FLAGS, reviewEnv } from './guard'
-import { CODE_SCHEMA, DOC_SCHEMA, codePrompt, docPrompt } from './prompts'
+import { CODE_SCHEMA, DOC_SCHEMA, type ThreadTalk, codePrompt, docPrompt } from './prompts'
 import { type LogLine, bootTime, lastResult, parseLog, pidAlive, readLog, strayLines } from './proc'
 
 export type { LogLine }
@@ -190,6 +190,7 @@ async function prepareAndSpawn(roundId: number) {
     if (item.kind === 'pr') {
       const r = repo!
       let prBody = ''
+      let talk: ThreadTalk | undefined
       let comments: Awaited<ReturnType<typeof listPullComments>> = []
       if (item.prNumber && r.githubRepo) {
         const pull = await getPull(r.githubRepo, item.prNumber)
@@ -198,6 +199,7 @@ async function prepareAndSpawn(roundId: number) {
         patchItem(item.id, { title: pull.title, baseRef: pull.baseRef, headRef: pull.headRef, author: pull.author, url: pull.url })
         Object.assign(item, { title: pull.title, baseRef: pull.baseRef, headRef: pull.headRef, author: pull.author })
         comments = await listPullComments(r.githubRepo, item.prNumber)
+        talk = await threadTalk(r.githubRepo, item.prNumber, previous)
       }
 
       await withRepoLock(r.localPath, async () => {
@@ -238,6 +240,7 @@ async function prepareAndSpawn(roundId: number) {
         docsChanged,
         links,
         addressee: resolveAddressee(item),
+        talk,
         title: item.title,
         prNumber: item.prNumber,
         author: item.author,
@@ -367,6 +370,28 @@ async function prepareAndSpawn(roundId: number) {
   }
 }
 
+/**
+ * What was said under each previous finding that went to GitHub as an inline
+ * comment — read-only, best-effort: without it the follow-up is still written,
+ * just without knowing the member's answer.
+ */
+async function threadTalk(repo: string, number: number, previous: FindingView[]): Promise<ThreadTalk | undefined> {
+  const posted = previous.filter((f) => f.ghCommentId)
+  if (!posted.length) return undefined
+  try {
+    const d = await getDiscussion(repo, number)
+    const talk: ThreadTalk = new Map()
+    for (const f of posted) {
+      const thread = d.threads.find((t) => t.comments.some((c) => c.id === f.ghCommentId))
+      const after = thread?.comments.filter((c) => c.id !== f.ghCommentId) ?? []
+      if (after.length) talk.set(f.id, after.map((c) => ({ author: c.author, body: c.body })))
+    }
+    return talk
+  } catch {
+    return undefined
+  }
+}
+
 function parseDocs(raw: string): DocFile[] {
   try {
     const v = JSON.parse(raw)
@@ -384,7 +409,7 @@ interface Output {
   /** Older rounds / older prompts. */
   summary_comment?: string
   findings?: RawFinding[]
-  previous?: Array<{ id?: number; status?: string; note?: string; line?: number; end_line?: number }>
+  previous?: Array<{ id?: number; status?: string; note?: string; line?: number; end_line?: number; reply?: string }>
 }
 
 async function cleanup(r: RoundRow) {
@@ -497,6 +522,8 @@ async function storeOutput(r: RoundRow, out: Output) {
         ghUrl: old.ghUrl,
         status,
         followNote: v?.note?.trim() || (v ? '' : 'Claude không đánh giá lại điểm này — tự kiểm tra.'),
+        // Only meaningful for a finding already on GitHub: what to say next in its thread.
+        followReply: old.ghUrl ? (v?.reply ?? '').trim() : '',
         position: position++,
       })
     }
