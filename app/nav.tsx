@@ -41,22 +41,23 @@ export function Nav({
     href === '/' ? pathname === '/' : pathname.startsWith(href)
 
   return (
-    <aside className="sticky top-0 z-30 flex flex-col gap-2 border-b border-line bg-surface/90 px-3 pt-3 backdrop-blur md:h-screen md:gap-5 md:border-b-0 md:border-r md:bg-surface md:px-3 md:py-4 md:backdrop-blur-none">
+    <aside className="sticky top-0 z-30 flex flex-col gap-2 border-b border-line bg-surface/90 px-3 pt-3 backdrop-blur md:h-screen md:gap-4 md:border-b-0 md:border-r md:bg-surface md:px-3 md:pb-3 md:pt-4 md:backdrop-blur-none">
       <div className="flex items-center gap-2.5 px-1.5">
         <span
           aria-hidden
-          className="grid size-8 shrink-0 place-items-center rounded-[9px] bg-gradient-to-br from-accent-2 to-accent text-on-accent shadow-card ring-1 ring-inset ring-white/15"
+          className="grid size-9 shrink-0 place-items-center rounded-[10px] bg-gradient-to-br from-accent-2 to-accent text-on-accent shadow-card ring-1 ring-inset ring-white/15"
         >
-          <LogoMark className="size-[19px]" />
+          <LogoMark className="size-5" />
         </span>
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 leading-tight">
           <b className="block truncate text-emph font-semibold tracking-tight">Jira Logwork</b>
-          {context && (
+          {context ? (
             <span className="block truncate font-mono text-micro text-ink-3 md:hidden" title={contextTitle(context)}>
               {context.project}
               {context.board ? ` · #${context.board}` : ''}
             </span>
-          )}
+          ) : null}
+          <span className="hidden truncate text-micro text-ink-3 md:block">Team worklog</span>
         </div>
         {/* Beside the brand on a phone; on a wide screen they move into the
             context strip below, where they no longer crowd the name. Never
@@ -68,37 +69,48 @@ export function Nav({
       </div>
 
       {context && (
-        <div className="mx-0.5 hidden items-center gap-1 rounded-xl border border-line bg-surface-2/60 py-1 pl-3 pr-1 md:flex">
+        <div className="hidden items-center gap-2.5 rounded-xl border border-line bg-surface-2/50 p-2 md:flex">
+          <span
+            aria-hidden
+            className="grid size-8 shrink-0 place-items-center rounded-lg bg-accent-soft font-mono text-caption font-bold text-accent-ink"
+          >
+            {context.project.slice(0, 2)}
+          </span>
           <div className="min-w-0 flex-1" title={contextTitle(context)}>
-            <div className="truncate font-mono text-caption font-semibold text-ink-2">
+            <div className="truncate font-mono text-caption font-semibold text-ink">
               {context.project}
               {context.board && <span className="font-normal text-ink-3"> · #{context.board}</span>}
             </div>
-            {context.team && (
+            {context.team ? (
               <div className="flex items-center gap-1.5 text-micro text-ink-3">
-                <span className="size-1.5 shrink-0 rounded-full bg-accent" />
-                team <span className="truncate font-mono text-ink-2">{context.team}</span>
+                <span className="size-1.5 shrink-0 rounded-full bg-good" />
+                <span className="truncate">
+                  team <span className="font-mono text-ink-2">{context.team}</span>
+                </span>
               </div>
+            ) : (
+              <div className="text-micro text-ink-3">toàn project</div>
             )}
           </div>
-          <RefreshButton />
-          <ThemeToggle />
+          <div className="flex shrink-0 items-center">
+            <RefreshButton />
+            <ThemeToggle />
+          </div>
         </div>
       )}
 
       {/* A single scrolling row on a phone — wrapping four labels into a 390px
-          bar broke "Tìm & nhận task" over four lines. */}
-      <nav className="-mx-3 flex flex-row gap-1 overflow-x-auto px-3 pb-2 [scrollbar-width:none] md:mx-0 md:flex-col md:gap-0.5 md:overflow-visible md:px-0 md:pb-0">
-        <div className="mb-1 hidden px-2.5 text-micro font-medium text-ink-3 md:block">Làm việc</div>
+          bar broke "Tìm & nhận task" over four lines. On a wide screen the
+          list scrolls on its own so Settings stays pinned at the bottom. */}
+      <nav className="-mx-3 flex flex-row gap-1 overflow-x-auto px-3 pb-2 [scrollbar-width:none] md:min-h-0 md:flex-1 md:flex-col md:gap-0.5 md:overflow-y-auto md:pb-0">
+        <SectionLabel>Làm việc</SectionLabel>
         {CORE.map((item) => (
           <NavLink key={item.href} {...item} active={isActive(item.href)} />
         ))}
 
         {modules.length > 0 && (
           <>
-            <div className="mb-1 mt-4 hidden px-2.5 text-micro font-medium text-ink-3 md:block">
-              Modules
-            </div>
+            <SectionLabel className="md:mt-5">Modules</SectionLabel>
             {modules.map((item) => (
               <NavLink
                 key={item.href}
@@ -111,10 +123,29 @@ export function Nav({
           </>
         )}
 
-        <div className="mt-4 hidden md:block" />
-        <NavLink href="/settings" label="Settings" icon="settings" active={isActive('/settings')} />
+        {/* Inline with the rest on a phone; below the scrolling list on a wide screen. */}
+        <span className="contents md:hidden">
+          <NavLink href="/settings" label="Settings" icon="settings" active={isActive('/settings')} />
+        </span>
       </nav>
+
+      <div className="hidden border-t border-line pt-3 md:block">
+        <NavLink href="/settings" label="Settings" icon="settings" active={isActive('/settings')} />
+      </div>
     </aside>
+  )
+}
+
+function SectionLabel({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  return (
+    <div
+      className={
+        'mb-1.5 hidden px-2.5 text-[10.5px] font-semibold uppercase leading-[13px] tracking-[0.08em] text-ink-3 md:block ' +
+        className
+      }
+    >
+      {children}
+    </div>
   )
 }
 
@@ -147,19 +178,27 @@ function NavLink({
       onFocus={() => router.prefetch(href)}
       aria-current={active ? 'page' : undefined}
       className={
-        'group relative flex shrink-0 items-center gap-2.5 whitespace-nowrap rounded-lg px-2.5 py-[7px] text-body transition-colors ' +
+        'group relative flex shrink-0 items-center gap-2.5 whitespace-nowrap rounded-lg px-2.5 py-[7px] text-body transition-colors md:py-2 ' +
         (active
           ? 'bg-accent-soft font-semibold text-accent-ink'
           : 'text-ink-2 hover:bg-surface-2 hover:text-ink')
       }
     >
+      {/* The marker on the left edge — only in the column; a phone's row of pills has no edge to hang it on. */}
+      {active && (
+        <span
+          aria-hidden
+          className="absolute -left-3 top-1.5 bottom-1.5 hidden w-[3px] rounded-r-full bg-accent md:block"
+        />
+      )}
       <Icon
         name={icon}
         className={
-          'size-[17px] shrink-0 ' + (active ? 'text-accent' : 'text-ink-3 group-hover:text-ink-2')
+          'size-[17px] shrink-0 transition-colors ' +
+          (active ? 'text-accent' : 'text-ink-3 group-hover:text-ink-2')
         }
       />
-      <span className="flex-1">{label}</span>
+      <span className="flex-1 truncate">{label}</span>
       <LinkSpinner />
     </Link>
   )

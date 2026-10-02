@@ -8,15 +8,11 @@ export default function SettingsLoading() {
         <Shimmer className="h-6 w-28" />
       </header>
 
-      <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="flex flex-col gap-4">
-          <CardSkeleton lines={6} />
-          <CardSkeleton lines={3} />
-        </div>
-        <div className="flex flex-col gap-4">
-          <CardSkeleton lines={5} />
-          <CardSkeleton lines={4} />
-        </div>
+      <Shimmer className="mb-5 h-10 w-full rounded-xl" />
+
+      <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-4 lg:grid-cols-2">
+        <CardSkeleton lines={6} />
+        <CardSkeleton lines={4} />
       </div>
     </>
   )

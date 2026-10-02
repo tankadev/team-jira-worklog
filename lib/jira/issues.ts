@@ -595,17 +595,17 @@ export async function getSprintTasks(
 }
 
 /**
- * The current user's subtasks in a sprint that sit in the "In Progress" status
- * category — what they are actively working on now. Feeds the daily report's
- * optional "today" list, returning just key + summary, newest activity first.
+ * The current user's subtasks in a sprint that are not Done yet — what the
+ * daily report offers under "Today". Returns key, summary and status, newest
+ * activity first; the report decides which are ticked by default.
  *
  * Sprint membership is resolved on the parents first (JQL cannot filter subtasks
  * by sprint — see {@link sprintParentKeys}), then subtasks are matched by
  * `parent in (…)`, same as {@link getBoard}.
  */
-export async function getInProgressSubtasks(
+export async function getOpenSubtasks(
   sprintId: number | null,
-): Promise<Array<{ key: string; summary: string }>> {
+): Promise<Array<{ key: string; summary: string; statusName: string }>> {
   if (!sprintId) return [];
   const projectKey = requireProjectKey();
   const parentKeys = await sprintParentKeys(sprintId, projectKey);
@@ -615,7 +615,7 @@ export async function getInProgressSubtasks(
     `project = "${escapeJql(projectKey)}"`,
     "assignee = currentUser()",
     "issuetype in subTaskIssueTypes()",
-    'statusCategory = "In Progress"',
+    "statusCategory != Done",
     ...teamClauses(),
   ];
 
@@ -629,13 +629,17 @@ export async function getInProgressSubtasks(
     batches.push(
       searchJql<JiraIssue>(
         `${[...base, `parent in (${chunk})`].join(" AND ")} ORDER BY updated DESC`,
-        ["summary"],
+        ["summary", "status"],
         { limit: 100 },
       ),
     );
   }
   const issues = (await Promise.all(batches)).flat();
-  return issues.map((i) => ({ key: i.key, summary: i.fields.summary ?? "" }));
+  return issues.map((i) => ({
+    key: i.key,
+    summary: i.fields.summary ?? "",
+    statusName: i.fields.status?.name ?? "",
+  }));
 }
 
 export interface IssueDetail {

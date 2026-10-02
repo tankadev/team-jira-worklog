@@ -1,6 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  /** Bottom-left is where Settings sits, pinned at the foot of the sidebar. */
+  devIndicators: {
+    position: 'bottom-right',
+  },
   experimental: {
     /**
      * Defaults to true, and caches fetch responses across hot reloads *including*

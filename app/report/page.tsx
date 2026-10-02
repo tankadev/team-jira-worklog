@@ -2,15 +2,16 @@ import Link from 'next/link'
 import { connection } from 'next/server'
 
 import { getMyself, jiraBlockedBy } from '@/lib/jira/client'
-import { getInProgressSubtasks } from '@/lib/jira/issues'
+import { getOpenSubtasks } from '@/lib/jira/issues'
 import { getSprints } from '@/lib/jira/sprints'
 import { getWorklogs, sumByDate } from '@/lib/jira/worklog'
-import { type ReportIssue, renderReport } from '@/lib/report'
+import type { ReportIssue } from '@/lib/report'
 import { listDaysOff } from '@/lib/days-off'
+import { statusTone } from '@/lib/jira/types'
 import { type QuotaRules, quotaForDate } from '@/lib/quota'
 import { SETTING_KEYS, getSetting, getWorkSchedule } from '@/lib/settings'
 import { getTemplate, listTemplates } from '@/lib/templates'
-import { DEFAULT_TZ, addDays, formatDateVi, formatDuration, isWeekend, todayIn, weekOf } from '@/lib/time'
+import { DEFAULT_TZ, formatDateVi, formatDuration, previousWorkday, todayIn, weekOf } from '@/lib/time'
 
 import { JiraDown } from '../jira-down'
 import { NavProvider } from '../board/navigation'
@@ -56,16 +57,14 @@ async function reportPage(props: PageProps<'/report'>) {
   const templateId = one(sp.template) ? Number(one(sp.template)) : undefined
   // Task keys are hidden unless explicitly turned on.
   const showKey = one(sp.key) === '1'
-  // On by default: list the in-progress subtasks under "Today". `today=0` opts out.
-  const withInProgress = one(sp.today) !== '0'
 
   const templates = listTemplates()
   const template = getTemplate(templateId)
 
   const days = weekOf(date)
   // The report is written for `date` ("today"); its "Previous day" block lists
-  // what was actually logged the day before.
-  const prevDate = addDays(date, -1)
+  // what was actually logged on the last working day — Friday, for a Monday.
+  const prevDate = previousWorkday(date)
   const { current } = await getSprints()
 
   // The sprint window can start before this week, so it is fetched separately
@@ -74,13 +73,13 @@ async function reportPage(props: PageProps<'/report'>) {
   const sprintTo = current?.endDate?.slice(0, 10)
 
   // prevDate falls in the previous week when `date` is a Monday, so the fetch
-  // reaches back to it; the extra day is harmless to the week table and stats.
-  const [weekEntries, sprintEntries, inProgress] = await Promise.all([
+  // reaches back to it; the extra days are harmless to the week table and stats.
+  const [weekEntries, sprintEntries, openTasks] = await Promise.all([
     getWorklogs(prevDate < days[0] ? prevDate : days[0], days[6], me.accountId, tz),
     sprintFrom && sprintTo
       ? getWorklogs(sprintFrom, min(sprintTo, todayIn(tz)), me.accountId, tz)
       : Promise.resolve([]),
-    withInProgress ? getInProgressSubtasks(current?.id ?? null) : Promise.resolve([]),
+    getOpenSubtasks(current?.id ?? null),
   ])
 
   const dayEntries = weekEntries.filter((e) => e.date === date)
@@ -88,7 +87,7 @@ async function reportPage(props: PageProps<'/report'>) {
 
   // One line per issue, not per worklog: several entries on the same issue in a
   // day should read as a single item in the report. The "Previous day" block is
-  // built from the day before the selected date.
+  // built from the last working day before the selected date.
   const byIssue = new Map<string, ReportIssue>()
   for (const e of prevEntries) {
     const existing = byIssue.get(e.issueKey)
@@ -101,24 +100,19 @@ async function reportPage(props: PageProps<'/report'>) {
       })
   }
   const issues = [...byIssue.values()].sort((a, b) => a.key.localeCompare(b.key))
-  const totalSeconds = issues.reduce((n, i) => n + i.seconds, 0)
 
   // Distinct today's numbers for the sidebar — how much of the report day has
   // been logged so far.
   const dayIssueCount = new Set(dayEntries.map((e) => e.issueKey)).size
   const daySeconds = dayEntries.reduce((n, e) => n + e.timeSpentSeconds, 0)
 
-  const body = renderReport(template?.body ?? '', {
-    // Anchored on the previous day so {{next_date}} resolves to `date`, the day
-    // the report is written for.
-    date: prevDate,
-    issues,
-    totalSeconds,
-    displayName: me.displayName,
-    sprintName: current?.name,
-    showKey,
-    todayIssues: inProgress.map((t) => ({ key: t.key, summary: t.summary, seconds: 0 })),
-  })
+  // Candidates for "Today", work in progress first — the likeliest picks sit
+  // at the top. None are ticked; the user chooses.
+  const TONE_ORDER = { prog: 0, todo: 1, test: 2, ver: 3, done: 4 } as const
+  const todayCandidates = openTasks
+    .map((t) => ({ ...t, tone: statusTone(t.statusName) }))
+    .sort((a, b) => TONE_ORDER[a.tone] - TONE_ORDER[b.tone])
+    .map((t) => ({ key: t.key, summary: t.summary, statusName: t.statusName }))
 
   const byDate = sumByDate(weekEntries)
   const rules: QuotaRules = {
@@ -127,7 +121,7 @@ async function reportPage(props: PageProps<'/report'>) {
     // runs 09:00–18:00 around lunch, so its halves are three hours and five.
     schedule: getWorkSchedule(),
     weekendCounts: getSetting(SETTING_KEYS.weekendCountsToQuota) === 'true',
-    daysOff: listDaysOff(days[0], days[6]),
+    daysOff: listDaysOff(prevDate < days[0] ? prevDate : days[0], days[6]),
   }
   const quota = rules.dailyHours
 
@@ -154,14 +148,20 @@ async function reportPage(props: PageProps<'/report'>) {
 
       <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[minmax(0,1fr)_296px]">
         <div className="flex flex-col gap-4">
+          {/* Keyed on the day: picks belong to one report, not to whichever day is shown next. */}
           <ReportOutput
-            body={body}
+            key={date}
+            template={template?.body ?? ''}
             date={date}
+            prevDate={prevDate}
+            prevDayOff={!!rules.daysOff[prevDate]}
+            displayName={me.displayName}
+            sprintName={current?.name}
+            previousIssues={issues}
+            todayCandidates={todayCandidates}
             templates={templates.map((t) => ({ id: t.id, name: t.name, isDefault: t.isDefault }))}
             templateId={template?.id ?? 0}
             showKey={showKey}
-            withInProgress={withInProgress}
-            empty={issues.length === 0}
           />
 
           <section className="card p-5">

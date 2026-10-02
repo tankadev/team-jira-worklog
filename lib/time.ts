@@ -287,6 +287,13 @@ export function addDays(date: string, delta: number): string {
   return `${at.getUTCFullYear()}-${String(at.getUTCMonth() + 1).padStart(2, '0')}-${String(at.getUTCDate()).padStart(2, '0')}`
 }
 
+/** The last weekday before `date` — a Monday's previous day is the Friday. */
+export function previousWorkday(date: string): string {
+  let d = addDays(date, -1)
+  while (isWeekend(d)) d = addDays(d, -1)
+  return d
+}
+
 /** Monday-first week containing `date`. */
 export function weekOf(date: string): string[] {
   const [y, m, d] = date.split('-').map(Number)

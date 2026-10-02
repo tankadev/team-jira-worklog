@@ -1,6 +1,8 @@
 'use client'
 
-import { useActionState, useState, useTransition } from 'react'
+import { createContext, useActionState, useContext, useEffect, useState, useTransition } from 'react'
+
+import { Icon } from '../icons'
 
 import {
   type DetectResult,
@@ -11,6 +13,7 @@ import {
   testGeminiConnection,
   testJiraConnection,
 } from './actions'
+import { TabPanel, useActiveTabIsForm } from './tabs'
 
 const K = {
   jiraBaseUrl: 'jira_base_url',
@@ -40,15 +43,141 @@ const K = {
   pointBudget3: 'point_budget_3',
 } as const
 
-export function SettingsForm({ initial }: { initial: Record<string, string> }) {
+const FORM_ID = 'settings-form'
+
+interface SaveState {
+  state: SaveResult | null
+  formAction: (formData: FormData) => void
+  pending: boolean
+  /** Something was edited since the last successful save. */
+  dirty: boolean
+  setDirty: (dirty: boolean) => void
+}
+
+const SaveContext = createContext<SaveState | null>(null)
+
+function useSave() {
+  const save = useContext(SaveContext)
+  if (!save) throw new Error('SettingsForm and SaveSettingsButton need a SettingsSaveProvider')
+  return save
+}
+
+/**
+ * Save state shared by the form and its button.
+ *
+ * The button sits in the tab bar, outside the <form>, and submits it through
+ * the `form` attribute. It used to be a bar under the form, which jumped up
+ * and down with every tab switch as the panel above it changed height.
+ */
+export function SettingsSaveProvider({ children }: { children: React.ReactNode }) {
+  const [dirty, setDirty] = useState(false)
   const [state, formAction, pending] = useActionState<SaveResult | null, FormData>(
-    saveSettings,
+    async (prev, formData) => {
+      const res = await saveSettings(prev, formData)
+      if (res.ok) setDirty(false)
+      return res
+    },
     null,
   )
 
   return (
-    <form action={formAction} className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
-      <div className="flex flex-col gap-4">
+    <SaveContext.Provider value={{ state, formAction, pending, dirty, setDirty }}>
+      {children}
+    </SaveContext.Provider>
+  )
+}
+
+/** One save for every form tab; hidden on the tabs that save themselves (modules, templates). */
+export function SaveSettingsButton() {
+  const { state, pending, dirty } = useSave()
+  const show = useActiveTabIsForm()
+
+  // ⌘S / Ctrl+S saves, rather than the browser offering to download the page.
+  useEffect(() => {
+    if (!show) return
+    function onKey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault()
+        ;(document.getElementById(FORM_ID) as HTMLFormElement | null)?.requestSubmit()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [show])
+
+  if (!show) return null
+
+  // An edit makes the last result stale, so "Đã lưu" gives way to "Chưa lưu".
+  // A failure is shown at every width — it is the one status that cannot wait.
+  const status = dirty
+    ? { tone: 'text-warn', dot: 'bg-warn', text: 'Chưa lưu', always: false }
+    : state
+      ? state.ok
+        ? null // the button itself turns into "Đã lưu"
+        : { tone: 'text-crit', dot: 'bg-crit', text: state.message, always: true }
+      : null
+  const saved = !!state?.ok && !dirty && !pending
+
+  return (
+    <div className="flex shrink-0 items-center gap-2.5 border-l border-line pl-2.5">
+      {status && (
+        <span
+          role="status"
+          title={status.text}
+          className={
+            'max-w-48 items-center gap-1.5 text-small ' +
+            (status.always ? 'flex ' : 'hidden xl:flex ') +
+            status.tone
+          }
+        >
+          <i className={'inline-block size-1.5 shrink-0 rounded-full ' + status.dot} />
+          <span className="truncate">{status.text}</span>
+        </span>
+      )}
+      <button
+        type="submit"
+        form={FORM_ID}
+        disabled={pending}
+        title="Lưu mọi tab (⌘S)"
+        className={
+          'relative flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-small font-semibold transition-colors disabled:opacity-60 ' +
+          (saved
+            ? 'bg-accent-soft text-accent-ink hover:bg-accent hover:text-on-accent'
+            : 'bg-accent text-on-accent shadow-card hover:bg-accent-2')
+        }
+      >
+        {saved && <Icon name="check" className="size-3.5" />}
+        {pending ? (
+          'Đang lưu…'
+        ) : saved ? (
+          'Đã lưu'
+        ) : (
+          <>
+            Lưu<span className="hidden sm:inline"> settings</span>
+          </>
+        )}
+        {/* Below xl the status text makes way for the tabs; the dot still says "unsaved". */}
+        {dirty && !pending && (
+          <span className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full bg-warn ring-2 ring-surface xl:hidden" />
+        )}
+      </button>
+    </div>
+  )
+}
+
+export function SettingsForm({ initial }: { initial: Record<string, string> }) {
+  const { formAction, setDirty } = useSave()
+  const showForm = useActiveTabIsForm()
+
+  return (
+    <form
+      id={FORM_ID}
+      action={formAction}
+      onChange={() => setDirty(true)}
+      hidden={!showForm}
+      className="flex flex-col gap-5"
+    >
+      <TabPanel id="connection" className={PANEL}>
         <Card id="jira" title="Kết nối Jira">
           <Field label="Jira base URL" name={K.jiraBaseUrl} defaultValue={initial[K.jiraBaseUrl]} mono />
           <Field label="Email" name={K.jiraEmail} defaultValue={initial[K.jiraEmail]} />
@@ -67,7 +196,9 @@ export function SettingsForm({ initial }: { initial: Record<string, string> }) {
         </Card>
 
         <TeamCard initial={initial} />
+      </TabPanel>
 
+      <TabPanel id="integrations" className={PANEL}>
         <Card id="gemini" title="Google Gemini">
           <Field
             label="API key"
@@ -99,9 +230,9 @@ export function SettingsForm({ initial }: { initial: Record<string, string> }) {
             hint="Scope repo. Seed lần đầu từ GITHUB_TOKEN trong .env.local. Dùng để quét nhánh trong module Nhánh & ghi chú."
           />
         </Card>
-      </div>
+      </TabPanel>
 
-      <div className="flex flex-col gap-4">
+      <TabPanel id="hours" className={PANEL}>
         <Card id="hours" title="Quy tắc giờ">
           <Field label="Định mức ngày thường" name={K.dailyQuotaHours} defaultValue={initial[K.dailyQuotaHours]} mono />
           <Field label="Bước nhảy nút +/−" name={K.logStepHours} defaultValue={initial[K.logStepHours]} mono />
@@ -135,7 +266,9 @@ export function SettingsForm({ initial }: { initial: Record<string, string> }) {
             11:00–18:00. Để trống hai ô nghỉ trưa nếu ngày làm liền mạch.
           </p>
         </Card>
+      </TabPanel>
 
+      <TabPanel id="points" className={PANEL}>
         <Card id="points" title="Quy đổi point → giờ">
           <label className="flex items-center gap-2 text-body text-ink-2">
             <input
@@ -183,29 +316,8 @@ export function SettingsForm({ initial }: { initial: Record<string, string> }) {
             hint="{n} lấy số cuối trong tên sprint — CTALK-TEAM Sprint 69 → [SPT-69] nếu mẫu là [SPT-{n}]. Để trống nếu không dùng."
           />
         </Card>
+      </TabPanel>
 
-      </div>
-
-      {/* One save for the whole form, kept in reach while scrolling. It sat at
-          the foot of the right column, half way down a long page, where it was
-          easy to edit a field and leave without saving. */}
-      <div className="sticky bottom-3 z-20 flex flex-wrap items-center justify-end gap-3 rounded-xl border border-line bg-surface/90 px-4 py-2.5 shadow-pop backdrop-blur lg:col-span-2">
-        <span className="mr-auto text-small text-ink-3">
-          Các ô phía trên chỉ được ghi khi bấm lưu.
-        </span>
-        {state && (
-          <span className={'text-body ' + (state.ok ? 'text-good' : 'text-crit')}>
-            {state.message}
-          </span>
-        )}
-        <button
-          type="submit"
-          disabled={pending}
-          className="rounded-lg bg-accent px-4 py-1.5 text-body font-semibold text-on-accent shadow-card hover:bg-accent-2 disabled:opacity-60"
-        >
-          {pending ? 'Đang lưu…' : 'Lưu settings'}
-        </button>
-      </div>
     </form>
   )
 }
@@ -228,6 +340,7 @@ function TeamCard({ initial }: { initial: Record<string, string> }) {
   const [sprintFilter, setSprintFilter] = useState(initial[K.teamSprintFilter] ?? '')
   const [result, setResult] = useState<DetectResult | null>(null)
   const [pending, startTransition] = useTransition()
+  const { setDirty } = useSave()
 
   function detect() {
     startTransition(async () => {
@@ -237,6 +350,7 @@ function TeamCard({ initial }: { initial: Record<string, string> }) {
         setLabel(res.scope.label ?? '')
         setPrefix(res.scope.prefix ?? '')
         setSprintFilter(res.scope.sprintFilter ?? '')
+        setDirty(true)
       }
     })
   }
@@ -302,6 +416,9 @@ function TeamCard({ initial }: { initial: Record<string, string> }) {
     </Card>
   )
 }
+
+/** Two cards side by side on a wide screen, stacked otherwise. */
+const PANEL = 'grid grid-cols-[minmax(0,1fr)] items-start gap-4 lg:grid-cols-2'
 
 function Card({ id, title, children }: { id?: string; title: string; children: React.ReactNode }) {
   return (

@@ -7,8 +7,19 @@ export interface ReportIssue {
 }
 
 export interface ReportContext {
-  /** Date the report covers, YYYY-MM-DD. */
+  /** Date the report covers — the "previous day" — YYYY-MM-DD. */
   date: string
+  /**
+   * The day the report is written for, behind {{next_date}}. Defaults to the
+   * day after `date`, which is wrong across a weekend: Monday's report covers
+   * Friday, and "Friday + 1" would head it with Saturday.
+   */
+  reportDate?: string
+  /**
+   * Nothing was logged on `date` and the user marked it as off: the issues
+   * block renders a single "Off" line in place of the (empty) list.
+   */
+  previousOff?: boolean
   issues: ReportIssue[]
   totalSeconds: number
   displayName?: string
@@ -47,7 +58,7 @@ function ddmmyyyy(date: string): string {
 export function renderReport(template: string, ctx: ReportContext): string {
   const scalars: Record<string, string> = {
     date: ddmmyyyy(ctx.date),
-    next_date: ddmmyyyy(addDays(ctx.date, 1)),
+    next_date: ddmmyyyy(ctx.reportDate ?? addDays(ctx.date, 1)),
     date_iso: ctx.date,
     total: formatDuration(ctx.totalSeconds),
     total_hours: (ctx.totalSeconds / 3600).toFixed(ctx.totalSeconds % 3600 === 0 ? 0 : 2),
@@ -57,25 +68,36 @@ export function renderReport(template: string, ctx: ReportContext): string {
   }
 
   // One row per issue, with the per-row fields substituted. Shared by the
-  // {{#issues}} and {{#today}} blocks so they format identically.
+  // {{#issues}} and {{#today}} blocks so they format identically. A row with no
+  // key is not an issue at all (the "Off" line): it drops the key and the time
+  // whatever the settings, rather than printing ` | Off (0h)`.
   const renderRows = (body: string, list: ReportIssue[]) =>
     list
       .map((issue) =>
-        (ctx.showKey
+        (ctx.showKey && issue.key
           ? body.replace(/\{\{key\}\}/g, issue.key)
           : body.replace(KEY_WITH_SEP, ''))
           .replace(/\{\{summary\}\}/g, issue.summary)
-          .replace(/\{\{time\}\}/g, formatDuration(issue.seconds))
-          .replace(/\{\{hours\}\}/g, (issue.seconds / 3600).toFixed(2).replace(/\.?0+$/, '')),
+          .replace(/[ \t]*\(?\{\{time\}\}\)?/g, (m) =>
+            issue.key ? m.replace('{{time}}', formatDuration(issue.seconds)) : '',
+          )
+          .replace(/[ \t]*\(?\{\{hours\}\}h?\)?/g, (m) =>
+            issue.key
+              ? m.replace('{{hours}}', (issue.seconds / 3600).toFixed(2).replace(/\.?0+$/, ''))
+              : '',
+          ),
       )
       .join('')
+
+  const previous: ReportIssue[] =
+    ctx.previousOff && !ctx.issues.length ? [{ key: '', summary: 'Off', seconds: 0 }] : ctx.issues
 
   const hasTodayBlock = /\{\{#today\}\}/.test(template)
 
   // Repeated blocks first, so scalars inside them resolve per row.
   let out = template
     .replace(/\{\{#issues\}\}\r?\n?([\s\S]*?)\{\{\/issues\}\}\r?\n?/g, (_m, body: string) =>
-      renderRows(body, ctx.issues),
+      renderRows(body, previous),
     )
     .replace(/\{\{#today\}\}\r?\n?([\s\S]*?)\{\{\/today\}\}\r?\n?/g, (_m, body: string) =>
       renderRows(body, ctx.todayIssues ?? []),
