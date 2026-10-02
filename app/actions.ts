@@ -13,11 +13,27 @@ import {
   updateDescription,
   updateSummary,
 } from '@/lib/jira/issues'
-import { createWorklog, deleteWorklog, loggedMinutesOnDate } from '@/lib/jira/worklog'
+import {
+  createWorklog,
+  deleteWorklog,
+  getWorklog,
+  loggedMinutesOnDate,
+  updateWorklog,
+} from '@/lib/jira/worklog'
+import { dayStatusText } from '@/lib/calendar-grid'
+import { quotaRules } from '@/lib/worklog-calendar'
+import { quotaForDate } from '@/lib/quota'
 import { listDaysOff } from '@/lib/days-off'
 import { scheduleForDate } from '@/lib/quota'
 import { SETTING_KEYS, getSetting, getWorkSchedule } from '@/lib/settings'
-import { type WorklogSlice, DEFAULT_TZ, formatDuration, formatSlices, sliceWorklog } from '@/lib/time'
+import {
+  type WorklogSlice,
+  DEFAULT_TZ,
+  formatDuration,
+  formatSlices,
+  jiraStarted,
+  sliceWorklog,
+} from '@/lib/time'
 
 export interface ActionResult {
   ok: boolean
@@ -366,5 +382,110 @@ export async function commitMessageAction(
     return { ok: true, message: `Đã sinh · ${res.model}`, type: res.type, subject: res.subject }
   } catch (error) {
     return { ok: false, message: error instanceof Error ? error.message : 'Gemini lỗi' }
+  }
+}
+
+export interface WorklogEditResult extends ActionResult {
+  /** The day that changed and how it now stands, e.g. "còn thiếu 2h". */
+  day?: { date: string; text: string; full: boolean }
+}
+
+/** How `date` stands once its total is `minutes`, for the message after an edit. */
+function dayAfter(date: string, minutes: number) {
+  const quota = quotaForDate(date, quotaRules(date, date))
+  const seconds = minutes * 60
+  return {
+    date,
+    text: dayStatusText(seconds, quota),
+    full: quota > 0 && seconds >= quota * 3600 - 60,
+  }
+}
+
+/**
+ * Reads a worklog and refuses one this user did not write — the calendar only
+ * ever offers the user's own, but the id arrives from the client.
+ */
+async function ownWorklog(issueKey: string, worklogId: string) {
+  if (!/^\d+$/.test(worklogId)) throw new Error('Worklog không hợp lệ')
+  const [me, worklog] = await Promise.all([getMyself(), getWorklog(issueKey, worklogId)])
+  if (worklog.author?.accountId !== me.accountId) throw new Error('Chỉ sửa được worklog của chính bạn')
+  return { me, worklog, tz: me.timeZone ?? DEFAULT_TZ }
+}
+
+/**
+ * Moves a worklog to another day — the calendar's drag and drop.
+ *
+ * The length stays; the start is placed the way a new log would be, after
+ * whatever the target day already holds and around the break. An entry that
+ * now crosses the break becomes two records, the same cut `logWorkAction`
+ * makes: the original keeps the first piece, a new worklog takes the rest.
+ */
+export async function moveWorklogAction(input: {
+  issueKey: string
+  worklogId: string
+  toDate: string
+}): Promise<WorklogEditResult> {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.toDate)) return { ok: false, message: 'Ngày không hợp lệ' }
+  try {
+    const { me, worklog, tz } = await ownWorklog(input.issueKey, input.worklogId)
+    const minutes = Math.round(worklog.timeSpentSeconds / 60)
+    const already = await loggedMinutesOnDate(input.toDate, me.accountId, tz, input.issueKey)
+    const schedule = scheduleForDate(input.toDate, getWorkSchedule(), listDaysOff(input.toDate, input.toDate))
+    const [first, ...rest] = sliceWorklog(already, minutes, schedule)
+
+    await updateWorklog(input.issueKey, input.worklogId, {
+      started: jiraStarted(input.toDate, tz, first.start),
+      timeSpentSeconds: first.minutes * 60,
+    })
+    for (const piece of rest) {
+      await createWorklog({
+        issueKey: input.issueKey,
+        hours: piece.minutes / 60,
+        date: input.toDate,
+        startMinute: piece.start,
+        tz,
+      })
+    }
+
+    const label = `${input.toDate.slice(8)}/${input.toDate.slice(5, 7)}`
+    return {
+      ok: true,
+      message: `Đã chuyển ${formatDuration(minutes * 60)} sang ${label} · ${formatSlices([first, ...rest])}`,
+      day: dayAfter(input.toDate, already + minutes),
+    }
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : 'Không chuyển được worklog' }
+  }
+}
+
+/** Changes how long a worklog ran; its day and start stay where they are. */
+export async function updateWorklogHoursAction(input: {
+  issueKey: string
+  worklogId: string
+  hours: number
+}): Promise<WorklogEditResult> {
+  const step = Number(getSetting(SETTING_KEYS.logStepHours) ?? '0.5') || 0.5
+  if (!Number.isFinite(input.hours) || input.hours < step) {
+    return { ok: false, message: `Tối thiểu ${step}h` }
+  }
+  try {
+    const { me, worklog, tz } = await ownWorklog(input.issueKey, input.worklogId)
+    await updateWorklog(input.issueKey, input.worklogId, {
+      timeSpentSeconds: Math.round(input.hours * 3600),
+    })
+    const date = new Intl.DateTimeFormat('en-CA', {
+      timeZone: tz,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date(worklog.started.replace(/([+-]\d{2})(\d{2})$/, '$1:$2')))
+    const total = await loggedMinutesOnDate(date, me.accountId, tz, input.issueKey)
+    return {
+      ok: true,
+      message: `Đã sửa thành ${input.hours}h`,
+      day: dayAfter(date, total),
+    }
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : 'Không sửa được worklog' }
   }
 }

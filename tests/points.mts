@@ -8,7 +8,7 @@
  * task does to the hours-per-point figure, and whether a total drops when the
  * board's status filter changes.
  */
-import { summarisePoints, type PointRow } from '@/lib/jira/types'
+import { acceptsStoryPoints, issueHygiene, summarisePoints, type PointRow } from '@/lib/jira/types'
 
 let n = 0
 let bad = 0
@@ -79,6 +79,24 @@ const none = summarisePoints([])
 eq([none.points, none.tasks, none.seconds, none.unpointed, none.donePoints], [0, 0, 0, 0, 0],
    'an empty sprint is all zeroes')
 eq(none.buckets, [], 'and draws no bands')
+
+/* ── issue types without points ─────────────────────────────────────────── */
+eq(acceptsStoryPoints('Improve'), false, 'an Improve takes no story point')
+eq(acceptsStoryPoints('improve '), false, 'matched without case or stray spaces')
+eq([acceptsStoryPoints('Task'), acceptsStoryPoints('Bug'), acceptsStoryPoints('Sub-task')], [true, true, true],
+   'every other type still does')
+
+/* ── team prefix: not on a Bug ───────────────────────────────────────────── */
+const team = { label: 'ctalk', prefix: '[CTALK]' }
+const base = { labels: ['ctalk'], startDate: '2026-10-01', dueDate: '2026-10-02' }
+eq(issueHygiene({ ...base, summary: '[Bug][Web] Display name dài', issueTypeName: 'Bug' }, team).missingPrefix, false,
+   'a Bug without [CTALK] is not flagged')
+eq(issueHygiene({ ...base, summary: '[Web] Update code', issueTypeName: 'Task' }, team).missingPrefix, true,
+   'a Task without [CTALK] still is')
+eq(issueHygiene({ ...base, summary: '[Web] Update code' }, team).missingPrefix, true,
+   'a subtask row (no type given) still is')
+eq(issueHygiene({ ...base, labels: [], summary: '[Bug] x', issueTypeName: 'Bug' }, team).missingLabel, true,
+   'a Bug still needs the team label')
 
 console.log(bad ? `\n${bad} of ${n} FAILED` : `\nall ${n} ok`)
 if (bad) process.exit(1)

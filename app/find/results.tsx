@@ -3,17 +3,9 @@
 import { useState, useTransition } from 'react'
 
 import type { FoundIssue } from '@/lib/jira/find'
-import { statusTone } from '@/lib/jira/types'
+import { statusStyle } from '@/lib/status-style'
 
 import { assignToMeAction } from './actions'
-
-const TONE: Record<string, string> = {
-  todo: 'bg-surface-2 text-ink-2',
-  prog: 'bg-accent-soft text-accent-ink',
-  test: 'bg-warn-soft text-warn',
-  ver: 'bg-blue-soft text-blue',
-  done: 'bg-good-soft text-good',
-}
 
 export function ResultList({
   issues,
@@ -69,7 +61,7 @@ function Row({ issue, mine }: { issue: FoundIssue; mine: boolean }) {
           <span
             className={
               'rounded-[5px] px-[7px] py-[3px] status-text ' +
-              TONE[statusTone(issue.statusName)]
+              statusStyle(issue.statusName)
             }
           >
             {issue.statusName}

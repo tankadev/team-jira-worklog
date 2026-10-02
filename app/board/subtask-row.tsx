@@ -15,6 +15,7 @@ import {
 import type { DayOffKind } from "@/lib/quota";
 import { DEFAULT_SCHEDULE, type WorkSchedule, formatDuration } from "@/lib/time";
 
+import { Icon } from "../icons";
 import { Spinner } from "../spinner";
 import { CommitMessageButton } from "./commit-message";
 import { DatesEditor } from "./dates-editor";
@@ -22,6 +23,7 @@ import { HygieneBadge } from "./hygiene-badge";
 import { IssueDetail } from "./issue-detail";
 import { LogStrip } from "./log-strip";
 import { useNav } from "./navigation";
+import { TaskLogsTrigger, WorklogCalendarDialog } from "./worklog-calendar";
 import { PointsEditor } from "./points-editor";
 import { StatusPill } from "./status-pill";
 import { TypeIcon } from "./type-icon";
@@ -88,6 +90,8 @@ export function SubtaskRow({
     null,
   );
   const [detailOpen, setDetailOpen] = useState(false);
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const [pending, startTransition] = useTransition();
   const [undoing, startUndo] = useTransition();
   const { refresh } = useNav();
@@ -168,6 +172,65 @@ export function SubtaskRow({
     ? subtask.lastLogDate
     : null;
 
+  /**
+   * A finished subtask folds to one line — key, summary, status — so a sprint
+   * full of Done work stays readable while still being there (hiding it made
+   * hours look missing). "Mở rộng" opens the full row for a late fix. Never folded
+   * while it carries the after-due warning: that one is a problem to act on.
+   */
+  const folded =
+    statusTone(subtask.statusName) === "done" &&
+    !expanded &&
+    !badLogDate &&
+    !open &&
+    !calendarOpen;
+
+  if (folded) {
+    return (
+      <div className="relative border-b border-line transition-colors last:border-b-0 hover:bg-surface-2/60">
+        <span
+          aria-hidden
+          className={
+            "pointer-events-none absolute left-6 top-0 w-px bg-line-strong " +
+            (railEnd ? "h-[19px]" : "h-full")
+          }
+        />
+        <span aria-hidden className="pointer-events-none absolute left-6 top-[19px] h-px w-3 bg-line-strong" />
+        <div className="flex items-center gap-2 py-2 pl-[44px] pr-4">
+          <button
+            type="button"
+            onClick={() => setDetailOpen(true)}
+            title={`Xem chi tiết ${subtask.key}`}
+            className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded px-0.5 opacity-80 hover:bg-accent-soft hover:opacity-100"
+          >
+            <TypeIcon name="Subtask" className="size-3.5" />
+            <span className="font-mono text-small font-semibold text-accent-ink">{subtask.key}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setDetailOpen(true)}
+            title={subtask.summary}
+            className="min-w-0 flex-1 truncate text-left text-small text-ink-2 hover:text-accent-ink"
+          >
+            {subtask.summary}
+          </button>
+          <StatusPill issueKey={subtask.key} statusName={subtask.statusName} issueType="Sub-task" compact />
+          <button
+            type="button"
+            onClick={() => setExpanded(true)}
+            title="Mở rộng — xem giờ, ngày, point và log"
+            aria-label={`Mở rộng ${subtask.key}`}
+            className="inline-flex h-7 shrink-0 items-center gap-1 rounded-md border border-line-strong bg-surface px-2 text-caption font-medium text-ink-2 shadow-card hover:border-accent hover:text-accent-ink"
+          >
+            <Icon name="chevrons-down" className="size-3.5" />
+            <span className="hidden sm:inline">Mở rộng</span>
+          </button>
+        </div>
+        {detailOpen && <IssueDetail issueKey={subtask.key} onClose={() => setDetailOpen(false)} />}
+      </div>
+    );
+  }
+
   return (
     <div
       title={
@@ -242,6 +305,8 @@ export function SubtaskRow({
             <StatusPill
               issueKey={subtask.key}
               statusName={subtask.statusName}
+              // Every row here is a subtask, so they all share one cache entry per status.
+              issueType="Sub-task"
               compact
             />
 
@@ -263,10 +328,16 @@ export function SubtaskRow({
               spentSeconds={total}
             />
 
-            <span
-              className="ml-1 text-caption text-ink-3"
-              title={`${isToday ? "Hôm nay" : dateLabel}: ${formatDuration(today)} · tổng: ${formatDuration(total)}`}
+            {/* Hover for the days this task was logged on; click for the
+                calendar to move, resize or add worklogs. */}
+            <TaskLogsTrigger
+              issueKey={subtask.key}
+              summary={subtask.summary}
+              anchorDate={subtask.lastLogDate ?? date}
+              presets={presets}
+              step={step}
             >
+            <span className="text-caption text-ink-3">
               {today > 0 || total > 0 ? (
                 <>
                   {isToday ? "Hôm nay" : `Ngày ${date.slice(8, 10)}/${date.slice(5, 7)}`}{" "}
@@ -288,6 +359,7 @@ export function SubtaskRow({
                 "Chưa log giờ"
               )}
             </span>
+            </TaskLogsTrigger>
 
             {badLogDate && (
               <span
@@ -313,6 +385,18 @@ export function SubtaskRow({
         </div>
 
         <div className="ml-auto flex shrink-0 items-center gap-2">
+          {expanded && (
+            <button
+              type="button"
+              onClick={() => setExpanded(false)}
+              title="Thu gọn task đã Done"
+              aria-label={`Thu gọn ${subtask.key}`}
+              className="inline-flex h-8 items-center gap-1 rounded-lg border border-line-strong bg-surface px-2.5 text-caption font-medium text-ink-2 shadow-card hover:border-accent hover:text-accent-ink"
+            >
+              <Icon name="chevrons-up" className="size-3.5" />
+              <span className="hidden sm:inline">Thu gọn</span>
+            </button>
+          )}
           <CommitMessageButton issueKey={subtask.key} />
           <button
             type="button"
@@ -354,6 +438,7 @@ export function SubtaskRow({
             dayOff={dayOff}
             pending={pending}
             onLog={submit}
+            onOpenCalendar={() => setCalendarOpen(true)}
             warning={
               pastDue
                 ? `⚠ ${subtask.key} đã Done, due ${subtask.dueDate} — ngày này nằm sau đó`
@@ -361,6 +446,18 @@ export function SubtaskRow({
             }
           />
         </div>
+      )}
+
+      {calendarOpen && (
+        <WorklogCalendarDialog
+          issueKey={subtask.key}
+          summary={subtask.summary}
+          initialMonth={date.slice(0, 7)}
+          initialDay={date}
+          presets={presets}
+          step={step}
+          onClose={() => setCalendarOpen(false)}
+        />
       )}
 
       {detailOpen && (

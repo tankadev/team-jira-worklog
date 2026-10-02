@@ -61,7 +61,10 @@ async function boardPage(props: PageProps<'/'>) {
 
   const tz = me.timeZone ?? DEFAULT_TZ
   const date = one(sp.date) ?? todayIn(tz)
-  const status = one(sp.status) === 'all' ? 'all' : 'open'
+  // Every status by default, Done included: a sprint's finished subtasks are
+  // still where its hours went, and hiding them made logged time look missing.
+  // "Chưa Done" is the opt-in narrowing.
+  const status = one(sp.status) === 'open' ? 'open' : 'all'
   const search = one(sp.q) ?? ''
   const epicFilter = one(sp.epic) ?? ''
   const parentFilter = one(sp.parent) ?? ''

@@ -10,6 +10,7 @@ import { Spinner } from '../spinner'
 import { suggestionFrom, useComposeContext } from './compose-context'
 import { CreateIssueButton } from './create-issue'
 import { useNav } from './navigation'
+import { PickAndLog } from './pick-and-log'
 
 /**
  * Creates a subtask from one line under its parent, then offers to log on it.
@@ -279,23 +280,12 @@ export function QuickSubtask({
               <span className="text-good">
                 ✓ Đã tạo <b className="font-mono">{created.key}</b> — log ngay:
               </span>
-              {presets.slice(0, 4).map((h) => (
-                <button
-                  key={h}
-                  type="button"
-                  disabled={logging}
-                  onClick={() => logOn(created.key, h)}
-                  className={
-                    'h-7 rounded-md border px-2 font-mono text-caption font-semibold disabled:opacity-50 ' +
-                    (isToday
-                      ? 'border-accent/60 bg-accent-soft text-accent-ink hover:bg-accent hover:text-on-accent'
-                      : 'border-ot/60 bg-ot-soft text-ot hover:bg-ot hover:text-white')
-                  }
-                >
-                  {h}h
-                </button>
-              ))}
-              {logging && <Spinner className="size-3 text-ink-3" />}
+              <PickAndLog
+                hours={presets.slice(0, 4)}
+                isToday={isToday}
+                pending={logging}
+                onLog={(h) => logOn(created.key, h)}
+              />
             </>
           )}
           {created && logged && (

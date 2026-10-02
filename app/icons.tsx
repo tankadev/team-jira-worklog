@@ -23,6 +23,8 @@ export type IconName =
   | 'git-commit'
   | 'copy'
   | 'check'
+  | 'chevrons-down'
+  | 'chevrons-up'
 
 const PATHS: Record<IconName, React.ReactNode> = {
   kanban: (
@@ -115,6 +117,8 @@ const PATHS: Record<IconName, React.ReactNode> = {
     </>
   ),
   check: <path d="M20 6 9 17l-5-5" />,
+  'chevrons-down': <path d="m7 7 5 5 5-5M7 13l5 5 5-5" />,
+  'chevrons-up': <path d="m17 11-5-5-5 5M17 17l-5-5-5 5" />,
   puzzle: (
     <path d="M10 3a2 2 0 0 1 4 0v2h4a1 1 0 0 1 1 1v4h-2a2 2 0 0 0 0 4h2v4a1 1 0 0 1-1 1h-4v-2a2 2 0 0 0-4 0v2H6a1 1 0 0 1-1-1v-4h2a2 2 0 0 0 0-4H5V6a1 1 0 0 1 1-1h4z" />
   ),

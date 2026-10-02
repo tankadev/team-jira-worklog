@@ -106,21 +106,28 @@ function describeError(status: number, body: unknown): string {
 
 export interface JiraFetchOptions extends Omit<RequestInit, 'body'> {
   body?: unknown
-  /** Bypass the short read cache — for reads that must reflect a just-made change. */
+  /** Bypass the read cache — for reads that must reflect a just-made change. */
   fresh?: boolean
   creds?: JiraCreds
 }
 
 /**
- * Short-lived read cache.
+ * Read cache.
  *
  * The underlying fetch stays `cache: 'no-store'` — this layer is our own so we
- * control it exactly. GET responses are held for a few seconds so flipping
- * between screens doesn't re-hit Jira every time; ANY write clears the whole
- * cache, so a change is never hidden behind a stale read. Stashed on globalThis
- * so a dev hot-reload keeps the cache instead of leaking a new Map.
+ * control it exactly. GET responses are held so flipping between screens
+ * answers from memory instead of re-asking Jira; ANY write from this app clears
+ * the whole cache, so its own changes are never hidden behind a stale read.
+ *
+ * Held for half an hour rather than seconds: the board is a working view, and
+ * re-fetching every list on every menu switch was the slowness. A change made
+ * elsewhere (Jira's own UI, a teammate) shows up on the "Làm mới" button, which
+ * clears this cache too. Stashed on globalThis so a dev hot-reload keeps the
+ * cache instead of leaking a new Map.
  */
-const JIRA_TTL_MS = 30_000
+const JIRA_TTL_MS = 30 * 60_000
+/** Oldest entries go first past this — a long session touches many URLs. */
+const JIRA_CACHE_MAX = 800
 interface JiraCacheEntry {
   at: number
   data: unknown
@@ -232,7 +239,15 @@ export async function jiraFetch<T = unknown>(path: string, options: JiraFetchOpt
 
   if (!res.ok) throw new JiraError(describeError(res.status, payload), res.status, url, payload)
 
-  if (isRead) readCache.set(url, { at: Date.now(), data: payload })
+  if (isRead) {
+    // Re-inserted so Map order stays oldest-first, which is what eviction reads.
+    readCache.delete(url)
+    readCache.set(url, { at: Date.now(), data: payload })
+    if (readCache.size > JIRA_CACHE_MAX) {
+      const oldest = readCache.keys().next().value
+      if (oldest !== undefined) readCache.delete(oldest)
+    }
+  }
 
   return payload as T
 }
@@ -261,6 +276,8 @@ export async function searchJql<T = JiraIssue>(
      * result — this is Jira's documented remedy. Capped at 50 by the API.
      */
     reconcileIssues?: string[]
+    /** Skip the read cache — for a read whose answer decides a write. */
+    fresh?: boolean
   } = {},
 ): Promise<T[]> {
   const pageSize = opts.maxResults ?? 100
@@ -286,7 +303,7 @@ export async function searchJql<T = JiraIssue>(
     const page = await jiraFetch<{ issues?: T[]; nextPageToken?: string | null }>(
       `/rest/api/3/search/jql?${params}`,
       // A reconcile read must see the just-written issue — never a cached page.
-      { creds: opts.creds, fresh: (opts.reconcileIssues?.length ?? 0) > 0 },
+      { creds: opts.creds, fresh: opts.fresh || (opts.reconcileIssues?.length ?? 0) > 0 },
     )
 
     out.push(...(page.issues ?? []))

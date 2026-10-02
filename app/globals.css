@@ -519,3 +519,84 @@ summary {
 :root[data-theme="dark"] .theme-icon-dark {
   display: block;
 }
+
+/*
+ * Workflow status colours — one per status, see lib/status-style.ts.
+ *
+ * Families follow the ticket along the workflow: grey to do, blue in progress,
+ * violet committed, amber → orange → rose ready to test (dev → integration →
+ * staging), teal → cyan → lime verified (same order), green done, and a solid
+ * red for blocked, which is the one that should stop the eye. Tints are pale on
+ * light and deep on dark, with text dark-on-light and light-on-dark, so each
+ * pill keeps its contrast in both themes.
+ */
+:root {
+  --st-todo-bg: #eceff0; --st-todo-fg: #4b5458;
+  --st-prog-bg: #dbe8ff; --st-prog-fg: #1f4fbf;
+  --st-commit-bg: #ece6ff; --st-commit-fg: #6431c9;
+  --st-rt-dev-bg: #fdf0c4; --st-rt-dev-fg: #8a5a00;
+  --st-rt-int-bg: #ffe2c7; --st-rt-int-fg: #b4460a;
+  --st-rt-stg-bg: #ffdbe2; --st-rt-stg-fg: #b0173f;
+  --st-v-dev-bg: #cdf5ec; --st-v-dev-fg: #0b6b62;
+  --st-v-int-bg: #cdf0fb; --st-v-int-fg: #0a6584;
+  --st-v-stg-bg: #e6f6c8; --st-v-stg-fg: #46700a;
+  --st-done-bg: #d5f2df; --st-done-fg: #17703d;
+  --st-blocked-bg: #d93025; --st-blocked-fg: #ffffff;
+  --st-x1-bg: #f3e1f7; --st-x1-fg: #85308f;
+  --st-x2-bg: #e2e8f0; --st-x2-fg: #34495e;
+  --st-x3-bg: #f6e7d8; --st-x3-fg: #7a4b1c;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --st-todo-bg: #262d2f; --st-todo-fg: #b9c2c4;
+    --st-prog-bg: #182b4d; --st-prog-fg: #8fb6ff;
+    --st-commit-bg: #2b2247; --st-commit-fg: #c3b2ff;
+    --st-rt-dev-bg: #3a2f0e; --st-rt-dev-fg: #f2c758;
+    --st-rt-int-bg: #3e2412; --st-rt-int-fg: #ff9d5c;
+    --st-rt-stg-bg: #40182a; --st-rt-stg-fg: #ff8fa8;
+    --st-v-dev-bg: #0f3430; --st-v-dev-fg: #62e3cf;
+    --st-v-int-bg: #0e2f3b; --st-v-int-fg: #6fdcf6;
+    --st-v-stg-bg: #24330e; --st-v-stg-fg: #bde66a;
+    --st-done-bg: #133220; --st-done-fg: #71e3a1;
+    --st-blocked-bg: #c5281e; --st-blocked-fg: #ffffff;
+    --st-x1-bg: #36203b; --st-x1-fg: #e3a8ee;
+    --st-x2-bg: #263240; --st-x2-fg: #aebccb;
+    --st-x3-bg: #3a2a1a; --st-x3-fg: #e6b98a;
+  }
+}
+
+:root[data-theme="dark"] {
+  --st-todo-bg: #262d2f; --st-todo-fg: #b9c2c4;
+  --st-prog-bg: #182b4d; --st-prog-fg: #8fb6ff;
+  --st-commit-bg: #2b2247; --st-commit-fg: #c3b2ff;
+  --st-rt-dev-bg: #3a2f0e; --st-rt-dev-fg: #f2c758;
+  --st-rt-int-bg: #3e2412; --st-rt-int-fg: #ff9d5c;
+  --st-rt-stg-bg: #40182a; --st-rt-stg-fg: #ff8fa8;
+  --st-v-dev-bg: #0f3430; --st-v-dev-fg: #62e3cf;
+  --st-v-int-bg: #0e2f3b; --st-v-int-fg: #6fdcf6;
+  --st-v-stg-bg: #24330e; --st-v-stg-fg: #bde66a;
+  --st-done-bg: #133220; --st-done-fg: #71e3a1;
+  --st-blocked-bg: #c5281e; --st-blocked-fg: #ffffff;
+  --st-x1-bg: #36203b; --st-x1-fg: #e3a8ee;
+  --st-x2-bg: #263240; --st-x2-fg: #aebccb;
+  --st-x3-bg: #3a2a1a; --st-x3-fg: #e6b98a;
+}
+
+.st-todo { background: var(--st-todo-bg); color: var(--st-todo-fg); }
+.st-prog { background: var(--st-prog-bg); color: var(--st-prog-fg); }
+.st-commit { background: var(--st-commit-bg); color: var(--st-commit-fg); }
+.st-rt-dev { background: var(--st-rt-dev-bg); color: var(--st-rt-dev-fg); }
+.st-rt-int { background: var(--st-rt-int-bg); color: var(--st-rt-int-fg); }
+.st-rt-stg { background: var(--st-rt-stg-bg); color: var(--st-rt-stg-fg); }
+.st-v-dev { background: var(--st-v-dev-bg); color: var(--st-v-dev-fg); }
+.st-v-int { background: var(--st-v-int-bg); color: var(--st-v-int-fg); }
+.st-v-stg { background: var(--st-v-stg-bg); color: var(--st-v-stg-fg); }
+.st-done { background: var(--st-done-bg); color: var(--st-done-fg); }
+.st-blocked { background: var(--st-blocked-bg); color: var(--st-blocked-fg); }
+.st-x1 { background: var(--st-x1-bg); color: var(--st-x1-fg); }
+.st-x2 { background: var(--st-x2-bg); color: var(--st-x2-fg); }
+.st-x3 { background: var(--st-x3-bg); color: var(--st-x3-fg); }
+
+/* The small dot in the status menu: the status colour, at full strength. */
+.st-dot { background: currentColor; }

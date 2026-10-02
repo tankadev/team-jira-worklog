@@ -3,24 +3,24 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 
 import { transitionAction } from "@/app/actions";
-import { type Transition, statusTone } from "@/lib/jira/types";
+import type { Transition } from "@/lib/jira/types";
+import { statusStyle } from "@/lib/status-style";
+import {
+  cachedTransitions,
+  forgetTransitions,
+  loadTransitions,
+  transitionsKey,
+} from "@/lib/transitions-cache";
 
 import { useNav } from "./navigation";
 
-const TONE: Record<string, string> = {
-  todo: "bg-surface-2 text-ink-2",
-  prog: "bg-accent-soft text-accent-ink",
-  test: "bg-warn-soft text-warn",
-  ver: "bg-blue-soft text-blue",
-  done: "bg-good-soft text-good",
-};
-
 /**
- * Status shown as a pill; the transition list is fetched on first open.
+ * Status shown as a pill, in that status's own colour; click to move it.
  *
- * Transitions are per-issue and per-workflow, so a board of twenty rows would
- * otherwise need twenty requests before it could render. Loading on demand
- * trades a brief wait on click for a board that appears immediately.
+ * The transition list is not loaded with the board — twenty rows would mean
+ * twenty requests before it could render. It is fetched once per issue type
+ * and status (see lib/transitions-cache), warmed as the pointer reaches the
+ * pill, and remembered across reloads, so the menu normally opens at once.
  */
 export function StatusPill({
   issueKey,
@@ -29,9 +29,12 @@ export function StatusPill({
   compact = false,
   readOnly = false,
   readOnlyReason,
+  issueType,
 }: {
   issueKey: string;
   statusName: string;
+  /** Issue type, so the cached transitions are shared with every issue of the same type and status. */
+  issueType?: string | null;
   onChanged?: (name: string) => void;
   /** Caps the width on the one-line board row so long statuses cannot push it wide. */
   compact?: boolean;
@@ -133,21 +136,27 @@ export function StatusPill({
     };
   }, [open]);
 
+  const cacheKey = transitionsKey(current, issueType);
+  // What the menu shows: this pill's own fetch, or what any pill in the same
+  // status already learned.
+  const shown = items ?? cachedTransitions(cacheKey);
+
+  /** Warms the cache while the pointer is still on its way to a click. */
+  function prefetch() {
+    if (readOnly || pending || cachedTransitions(cacheKey)) return;
+    loadTransitions(issueKey, cacheKey).catch(() => {});
+  }
+
   async function toggle() {
     if (open) return setOpen(false);
     place();
     setOpen(true);
-    if (items || loading) return;
+    if (shown || loading) return;
 
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(
-        `/api/jira/transitions?key=${encodeURIComponent(issueKey)}`,
-      );
-      const body = await res.json();
-      if (!res.ok) throw new Error(body?.error ?? "Không lấy được transition");
-      setItems(body.transitions ?? []);
+      setItems(await loadTransitions(issueKey, cacheKey));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Không lấy được transition");
     } finally {
@@ -162,10 +171,14 @@ export function StatusPill({
       if (res.ok) {
         setOptimistic(t.toStatusName);
         onChanged?.(t.toStatusName);
-        // The list depends on the new status, so force a refetch next open.
+        // The list depends on the new status — the cache answers for that one.
         setItems(null);
         refresh();
       } else {
+        // A rejected transition may mean the cached list is out of date
+        // (the workflow changed); ask Jira afresh next time.
+        forgetTransitions(cacheKey);
+        setItems(null);
         setError(res.message);
       }
     });
@@ -181,7 +194,7 @@ export function StatusPill({
           "inline-flex items-center gap-1 rounded-[5px] px-[7px] py-[3px] status-text opacity-80 " +
           (compact ? "max-w-[220px]" : "") +
           " " +
-          TONE[statusTone(current)]
+          statusStyle(current)
         }
       >
         <span className="truncate">{current}</span>
@@ -196,13 +209,15 @@ export function StatusPill({
         ref={btn}
         type="button"
         onClick={toggle}
+        onMouseEnter={prefetch}
+        onFocus={prefetch}
         disabled={pending}
         title={`${current} — bấm để đổi trạng thái`}
         className={
           "inline-flex items-center gap-1 rounded-[5px] px-[7px] py-[3px] status-text disabled:opacity-60 " +
           (compact ? "max-w-[220px]" : "") +
           " " +
-          TONE[statusTone(current)]
+          statusStyle(current)
         }
       >
         {pending ? (
@@ -241,7 +256,7 @@ export function StatusPill({
             }
             className="fixed z-40 flex max-h-64 min-w-[220px] flex-col overflow-y-auto rounded-lg border border-line-strong bg-surface p-1 shadow-pop"
           >
-            {loading && (
+            {loading && !shown && (
               <span className="flex items-center gap-1.5 px-2 py-1.5 text-small text-ink-3">
                 <span className="inline-block size-3 animate-spin rounded-full border-[1.5px] border-line-strong border-t-accent" />
                 Đang tải transition…
@@ -250,18 +265,22 @@ export function StatusPill({
             {error && (
               <span className="px-2 py-1.5 text-small text-crit">{error}</span>
             )}
-            {items?.length === 0 && (
+            {shown?.length === 0 && (
               <span className="px-2 py-1.5 text-small text-ink-3">
                 Không có transition khả dụng
               </span>
             )}
-            {items?.map((t) => (
+            {shown?.map((t) => (
               <button
                 key={t.id}
                 type="button"
                 onClick={() => choose(t)}
-                className="rounded px-2 py-1.5 text-left text-small hover:bg-accent-soft hover:text-accent-ink"
+                className="flex items-center gap-2 rounded px-2 py-1.5 text-left text-small hover:bg-surface-2"
               >
+                {/* The destination's own colour, so the menu reads like the board. */}
+                <span className={"grid shrink-0 place-items-center rounded-full p-[3px] " + statusStyle(t.toStatusName)}>
+                  <span className="block size-2 rounded-full bg-current" />
+                </span>
                 {/* Jira's transition name can differ from the status it lands on,
                     so show the destination status — that is what the user means. */}
                 {t.toStatusName}

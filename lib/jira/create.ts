@@ -5,6 +5,7 @@ import { textToAdf } from './adf'
 import { type JiraIssue, JiraError, jiraFetch, searchJql } from './client'
 import { updateStoryPoints } from './issues'
 import { getProjectMeta } from './meta'
+import { needsTeamPrefix } from './types'
 
 export interface CreateIssueInput {
   issueTypeId: string
@@ -154,7 +155,8 @@ export async function createIssue(input: CreateIssueInput): Promise<CreatedIssue
   const fields: Record<string, unknown> = {
     project: { key: projectKey },
     issuetype: { id: input.issueTypeId },
-    summary: withTeamPrefix(input.summary, team.prefix),
+    // A Bug keeps the reporter's own `[Bug][…]` naming — see needsTeamPrefix.
+    summary: needsTeamPrefix(type.name) ? withTeamPrefix(input.summary, team.prefix) : input.summary.trim(),
     description: textToAdf(input.description, input.dod),
   }
 

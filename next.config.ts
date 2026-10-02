@@ -9,6 +9,19 @@ const nextConfig: NextConfig = {
      * doubly confusing to chase.
      */
     serverComponentsHmrCache: false,
+    /**
+     * Keeps visited pages in the browser's client cache, so switching between
+     * menus reuses what was already loaded instead of asking Jira again.
+     *
+     * Freshness is explicit instead: the "Làm mới" button and every write the
+     * app makes (log, status, points, dates, create) invalidate the whole
+     * client cache through `revalidatePath`, so a page is only ever as old as
+     * the last change made from here — and one click from current.
+     */
+    staleTimes: {
+      dynamic: 3600,
+      static: 3600,
+    },
   },
 };
 

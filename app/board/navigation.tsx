@@ -1,6 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+
+import { invalidateViewsAction } from "../refresh-actions";
 import {
   createContext,
   useCallback,
@@ -53,7 +55,12 @@ export function NavProvider({ children }: { children: React.ReactNode }) {
    * takes, which reads as "the save did not work".
    */
   const refresh = useCallback(() => {
-    startTransition(() => router.refresh());
+    startTransition(async () => {
+      // Every screen kept in the client cache, not just this one — otherwise
+      // the report would still show the hours from before this log.
+      await invalidateViewsAction();
+      router.refresh();
+    });
   }, [router]);
 
   const value = useMemo(

@@ -41,7 +41,7 @@ export function PendingTasks({ tasks, title }: { tasks: SprintTask[]; title?: st
             </span>
 
             {/* The same pill as a parent's header — click to change status. */}
-            <StatusPill issueKey={t.key} statusName={t.statusName} />
+            <StatusPill issueKey={t.key} statusName={t.statusName} issueType={t.issueTypeName} />
 
             <span className="min-w-[260px] flex-1 basis-[320px]">
               <span className="block text-body font-medium leading-snug">{t.summary}</span>

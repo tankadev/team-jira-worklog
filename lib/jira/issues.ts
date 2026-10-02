@@ -11,6 +11,7 @@ import { getBoardConfig } from "./board-config";
 import {
   JiraError, type JiraIssue, jiraFetch, searchJql } from "./client";
 import { getProjectMeta } from "./meta";
+import { acceptsStoryPoints } from "./types";
 import type {
   BoardParent,
   BoardSubtask,
@@ -745,6 +746,20 @@ export async function updateStoryPoints(
   const meta = await getProjectMeta();
   if (!meta.storyPointsFieldId)
     throw new Error("Không tìm thấy field story point");
+
+  // Refused here rather than only hidden in the UI: this write would succeed on
+  // an Improve, and the board would then count a point Jira's backlog never
+  // should have had. Clearing one (null) stays allowed — that is the fix.
+  if (points !== null) {
+    const issue = await jiraFetch<{ fields?: { issuetype?: { name?: string } } }>(
+      `/rest/api/3/issue/${encodeURIComponent(issueKey)}?fields=issuetype`,
+      { fresh: true },
+    );
+    const typeName = issue.fields?.issuetype?.name ?? "";
+    if (!acceptsStoryPoints(typeName)) {
+      throw new Error(`${issueKey} là ${typeName} — loại này không đánh story point`);
+    }
+  }
 
   // The plain field write is tried first even when createmeta never mentioned
   // the field. That sounds wrong and is not: on this instance `customfield_10033`

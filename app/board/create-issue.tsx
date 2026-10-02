@@ -12,6 +12,7 @@ import { todayIn } from '@/lib/time'
 import { DateInput } from '../date-input'
 import { Spinner, Working } from '../spinner'
 import { useNav } from './navigation'
+import { PickAndLog } from './pick-and-log'
 
 interface Template {
   id: number
@@ -501,18 +502,12 @@ function CreateIssueModal({
                     ) : (
                       <>
                         <span className="text-small text-ink-2">Log ngay vào {logDate.slice(8)}/{logDate.slice(5, 7)}:</span>
-                        {[0.5, 1, 2, 4, 8].map((h) => (
-                          <button
-                            key={h}
-                            type="button"
-                            disabled={logging}
-                            onClick={() => logNow(justCreated.key, h)}
-                            className="h-7 rounded-md border border-good/50 bg-surface px-2 font-mono text-caption font-semibold text-good hover:bg-good hover:text-white disabled:opacity-50"
-                          >
-                            {h}h
-                          </button>
-                        ))}
-                        {logging && <Spinner className="size-3 text-ink-3" />}
+                        <PickAndLog
+                          hours={[0.5, 1, 2, 4, 8]}
+                          isToday={logDate === new Date().toLocaleDateString('sv')}
+                          pending={logging}
+                          onLog={(h) => logNow(justCreated.key, h)}
+                        />
                       </>
                     )}
                   </span>

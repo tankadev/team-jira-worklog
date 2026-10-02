@@ -1,4 +1,5 @@
 import {
+  acceptsStoryPoints,
   isOwnedByOther,
   issueHygiene,
   loggedButTodo,
@@ -17,7 +18,7 @@ import { formatDuration } from "@/lib/time";
 
 import { DatesEditor } from "./dates-editor";
 import { HygieneBadge } from "./hygiene-badge";
-import { PointsEditor, PointsRollup } from "./points-editor";
+import { NoPointsChip, PointsEditor, PointsRollup } from "./points-editor";
 import { QuickSubtask } from "./quick-subtask";
 import { SprintFixButton } from "./sprint-fix";
 import { StatusPill } from "./status-pill";
@@ -98,6 +99,7 @@ export function ParentGroup({
    */
   const ownedByOther = isOwnedByOther(group.assigneeAccountId, myAccountId);
   const hygiene = issueHygiene(group, team);
+  const pointable = acceptsStoryPoints(group.issueTypeName);
   const lockReason = ownedByOther
     ? `${group.key} do ${group.assigneeName} phụ trách — chỉ xem, không sửa được từ đây`
     : undefined;
@@ -133,6 +135,7 @@ export function ParentGroup({
             <StatusPill
               issueKey={group.key}
               statusName={group.statusName}
+              issueType={group.issueTypeName}
               readOnly={ownedByOther}
               readOnlyReason={lockReason}
             />
@@ -196,16 +199,26 @@ export function ParentGroup({
                 readOnlyReason={lockReason}
               />
             )}
-            {!isOrphan && (
-              <PointsEditor
-                issueKey={group.key}
-                value={group.storyPoints}
-                suggestion={group.childPointsTotal || null}
-                variant="parent"
-                readOnly={ownedByOther}
-                readOnlyReason={lockReason}
-              />
-            )}
+            {!isOrphan &&
+              (pointable ? (
+                <PointsEditor
+                  issueKey={group.key}
+                  value={group.storyPoints}
+                  suggestion={group.childPointsTotal || null}
+                  variant="parent"
+                  readOnly={ownedByOther}
+                  readOnlyReason={lockReason}
+                />
+              ) : (
+                // An Improve carries no points: no editor to set one by mistake,
+                // and a point that got there anyway shows as the error it is.
+                <NoPointsChip
+                  issueKey={group.key}
+                  issueTypeName={group.issueTypeName}
+                  value={group.storyPoints}
+                  readOnly={ownedByOther}
+                />
+              ))}
           </span>
         </div>
 
@@ -214,7 +227,7 @@ export function ParentGroup({
         {!isOrphan && (
           <div className="mt-1">
             <PointsRollup
-              value={group.storyPoints}
+              value={pointable ? group.storyPoints : null}
               childTotal={group.childPointsTotal}
               childCount={group.childCount}
             />

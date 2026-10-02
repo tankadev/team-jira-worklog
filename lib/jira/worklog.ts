@@ -79,6 +79,11 @@ export async function getWorklogs(
   const issues = await searchJql<JiraIssue>(jql, ['summary'], {
     limit: 200,
     reconcileIssues: reconcileIds,
+    // The placement query (it passes `alwaysInclude`) decides where the next
+    // entry starts on the clock. With reads cached for half an hour, a day
+    // logged elsewhere meanwhile would be missed and the entry would overlap
+    // it — so that one read is always live.
+    fresh: alwaysInclude.length > 0,
   })
 
   const extra = alwaysInclude.filter((key) => key && !issues.some((i) => i.key === key))
@@ -101,7 +106,7 @@ export async function getWorklogs(
       const res = await jiraFetch<{ worklogs?: RawWorklog[] }>(
         `/rest/api/3/issue/${encodeURIComponent(issue.key)}/worklog` +
           `?startedAfter=${after}&startedBefore=${before}&maxResults=200`,
-        // `fresh` skips the short read cache. Only the placement query asks for
+        // `fresh` skips the read cache. Only the placement query asks for
         // it: that read decides where the next entry starts, and a copy cached
         // seconds ago is precisely the one missing the entry just written.
         { fresh: alwaysInclude.length > 0 },
@@ -200,5 +205,31 @@ export async function deleteWorklog(issueKey: string, worklogId: string) {
   return jiraFetch(
     `/rest/api/3/issue/${encodeURIComponent(issueKey)}/worklog/${encodeURIComponent(worklogId)}?notifyUsers=false&adjustEstimate=leave`,
     { method: 'DELETE' },
+  )
+}
+
+/** One worklog as Jira holds it — read fresh, since it decides a write. */
+export async function getWorklog(issueKey: string, worklogId: string) {
+  return jiraFetch<{ id: string; started: string; timeSpentSeconds: number; author?: { accountId?: string } }>(
+    `/rest/api/3/issue/${encodeURIComponent(issueKey)}/worklog/${encodeURIComponent(worklogId)}`,
+    { fresh: true },
+  )
+}
+
+/**
+ * Changes when a worklog started and/or how long it ran. Only the fields given
+ * are sent, so moving a day keeps the comment and editing hours keeps the day.
+ */
+export async function updateWorklog(
+  issueKey: string,
+  worklogId: string,
+  change: { started?: string; timeSpentSeconds?: number },
+) {
+  const body: Record<string, unknown> = {}
+  if (change.started) body.started = change.started
+  if (change.timeSpentSeconds) body.timeSpentSeconds = change.timeSpentSeconds
+  return jiraFetch<{ id: string }>(
+    `/rest/api/3/issue/${encodeURIComponent(issueKey)}/worklog/${encodeURIComponent(worklogId)}?notifyUsers=false&adjustEstimate=leave`,
+    { method: 'PUT', body },
   )
 }

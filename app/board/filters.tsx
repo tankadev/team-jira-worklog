@@ -23,7 +23,9 @@ function dm(iso: string | null) {
 const SORT_KEY = 'board:sort'
 
 /** Filter params remembered across navigation, so returning keeps the view. */
-const FILTERS_KEY = 'board:filters'
+// v2: the default status flipped from "Chưa Done" to every status. A
+// remembered "open" from before would otherwise keep hiding Done subtasks.
+const FILTERS_KEY = 'board:filters:v2'
 const REMEMBERED = ['status', 'q', 'epic', 'parent', 'sprint'] as const
 
 export function BoardFilters({
@@ -188,10 +190,11 @@ export function BoardFilters({
         className={control}
         disabled={pending}
         value={status}
-        onChange={(e) => set('status', e.target.value)}
+        // 'all' is the default, so it is the absence of the param.
+        onChange={(e) => set('status', e.target.value === 'open' ? 'open' : null)}
       >
-        <option value="open">Chưa Done</option>
         <option value="all">Mọi trạng thái</option>
+        <option value="open">Chưa Done</option>
       </select>
 
       <select
@@ -259,7 +262,7 @@ export function BoardFilters({
         />
       </form>
 
-      {(search || sprintId === null || status === 'all' || epicKey || parentKey) && (
+      {(search || sprintId === null || status === 'open' || epicKey || parentKey) && (
         <button
           // Clears the remembered filters too; the sort preference stays, since
           // it's a display choice rather than a filter.

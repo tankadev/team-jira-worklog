@@ -293,12 +293,28 @@ export interface IssueHygiene {
   problems: string[];
 }
 
+/**
+ * Issue types whose title does not carry the team tag.
+ *
+ * A Bug is filed under the reporter's own convention — `[Bug][Web] …` — not the
+ * team's `[CTALK]`, so flagging it as "thiếu tiền tố" was a warning about a
+ * rule that does not apply. The label is still required: that is what puts it
+ * on the team's board. Lowercase names.
+ */
+export const TEAM_PREFIX_EXEMPT_TYPES = ["bug"];
+
+export function needsTeamPrefix(issueTypeName: string | null | undefined): boolean {
+  return !TEAM_PREFIX_EXEMPT_TYPES.includes((issueTypeName ?? "").trim().toLowerCase());
+}
+
 export function issueHygiene(
   issue: {
     summary: string;
     labels: string[];
     startDate: string | null;
     dueDate: string | null;
+    /** Absent for a subtask row, which always follows the team convention. */
+    issueTypeName?: string | null;
   },
   team: { label: string | null; prefix: string | null },
 ): IssueHygiene {
@@ -308,6 +324,7 @@ export function issueHygiene(
   );
   const missingPrefix = Boolean(
     team.prefix &&
+    needsTeamPrefix(issue.issueTypeName) &&
     !issue.summary.trim().toLowerCase().startsWith(team.prefix.toLowerCase()),
   );
   const missingStartDate = !issue.startDate;
@@ -392,4 +409,18 @@ export function isOwnedByOther(
 ): boolean {
   if (!assigneeAccountId || !myAccountId) return false;
   return assigneeAccountId !== myAccountId;
+}
+
+/**
+ * Issue types that carry no story points on this Jira.
+ *
+ * An Improve is not estimated — Jira's own backlog will not take a point on
+ * one — but the field write the app uses accepts any issue, so nothing on the
+ * Jira side stops a wrong number landing there and skewing the sprint total.
+ * Lowercase names.
+ */
+export const UNPOINTED_ISSUE_TYPES = ["improve"];
+
+export function acceptsStoryPoints(issueTypeName: string | null | undefined): boolean {
+  return !UNPOINTED_ISSUE_TYPES.includes((issueTypeName ?? "").trim().toLowerCase());
 }

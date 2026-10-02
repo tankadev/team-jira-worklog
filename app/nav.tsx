@@ -4,6 +4,8 @@ import Link, { useLinkStatus } from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useTransition } from 'react'
 
+import { clearTransitionsCache } from '@/lib/transitions-cache'
+
 import { refreshDataAction } from './refresh-actions'
 
 import { Icon, LogoMark, type IconName } from './icons'
@@ -182,12 +184,15 @@ function LinkSpinner() {
   )
 }
 
-/** Drops the short Jira read cache and re-renders — the "give me live data now" button. */
+/** Drops every cache (server reads, client pages, status transitions) and re-renders — the "give me live data now" button. */
 function RefreshButton() {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
 
   function refresh() {
+    // Everything cached anywhere goes: the server's Jira reads, every page in
+    // the client cache, and the remembered status transitions.
+    clearTransitionsCache()
     startTransition(async () => {
       await refreshDataAction()
       router.refresh()
@@ -198,8 +203,8 @@ function RefreshButton() {
     <button
       onClick={refresh}
       disabled={pending}
-      title="Làm mới dữ liệu Jira"
-      aria-label="Làm mới dữ liệu Jira"
+      title="Đồng bộ lại từ Jira — các màn hình được giữ trong bộ nhớ cho tới khi bấm nút này"
+      aria-label="Đồng bộ lại từ Jira"
       className="grid size-8 shrink-0 place-items-center rounded-lg text-ink-3 hover:bg-surface-2 hover:text-ink disabled:opacity-60"
     >
       <Icon name="refresh" className={'size-4 ' + (pending ? 'animate-spin' : '')} />

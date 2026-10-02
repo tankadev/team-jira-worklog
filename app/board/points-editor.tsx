@@ -231,3 +231,62 @@ export function PointsRollup({
     </span>
   )
 }
+
+
+/**
+ * Stands in for the points chip on an issue type that carries none (Improve).
+ *
+ * Normally just a label saying so. If a point was set anyway — before this
+ * rule, or from Jira directly — it is shown as the mistake it is, with the one
+ * action that fixes it.
+ */
+export function NoPointsChip({
+  issueKey,
+  issueTypeName,
+  value,
+  readOnly = false,
+}: {
+  issueKey: string
+  issueTypeName: string
+  value: number | null
+  readOnly?: boolean
+}) {
+  const [pending, startTransition] = useTransition()
+  const [cleared, setCleared] = useState(false)
+  const [note, setNote] = useState<string | null>(null)
+  const { refresh } = useNav()
+
+  if (value === null || cleared) {
+    return (
+      <span
+        title={`${issueTypeName} không đánh story point`}
+        className="inline-flex h-6 items-center rounded-[5px] border border-dashed border-line-strong px-1.5 text-caption text-ink-3"
+      >
+        {issueTypeName} · không point
+      </span>
+    )
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <button
+        type="button"
+        disabled={pending || readOnly}
+        onClick={() =>
+          startTransition(async () => {
+            const res = await setStoryPointsAction(issueKey, null)
+            if (res.ok) {
+              setCleared(true)
+              refresh()
+            } else setNote(res.message)
+          })
+        }
+        title={`${issueTypeName} không đánh story point — ${value} SP đang có là sai. Bấm để xoá.`}
+        className="inline-flex h-6 items-center gap-1 rounded-[5px] border border-crit bg-crit-soft px-1.5 font-mono text-small text-crit hover:brightness-105 disabled:opacity-60"
+      >
+        {pending ? <Spinner className="size-2.5" /> : <>⚠ {value} SP · xoá</>}
+      </button>
+      {note && <span className="text-caption text-crit">{note}</span>}
+    </span>
+  )
+}

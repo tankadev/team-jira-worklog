@@ -3,21 +3,13 @@
 import { useEffect, useRef, useState, useTransition } from 'react'
 
 import { type AdfBlock, adfToBlocks, splitDod, textToAdf } from '@/lib/jira/adf'
-import { statusTone } from '@/lib/jira/types'
+import { statusStyle } from '@/lib/status-style'
 import { formatDuration } from '@/lib/time'
 
 import { regenerateDescriptionAction, updateDescriptionAction, updateSummaryAction } from '../actions'
 import { Spinner } from '../spinner'
 import { StatusPill } from './status-pill'
 import { TypeIcon } from './type-icon'
-
-const TONE: Record<string, string> = {
-  todo: 'bg-surface-2 text-ink-2',
-  prog: 'bg-accent-soft text-accent-ink',
-  test: 'bg-warn-soft text-warn',
-  ver: 'bg-blue-soft text-blue',
-  done: 'bg-good-soft text-good',
-}
 
 interface Detail {
   key: string
@@ -122,7 +114,7 @@ export function IssueDetail({ issueKey, onClose }: { issueKey: string; onClose: 
             {issueKey}
           </a>
           {detail && (
-            <StatusPill issueKey={detail.key} statusName={detail.statusName} />
+            <StatusPill issueKey={detail.key} statusName={detail.statusName} issueType={detail.issueTypeName} />
           )}
           <button
             type="button"
@@ -582,5 +574,5 @@ function Block({ block }: { block: AdfBlock }) {
 
 /** Status colour for a pill rendered outside this file. */
 export function toneClass(status: string) {
-  return TONE[statusTone(status)]
+  return statusStyle(status)
 }
