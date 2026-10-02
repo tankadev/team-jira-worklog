@@ -1,9 +1,12 @@
 'use server'
 
 import { getMyself } from '@/lib/jira/client'
-import { generateTask, pointRulesText } from '@/lib/ai/gemini'
+import { generateCommitMessage, generateTask, pointRulesText } from '@/lib/ai/gemini'
+import { adfToText } from '@/lib/jira/adf'
+import type { CommitType } from '@/lib/commit-message'
 import {
   attachToSprint,
+  getIssueDetail,
   transitionIssue,
   updateDates,
   updateStoryPoints,
@@ -339,3 +342,29 @@ export async function transitionAction(
   }
 }
 
+
+/**
+ * Drafts a Conventional Commits subject for an issue from its title and
+ * description — the "Commit message" button on a subtask. Read-only: it reads
+ * the issue (and its parent, whose type is the best hint for fix vs feat) and
+ * asks Gemini; nothing is written to Jira.
+ */
+export async function commitMessageAction(
+  issueKey: string,
+): Promise<ActionResult & { type?: CommitType; subject?: string }> {
+  try {
+    const issue = await getIssueDetail(issueKey)
+    const parent = issue.parentKey ? await getIssueDetail(issue.parentKey).catch(() => null) : null
+    const res = await generateCommitMessage({
+      issueKey,
+      summary: issue.summary,
+      description: adfToText(issue.description),
+      issueTypeName: issue.issueTypeName,
+      parentSummary: parent?.summary ?? issue.parentSummary,
+      parentTypeName: parent?.issueTypeName ?? null,
+    })
+    return { ok: true, message: `Đã sinh · ${res.model}`, type: res.type, subject: res.subject }
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : 'Gemini lỗi' }
+  }
+}

@@ -1,6 +1,7 @@
 import 'server-only'
 
 import { SETTING_KEYS, getSetting } from '../settings'
+import { type CommitType, COMMIT_TYPES, cleanCommitSubject, isCommitType } from '../commit-message'
 import { RetryableError, parseRetryAfter, withRetry } from './retry'
 
 export interface GeneratedTask {
@@ -62,8 +63,17 @@ interface GeminiResponse {
   error?: { message?: string; status?: string }
 }
 
-/** One call. Throws RetryableError for anything worth another go. */
-async function callOnce(model: string, apiKey: string, prompt: string): Promise<GeneratedTask> {
+/**
+ * One call, returning the parsed JSON object. Throws RetryableError for
+ * anything worth another go. Shared by every prompt; each validates the shape
+ * it asked for itself.
+ */
+async function requestJson(
+  model: string,
+  apiKey: string,
+  prompt: string,
+  temperature = 0.4,
+): Promise<Record<string, unknown>> {
   let res: Response
   try {
     res = await fetch(`${ENDPOINT}/${encodeURIComponent(model)}:generateContent`, {
@@ -72,7 +82,7 @@ async function callOnce(model: string, apiKey: string, prompt: string): Promise<
       headers: { 'x-goog-api-key': apiKey, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.4, responseMimeType: 'application/json' },
+        generationConfig: { temperature, responseMimeType: 'application/json' },
       }),
     })
   } catch (error) {
@@ -120,15 +130,20 @@ async function callOnce(model: string, apiKey: string, prompt: string): Promise<
     )
   }
 
-  let parsed: Partial<GeneratedTask>
   try {
-    parsed = JSON.parse(extractJson(text))
+    const parsed = JSON.parse(extractJson(text))
+    if (parsed && typeof parsed === 'object') return parsed as Record<string, unknown>
   } catch {
-    // Malformed JSON is the failure this user hits most; it is a sampling
-    // artefact and clears on a re-roll, so it is retryable rather than fatal.
-    throw new RetryableError('Gemini trả về dữ liệu không đọc được')
+    // fall through
   }
+  // Malformed JSON is the failure this user hits most; it is a sampling
+  // artefact and clears on a re-roll, so it is retryable rather than fatal.
+  throw new RetryableError('Gemini trả về dữ liệu không đọc được')
+}
 
+/** The task prompt's answer, validated. */
+function parseTask(raw: Record<string, unknown>): GeneratedTask {
+  const parsed = raw as Partial<GeneratedTask>
   if (!parsed.title?.trim()) throw new RetryableError('Gemini trả về thiếu title')
 
   const points = Number(parsed.storyPoints)
@@ -151,17 +166,19 @@ export interface GenerateOutcome extends GeneratedTask {
 }
 
 /**
- * Runs the prompt, falling through to a spare model when the primary is out of
+ * Runs a prompt, falling through to a spare model when the primary is out of
  * quota.
  *
  * Retrying alone cannot help there: a spent quota stays spent for the rest of
  * the window, so the only way through is a different model. Transient failures
- * are still handled by the retry inside each attempt.
+ * are still handled by the retry inside each attempt — including an answer
+ * that `parse` rejects, which throws RetryableError for a re-roll.
  */
-export async function generateTask(
-  idea: string,
-  context: { pointRules: string; parentSummary?: string },
-): Promise<GenerateOutcome> {
+async function runPrompt<T>(
+  prompt: string,
+  parse: (raw: Record<string, unknown>) => T,
+  temperature?: number,
+): Promise<T & { attempts: number; model: string }> {
   const apiKey = getSetting(SETTING_KEYS.googleApiKey)
   if (!apiKey) throw new Error('Chưa có Google API key — vào Settings điền')
 
@@ -171,15 +188,15 @@ export async function generateTask(
     .map((m) => m.trim())
     .filter((m) => m && m !== primary)
 
-  const prompt = buildPrompt(idea, context)
   let totalAttempts = 0
   let last: Error | null = null
 
   for (const model of [primary, ...fallbacks]) {
     try {
-      const { value, attempts } = await withRetry(() => callOnce(model, apiKey, prompt), {
-        maxAttempts: MAX_ATTEMPTS,
-      })
+      const { value, attempts } = await withRetry(
+        async () => parse(await requestJson(model, apiKey, prompt, temperature)),
+        { maxAttempts: MAX_ATTEMPTS },
+      )
       return { ...value, attempts: totalAttempts + attempts, model }
     } catch (error) {
       totalAttempts += MAX_ATTEMPTS
@@ -190,6 +207,68 @@ export async function generateTask(
   }
 
   throw last ?? new Error('Gemini lỗi')
+}
+
+export async function generateTask(
+  idea: string,
+  context: { pointRules: string; parentSummary?: string },
+): Promise<GenerateOutcome> {
+  return runPrompt(buildPrompt(idea, context), parseTask)
+}
+
+/**
+ * A Conventional Commits subject for a Jira issue: the type and a short
+ * imperative line. The app adds `Ref: VT-123` itself, and lets the user switch
+ * the type without asking again — so the model only decides what it is good at.
+ */
+export async function generateCommitMessage(input: {
+  issueKey: string
+  summary: string
+  description: string
+  issueTypeName: string
+  parentSummary: string | null
+  parentTypeName: string | null
+}): Promise<{ type: CommitType; subject: string; attempts: number; model: string }> {
+  return runPrompt(buildCommitPrompt(input), parseCommit, 0.3)
+}
+
+function buildCommitPrompt(input: {
+  issueKey: string
+  summary: string
+  description: string
+  issueTypeName: string
+  parentSummary: string | null
+  parentTypeName: string | null
+}) {
+  return `You write git commit messages following the Conventional Commits spec.
+
+Pick exactly one type:
+${COMMIT_TYPES.map((t) => `- ${t.type}: ${t.hint}`).join('\n')}
+
+Rules for the subject:
+- English, imperative mood ("add", "fix", "handle" — not "added" or "adds")
+- lowercase first letter, no trailing period
+- at most 60 characters, specific about what changes
+- no Jira key, no ticket tags like [CTALK] or [Web], no type prefix — only the words
+- a Bug (or a task under a Bug) is almost always "fix"
+
+Jira issue ${input.issueKey} (${input.issueTypeName}):
+Title: ${input.summary}
+${input.description ? `Description:\n"""\n${input.description.slice(0, 3000)}\n"""\n` : ''}${
+    input.parentSummary
+      ? `It is a subtask of ${input.parentTypeName ?? 'a task'}: "${input.parentSummary}"\n`
+      : ''
+  }
+Return ONLY a JSON object, no explanation, no markdown fence:
+{"type": "fix", "subject": "..."}`
+}
+
+/** The commit prompt's answer, validated and cleaned to the rules above. */
+function parseCommit(raw: Record<string, unknown>): { type: CommitType; subject: string } {
+  const type = String(raw.type ?? '').trim().toLowerCase()
+  const subject = cleanCommitSubject(String(raw.subject ?? ''))
+  if (!subject) throw new RetryableError('Gemini trả về thiếu subject')
+  return { type: isCommitType(type) ? type : 'chore', subject }
 }
 
 export function pointRulesText(): string {

@@ -16,6 +16,7 @@ import type { DayOffKind } from "@/lib/quota";
 import { DEFAULT_SCHEDULE, type WorkSchedule, formatDuration } from "@/lib/time";
 
 import { Spinner } from "../spinner";
+import { CommitMessageButton } from "./commit-message";
 import { DatesEditor } from "./dates-editor";
 import { HygieneBadge } from "./hygiene-badge";
 import { IssueDetail } from "./issue-detail";
@@ -312,6 +313,7 @@ export function SubtaskRow({
         </div>
 
         <div className="ml-auto flex shrink-0 items-center gap-2">
+          <CommitMessageButton issueKey={subtask.key} />
           <button
             type="button"
             onClick={() => setOpen((v) => !v)}

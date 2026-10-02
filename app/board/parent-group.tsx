@@ -106,8 +106,8 @@ export function ParentGroup({
   const loggedTotal = group.childTimeSpentTotal;
 
   return (
-    <article className="card overflow-hidden">
-      <header className="border-b border-line bg-surface-2/70 px-4 py-3">
+    <article className="card">
+      <header className="rounded-t-[13px] border-b border-line bg-surface-2/70 px-4 py-3">
         <div className="flex flex-wrap items-center gap-2">
           {!isOrphan && (
             <>
