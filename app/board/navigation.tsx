@@ -121,7 +121,7 @@ export function NavDimmer({
 
       {pending && label && (
         <div className="pointer-events-none absolute inset-x-0 top-3 flex justify-center">
-          <span className="flex items-center gap-1.5 rounded-full border border-line bg-surface px-2.5 py-1 text-[11.5px] text-ink-2 shadow-sm">
+          <span className="flex items-center gap-1.5 rounded-full border border-line bg-surface px-2.5 py-1 text-small text-ink-2 shadow-sm">
             <span className="inline-block size-3 animate-spin rounded-full border-[1.5px] border-line-strong border-t-accent" />
             {label}
           </span>
@@ -136,7 +136,7 @@ export function NavSpinner() {
   const { pending } = useNav();
   if (!pending) return null;
   return (
-    <span className="flex items-center gap-1.5 font-mono text-[11.5px] text-ink-3">
+    <span className="flex items-center gap-1.5 font-mono text-small text-ink-3">
       <span className="inline-block size-3 animate-spin rounded-full border-[1.5px] border-line-strong border-t-accent" />
       đang tải…
     </span>

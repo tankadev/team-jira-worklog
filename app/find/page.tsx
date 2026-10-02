@@ -25,9 +25,9 @@ export default async function FindPage(props: PageProps<'/find'>) {
 
   if (!getSetting(SETTING_KEYS.jiraApiToken)) {
     return (
-      <div className="rounded-[9px] border border-line bg-surface p-[17px]">
-        <span className="text-[13px]">Chưa cấu hình Jira — </span>
-        <Link href="/settings" className="text-[13px] text-accent-ink underline underline-offset-2">
+      <div className="card p-5">
+        <span className="text-body">Chưa cấu hình Jira — </span>
+        <Link href="/settings" className="text-body text-accent-ink underline underline-offset-2">
           mở Settings
         </Link>
       </div>
@@ -78,8 +78,8 @@ export default async function FindPage(props: PageProps<'/find'>) {
   return (
     <NavProvider>
       <header className="mb-4">
-        <h1 className="text-xl font-semibold tracking-tight">Tìm &amp; nhận task</h1>
-        <p className="mt-1 text-[12.5px] text-ink-3">
+        <h1 className="text-title font-semibold tracking-tight">Tìm &amp; nhận task</h1>
+        <p className="mt-1 text-body text-ink-3">
           Tìm task chưa ai nhận hoặc của người khác, rồi tự assign cho mình.
         </p>
       </header>
@@ -104,11 +104,11 @@ export default async function FindPage(props: PageProps<'/find'>) {
       />
 
       {error ? (
-        <div className="rounded-[9px] border border-crit/40 bg-crit-soft p-[17px]">
-          <div className="mb-1 font-mono text-[10.5px] uppercase tracking-[0.09em] text-crit">
+        <div className="rounded-xl border border-crit/40 bg-crit-soft p-5">
+          <div className="mb-1 eyebrow text-crit">
             Truy vấn lỗi
           </div>
-          <p className="text-[13px]">{error}</p>
+          <p className="text-body">{error}</p>
         </div>
       ) : (
         <ResultList

@@ -47,9 +47,9 @@ export function SettingsForm({ initial }: { initial: Record<string, string> }) {
   )
 
   return (
-    <form action={formAction} className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+    <form action={formAction} className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
       <div className="flex flex-col gap-4">
-        <Card title="Kết nối Jira">
+        <Card id="jira" title="Kết nối Jira">
           <Field label="Jira base URL" name={K.jiraBaseUrl} defaultValue={initial[K.jiraBaseUrl]} mono />
           <Field label="Email" name={K.jiraEmail} defaultValue={initial[K.jiraEmail]} />
           <Field
@@ -68,7 +68,7 @@ export function SettingsForm({ initial }: { initial: Record<string, string> }) {
 
         <TeamCard initial={initial} />
 
-        <Card title="Google Gemini">
+        <Card id="gemini" title="Google Gemini">
           <Field
             label="API key"
             name={K.googleApiKey}
@@ -90,7 +90,7 @@ export function SettingsForm({ initial }: { initial: Record<string, string> }) {
         {/* Used only by the "Nhánh & ghi chú" module, but kept here with the
             other credentials: a token filed somewhere else is a token nobody
             remembers to rotate. */}
-        <Card title="GitHub">
+        <Card id="github" title="GitHub">
           <Field
             label="Personal access token"
             name={K.githubToken}
@@ -102,11 +102,11 @@ export function SettingsForm({ initial }: { initial: Record<string, string> }) {
       </div>
 
       <div className="flex flex-col gap-4">
-        <Card title="Quy tắc giờ">
+        <Card id="hours" title="Quy tắc giờ">
           <Field label="Định mức ngày thường" name={K.dailyQuotaHours} defaultValue={initial[K.dailyQuotaHours]} mono />
           <Field label="Bước nhảy nút +/−" name={K.logStepHours} defaultValue={initial[K.logStepHours]} mono />
           <Field label="Preset chọn nhanh" name={K.logPresets} defaultValue={initial[K.logPresets]} mono />
-          <label className="flex items-center gap-2 text-[13px] text-ink-2">
+          <label className="flex items-center gap-2 text-body text-ink-2">
             <input
               type="checkbox"
               name={K.weekendCountsToQuota}
@@ -115,12 +115,12 @@ export function SettingsForm({ initial }: { initial: Record<string, string> }) {
             />
             Cuối tuần cũng tính định mức
           </label>
-          <p className="text-[11.5px] leading-relaxed text-ink-3">
+          <p className="text-small leading-relaxed text-ink-3">
             Mặc định T7 và CN không có định mức — giờ log vào vẫn cộng tổng nhưng không bị cảnh báo thiếu.
           </p>
         </Card>
 
-        <Card title="Giờ làm việc">
+        <Card id="schedule" title="Giờ làm việc">
           <div className="grid grid-cols-2 gap-3">
             <Field label="Bắt đầu" name={K.workDayStart} defaultValue={initial[K.workDayStart]} mono />
             <Field label="Kết thúc" name={K.workDayEnd} defaultValue={initial[K.workDayEnd]} mono />
@@ -129,15 +129,15 @@ export function SettingsForm({ initial }: { initial: Record<string, string> }) {
             <Field label="Nghỉ trưa từ" name={K.breakStart} defaultValue={initial[K.breakStart]} mono />
             <Field label="Đến" name={K.breakEnd} defaultValue={initial[K.breakEnd]} mono />
           </div>
-          <p className="text-[11.5px] leading-relaxed text-ink-3">
+          <p className="text-small leading-relaxed text-ink-3">
             Định dạng <code className="font-mono">HH:MM</code>. Worklog xếp nối tiếp nhau từ giờ bắt
             đầu và nhảy qua giờ nghỉ: log 1h rồi 1h rồi 6h sẽ thành 09:00–10:00, 10:00–11:00,
             11:00–18:00. Để trống hai ô nghỉ trưa nếu ngày làm liền mạch.
           </p>
         </Card>
 
-        <Card title="Quy đổi point → giờ">
-          <label className="flex items-center gap-2 text-[13px] text-ink-2">
+        <Card id="points" title="Quy đổi point → giờ">
+          <label className="flex items-center gap-2 text-body text-ink-2">
             <input
               type="checkbox"
               name={K.showSprintPoints}
@@ -146,7 +146,7 @@ export function SettingsForm({ initial }: { initial: Record<string, string> }) {
             />
             Hiện bảng tổng hợp point của sprint
           </label>
-          <p className="text-[11.5px] leading-relaxed text-ink-3">
+          <p className="text-small leading-relaxed text-ink-3">
             Mặc định tắt. Panel bên phải task board: bao nhiêu point đã xong,
             chia theo trạng thái, và giờ mỗi point. Tắt thì bỏ hẳn — không vẽ
             panel và cũng không chạy truy vấn Jira nào cho nó.
@@ -164,17 +164,17 @@ export function SettingsForm({ initial }: { initial: Record<string, string> }) {
                 <input
                   name={name}
                   defaultValue={initial[name] ?? ''}
-                  className="w-full rounded-md border border-line bg-ground px-[9px] py-[6px] font-mono text-[13px]"
+                  className="w-full rounded-lg border border-line bg-ground px-3 py-[7px] font-mono text-body"
                 />
               </div>
             ))}
           </div>
-          <p className="text-[11.5px] leading-relaxed text-ink-3">
+          <p className="text-small leading-relaxed text-ink-3">
             Chỉ để hiện cảnh báo mềm khi giờ log vượt mốc trên. Không bao giờ chặn thao tác log.
           </p>
         </Card>
 
-        <Card title="Tiền tố sprint">
+        <Card id="sprint-prefix" title="Tiền tố sprint">
           <Field
             label="Mẫu"
             name={K.sprintPrefixPattern}
@@ -184,20 +184,27 @@ export function SettingsForm({ initial }: { initial: Record<string, string> }) {
           />
         </Card>
 
-        <div className="flex items-center justify-end gap-3">
-          {state && (
-            <span className={'text-[13px] ' + (state.ok ? 'text-good' : 'text-crit')}>
-              {state.message}
-            </span>
-          )}
-          <button
-            type="submit"
-            disabled={pending}
-            className="rounded-md bg-accent px-3 py-[6px] text-sm font-medium text-white hover:bg-accent-2 disabled:opacity-60"
-          >
-            {pending ? 'Đang lưu…' : 'Lưu settings'}
-          </button>
-        </div>
+      </div>
+
+      {/* One save for the whole form, kept in reach while scrolling. It sat at
+          the foot of the right column, half way down a long page, where it was
+          easy to edit a field and leave without saving. */}
+      <div className="sticky bottom-3 z-20 flex flex-wrap items-center justify-end gap-3 rounded-xl border border-line bg-surface/90 px-4 py-2.5 shadow-pop backdrop-blur lg:col-span-2">
+        <span className="mr-auto text-small text-ink-3">
+          Các ô phía trên chỉ được ghi khi bấm lưu.
+        </span>
+        {state && (
+          <span className={'text-body ' + (state.ok ? 'text-good' : 'text-crit')}>
+            {state.message}
+          </span>
+        )}
+        <button
+          type="submit"
+          disabled={pending}
+          className="rounded-lg bg-accent px-4 py-1.5 text-body font-semibold text-on-accent shadow-card hover:bg-accent-2 disabled:opacity-60"
+        >
+          {pending ? 'Đang lưu…' : 'Lưu settings'}
+        </button>
       </div>
     </form>
   )
@@ -235,7 +242,7 @@ function TeamCard({ initial }: { initial: Record<string, string> }) {
   }
 
   return (
-    <Card title="Team trên board">
+    <Card id="team" title="Team trên board">
       <ControlledField
         label="Label của team"
         name={K.teamLabel}
@@ -266,12 +273,12 @@ function TeamCard({ initial }: { initial: Record<string, string> }) {
           type="button"
           disabled={pending}
           onClick={detect}
-          className="rounded-md border border-line-strong bg-surface px-[9px] py-1 text-[12.5px] hover:bg-surface-2 disabled:opacity-60"
+          className="rounded-lg border border-line-strong bg-surface px-3 py-1.5 font-medium text-body hover:bg-surface-2 disabled:opacity-60"
         >
           {pending ? 'Đang dò…' : 'Dò từ board'}
         </button>
         {result && (
-          <span className="flex min-w-0 items-center gap-2 font-mono text-[11px]">
+          <span className="flex min-w-0 items-center gap-2 font-mono text-caption">
             <i
               className={
                 'inline-block size-[6px] shrink-0 rounded-full ' +
@@ -283,12 +290,12 @@ function TeamCard({ initial }: { initial: Record<string, string> }) {
         )}
       </div>
       {result?.detail && (
-        <code className="block overflow-x-auto rounded-md bg-surface-2 px-2 py-1.5 font-mono text-[11px] text-ink-3">
+        <code className="block overflow-x-auto rounded-md bg-surface-2 px-2 py-1.5 font-mono text-caption text-ink-3">
           {result.detail}
         </code>
       )}
       {result?.ok && (
-        <p className="text-[11.5px] leading-relaxed text-ink-3">
+        <p className="text-small leading-relaxed text-ink-3">
           Đã điền sẵn — kiểm tra lại rồi bấm <b className="text-ink-2">Lưu settings</b>.
         </p>
       )}
@@ -296,10 +303,10 @@ function TeamCard({ initial }: { initial: Record<string, string> }) {
   )
 }
 
-function Card({ title, children }: { title: string; children: React.ReactNode }) {
+function Card({ id, title, children }: { id?: string; title: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-[9px] border border-line bg-surface p-[17px]">
-      <div className="mb-3 font-mono text-[10.5px] uppercase tracking-[0.09em] text-ink-3">
+    <section id={id} className="card scroll-mt-20 p-5">
+      <div className="mb-3 eyebrow text-ink-2">
         {title}
       </div>
       <div className="flex flex-col gap-3">{children}</div>
@@ -330,11 +337,11 @@ function Field({
         type={type}
         defaultValue={defaultValue ?? ''}
         className={
-          'w-full rounded-md border border-line bg-ground px-[10px] py-[7px] text-[13.5px] ' +
+          'w-full rounded-lg border border-line bg-ground px-3 py-2 text-emph ' +
           (mono ? 'font-mono' : '')
         }
       />
-      {hint && <span className="text-[11.5px] leading-relaxed text-ink-3">{hint}</span>}
+      {hint && <span className="text-small leading-relaxed text-ink-3">{hint}</span>}
     </label>
   )
 }
@@ -362,11 +369,11 @@ function ControlledField({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className={
-          'w-full rounded-md border border-line bg-ground px-[10px] py-[7px] text-[13.5px] ' +
+          'w-full rounded-lg border border-line bg-ground px-3 py-2 text-emph ' +
           (mono ? 'font-mono' : '')
         }
       />
-      {hint && <span className="text-[11.5px] leading-relaxed text-ink-3">{hint}</span>}
+      {hint && <span className="text-small leading-relaxed text-ink-3">{hint}</span>}
     </label>
   )
 }
@@ -385,13 +392,13 @@ function ConnectionTest({ label, run }: { label: string; run: () => Promise<Test
         type="button"
         disabled={pending}
         onClick={() => startTransition(async () => setResult(await run()))}
-        className="rounded-md border border-line-strong bg-surface px-[9px] py-1 text-[12.5px] hover:bg-surface-2 disabled:opacity-60"
+        className="rounded-lg border border-line-strong bg-surface px-3 py-1.5 font-medium text-body hover:bg-surface-2 disabled:opacity-60"
       >
         {pending ? 'Đang thử…' : label}
       </button>
 
       {result && (
-        <span className="flex items-center gap-2 font-mono text-[11px]">
+        <span className="flex items-center gap-2 font-mono text-caption">
           <i
             className={
               'inline-block size-[6px] shrink-0 rounded-full ' +

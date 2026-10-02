@@ -91,23 +91,23 @@ export function SprintPanel({
 
   return (
     <aside className="flex flex-col gap-3.5 lg:sticky lg:top-5">
-      <section className="rounded-[9px] border border-line bg-surface p-[17px]">
-        <div className="mb-2.5 font-mono text-[10.5px] uppercase tracking-[0.09em] text-ink-3">
+      <section className="card p-4">
+        <div className="mb-1 eyebrow text-ink-2">
           {sprintName}
         </div>
 
-        <div className="mb-3 flex items-baseline gap-2">
-          <span className="font-mono text-[22px] font-medium tracking-[-0.03em] tabular">
+        <div className="mb-3 flex items-baseline gap-1.5">
+          <span className="text-[32px] font-semibold leading-none tracking-[-0.03em] tabular">
             {complete}
           </span>
-          <span className="font-mono text-[13px] text-ink-3">/ {workdays.length} ngày đủ giờ</span>
+          <span className="text-body text-ink-3">/ {workdays.length} ngày đủ giờ</span>
           {short.length > 0 && (
-            <span className="ml-auto rounded-full bg-warn-soft px-2 py-[2.5px] text-[11.5px] font-medium text-warn">
+            <span className="ml-auto rounded-full bg-warn-soft px-2 py-[2.5px] text-small font-medium text-warn">
               thiếu {formatDuration(missingSeconds)}
             </span>
           )}
           {short.length === 0 && workdays.length > 0 && (
-            <span className="ml-auto rounded-full bg-good-soft px-2 py-[2.5px] text-[11.5px] font-medium text-good">
+            <span className="ml-auto rounded-full bg-good-soft px-2 py-[2.5px] text-small font-medium text-good">
               đủ hết ✓
             </span>
           )}
@@ -129,10 +129,13 @@ export function SprintPanel({
           ))}
 
           {upcoming.length > 0 && (
-            <div className="mt-1.5 border-t border-line pt-1.5">
-              <div className="mb-1 font-mono text-[10px] uppercase tracking-[0.08em] text-ink-3">
-                còn lại {upcoming.length} ngày
-              </div>
+            // Collapsed by default: thirteen rows of "—" made the panel the longest
+            // thing on the page. Open it to plan leave on a coming day.
+            <details className="group/up mt-1.5 border-t border-line pt-1.5">
+              <summary className="flex list-none items-center gap-1.5 rounded px-1.5 py-1 text-small font-medium text-ink-3 hover:bg-surface-2 hover:text-ink-2 [&::-webkit-details-marker]:hidden">
+                <span className="inline-block text-[9px] transition-transform group-open/up:rotate-90">▶</span>
+                Còn lại {upcoming.length} ngày
+              </summary>
               {upcoming.map((d) => (
                 <DayRow
                   key={d}
@@ -146,13 +149,13 @@ export function SprintPanel({
                   future
                 />
               ))}
-            </div>
+            </details>
           )}
         </div>
 
-        <div className="mt-2.5 flex justify-between border-t border-line pt-2.5 font-mono text-xs">
+        <div className="mt-2.5 flex justify-between border-t border-line pt-2.5 text-small">
           <span className="text-ink-3">Tổng sprint</span>
-          <b className="tabular">
+          <b className="font-mono tabular">
             {formatDuration(totalSeconds)}
             <span className="font-normal text-ink-3"> / {formatDuration(expectedSeconds)}</span>
           </b>
@@ -160,8 +163,8 @@ export function SprintPanel({
       </section>
 
       {short.length > 0 && (
-        <section className="rounded-[9px] border border-line bg-surface p-[17px]">
-          <div className="mb-2 font-mono text-[10.5px] uppercase tracking-[0.09em] text-ink-3">
+        <section className="card p-4">
+          <div className="mb-2 eyebrow text-ink-2">
             Ngày chưa đủ ({short.length})
           </div>
           <div className="flex flex-wrap gap-1.5">
@@ -169,7 +172,7 @@ export function SprintPanel({
               <Link
                 key={d}
                 href={hrefFor(d)}
-                className="rounded-md border border-warn/40 bg-warn-soft px-2 py-[3px] font-mono text-[11.5px] text-warn hover:border-warn"
+                className="rounded-md border border-warn/40 bg-warn-soft px-2 py-[3px] font-mono text-small text-warn hover:border-warn"
                 title={`Thiếu ${formatDuration(quotaFor(d) * 3600 - (secondsByDate[d] ?? 0))} — bấm để log bù`}
               >
                 <span className="inline-flex items-center gap-1.5">
@@ -179,7 +182,7 @@ export function SprintPanel({
               </Link>
             ))}
           </div>
-          <p className="mt-2 text-[11.5px] leading-relaxed text-ink-3">
+          <p className="mt-2 text-small leading-relaxed text-ink-3">
             Bấm một ngày để chuyển sang ngày đó rồi log bù.
           </p>
         </section>
@@ -219,14 +222,14 @@ function DayRow({
   return (
     <div
       className={
-        'group grid grid-cols-[58px_minmax(0,1fr)_38px_18px] items-center gap-1.5 rounded px-1.5 py-1 ' +
+        'group grid grid-cols-[64px_minmax(0,1fr)_38px_18px] items-center gap-1.5 rounded-md px-1.5 py-1 ' +
         (selected ? '-mx-1.5 bg-accent-soft' : 'hover:bg-surface-2')
       }
     >
       <Link href={href} className="contents">
       <span
         className={
-          'font-mono text-[11px] ' +
+          'font-mono text-caption ' +
           (selected
             ? 'font-semibold text-accent-ink'
             : future || quota === 0
@@ -252,7 +255,7 @@ function DayRow({
 
       <span
         className={
-          'text-right font-mono text-[11.5px] tabular ' +
+          'text-right font-mono text-small tabular ' +
           (seconds ? (short ? 'text-warn' : '') : 'text-ink-3')
         }
       >

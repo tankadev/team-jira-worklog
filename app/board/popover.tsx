@@ -53,7 +53,7 @@ export function Popover({
       {open && (
         <div
           className={
-            'absolute top-[calc(100%+6px)] z-50 rounded-lg border border-line-strong bg-surface p-2.5 shadow-lg ' +
+            'absolute top-[calc(100%+6px)] z-50 rounded-lg border border-line-strong bg-surface p-2.5 shadow-pop ' +
             (align === 'right' ? 'right-0' : 'left-0') +
             ' ' +
             panelClassName
@@ -68,7 +68,7 @@ export function Popover({
 
 export function PopoverTitle({ children }: { children: React.ReactNode }) {
   return (
-    <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.07em] text-ink-3">
+    <div className="mb-2 eyebrow text-ink-2">
       {children}
     </div>
   )

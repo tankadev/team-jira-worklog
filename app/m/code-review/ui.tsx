@@ -16,13 +16,13 @@ import { useNow } from '@/lib/use-now'
 
 import { claudeStatusAction } from './actions'
 
-export const CARD = 'rounded-[9px] border border-line bg-surface p-[17px]'
-export const CTITLE = 'font-mono text-[10.5px] uppercase tracking-[0.09em] text-ink-3'
+export const CARD = 'card p-5'
+export const CTITLE = 'eyebrow text-ink-2'
 export const BTN =
-  'rounded-md border border-line-strong bg-surface px-2.5 py-1 text-[12.5px] hover:bg-surface-2 disabled:opacity-50'
+  'rounded-lg border border-line-strong bg-surface px-3 py-1.5 font-medium text-body hover:bg-surface-2 disabled:opacity-50'
 export const BTN_PRI =
-  'rounded-md bg-accent px-3 py-1 text-[12.5px] font-medium text-white hover:bg-accent-2 disabled:opacity-50'
-export const INPUT = 'w-full rounded-md border border-line bg-ground px-2.5 py-1.5 text-[13px]'
+  'rounded-lg bg-accent shadow-card px-3 py-1.5 text-body font-semibold text-on-accent hover:bg-accent-2 disabled:opacity-50'
+export const INPUT = 'w-full rounded-lg border border-line bg-ground px-3 py-2 text-body'
 
 export function TabBtn({ on, onClick, children }: { on: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
@@ -68,7 +68,7 @@ const SEVERITY_CLS: Record<Severity, string> = {
 
 export function SeverityPill({ s }: { s: Severity }) {
   return (
-    <span className={`whitespace-nowrap rounded px-1.5 py-[1px] text-[11px] font-semibold ${SEVERITY_CLS[s]}`}>
+    <span className={`whitespace-nowrap rounded px-1.5 py-[1px] text-caption font-semibold ${SEVERITY_CLS[s]}`}>
       {SEVERITY_LABEL[s]}
     </span>
   )
@@ -83,7 +83,7 @@ const STATUS_CLS: Record<FindingStatus, string> = {
 }
 
 export function StatusPill({ s }: { s: FindingStatus }) {
-  return <span className={`rounded px-1.5 py-[1px] text-[11px] font-medium ${STATUS_CLS[s]}`}>{FINDING_STATUS_LABEL[s]}</span>
+  return <span className={`rounded px-1.5 py-[1px] text-caption font-medium ${STATUS_CLS[s]}`}>{FINDING_STATUS_LABEL[s]}</span>
 }
 
 const ROUND_CLS: Record<RoundState, string> = {
@@ -100,7 +100,7 @@ const ROUND_CLS: Record<RoundState, string> = {
 export function RoundPill({ s }: { s: RoundState }) {
   const live = s === 'running' || s === 'preparing' || s === 'finalizing'
   return (
-    <span className={`inline-flex items-center gap-1 rounded px-1.5 py-[1px] text-[11px] font-medium ${ROUND_CLS[s]}`}>
+    <span className={`inline-flex items-center gap-1 rounded px-1.5 py-[1px] text-caption font-medium ${ROUND_CLS[s]}`}>
       {live && <span className="size-1.5 animate-pulse rounded-full bg-current" />}
       {ROUND_LABEL[s]}
     </span>
@@ -117,7 +117,7 @@ export function ClaudeBanner({ check: c, onChange }: { check: ClaudeCheck; onCha
 
   if (c.ok) {
     return (
-      <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border border-line bg-surface px-3 py-2 text-[12px] text-ink-2">
+      <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border border-line bg-surface px-3 py-2 text-small text-ink-2">
         <span className="font-medium text-good">● Claude Code CLI sẵn sàng</span>
         <span className="font-mono text-ink-3">{c.version}</span>
         {c.account && <span>· {c.account}</span>}
@@ -128,7 +128,7 @@ export function ClaudeBanner({ check: c, onChange }: { check: ClaudeCheck; onCha
     )
   }
   return (
-    <div className="mb-4 rounded-md border border-crit bg-crit-soft px-3 py-2.5 text-[12.5px] text-crit">
+    <div className="mb-4 rounded-md border border-crit bg-crit-soft px-3 py-2.5 text-body text-crit">
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-semibold">✗ Chưa review được — Claude Code CLI chưa sẵn sàng</span>
         <button type="button" onClick={recheck} disabled={busy} className={BTN + ' ml-auto text-ink'}>
@@ -136,7 +136,7 @@ export function ClaudeBanner({ check: c, onChange }: { check: ClaudeCheck; onCha
         </button>
       </div>
       <p className="mt-1 text-ink-2">{c.problem}</p>
-      {c.bin && <p className="mt-0.5 font-mono text-[11px] text-ink-3">{c.bin}</p>}
+      {c.bin && <p className="mt-0.5 font-mono text-caption text-ink-3">{c.bin}</p>}
     </div>
   )
 }
@@ -249,7 +249,7 @@ export function DropZone({
           if (!disabled) take(e.dataTransfer.files)
         }}
         className={
-          'flex cursor-pointer flex-col items-center justify-center gap-0.5 rounded-md border-2 border-dashed px-3 py-4 text-center text-[12.5px] transition-colors ' +
+          'flex cursor-pointer flex-col items-center justify-center gap-0.5 rounded-md border-2 border-dashed px-3 py-4 text-center text-body transition-colors ' +
           (disabled
             ? 'cursor-not-allowed border-line text-ink-3 opacity-60'
             : over
@@ -258,7 +258,7 @@ export function DropZone({
         }
       >
         <span className="font-medium">{over ? 'Thả file vào đây' : '📂 Kéo thả nhiều file vào đây, hoặc bấm để chọn'}</span>
-        <span className="text-[11.5px] text-ink-3">{hint ?? `Nhận ${extensions.join(', ')} — chọn được nhiều file một lần`}</span>
+        <span className="text-small text-ink-3">{hint ?? `Nhận ${extensions.join(', ')} — chọn được nhiều file một lần`}</span>
       </div>
       <input
         ref={input}
@@ -271,7 +271,7 @@ export function DropZone({
           e.target.value = ''
         }}
       />
-      {skipped && <p className="mt-1 text-[12px] text-warn">{skipped}</p>}
+      {skipped && <p className="mt-1 text-small text-warn">{skipped}</p>}
     </div>
   )
 }

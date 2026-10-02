@@ -72,7 +72,7 @@ export function PointsEditor({
     return (
       <span
         title={readOnlyReason ?? `Story point của ${issueKey}`}
-        className="inline-flex h-6 min-w-[26px] items-center justify-center gap-1 rounded-[5px] border border-line bg-surface-2 px-1.5 font-mono text-[11.5px] text-ink-3"
+        className="inline-flex h-6 min-w-[26px] items-center justify-center gap-1 rounded-[5px] border border-line bg-surface-2 px-1.5 font-mono text-small text-ink-3"
       >
         {label}
       </span>
@@ -91,7 +91,7 @@ export function PointsEditor({
             over ? 'Đã log quá ước lượng — chỉ cảnh báo, không chặn' : `Story point của ${issueKey}`
           }
           className={
-            'inline-flex h-6 min-w-[26px] items-center justify-center gap-1 rounded-[5px] border px-1.5 font-mono text-[11.5px] disabled:opacity-60 ' +
+            'inline-flex h-6 min-w-[26px] items-center justify-center gap-1 rounded-[5px] border px-1.5 font-mono text-small disabled:opacity-60 ' +
             (over
               ? 'border-crit bg-crit-soft text-crit'
               : mismatch
@@ -125,12 +125,12 @@ export function PointsEditor({
                         : 'border-line bg-ground hover:border-line-strong')
                     }
                   >
-                    <b className="font-mono text-[15px]">{p}</b>
-                    <span className="font-mono text-[10px] text-ink-3">{budgets?.[p] ?? ''}</span>
+                    <b className="font-mono text-lead">{p}</b>
+                    <span className="font-mono text-micro text-ink-3">{budgets?.[p] ?? ''}</span>
                   </button>
                 ))}
               </div>
-              <p className="mt-2 text-[11px] text-ink-3">Tối đa 3 point.</p>
+              <p className="mt-2 text-caption text-ink-3">Tối đa 3 point.</p>
             </>
           ) : (
             <>
@@ -142,14 +142,14 @@ export function PointsEditor({
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') save(draft === '' ? null : Number(draft), close)
                 }}
-                className="w-full rounded-md border border-line bg-ground px-2 py-1.5 text-center font-mono text-[13px] tabular"
+                className="w-full rounded-md border border-line bg-ground px-2 py-1.5 text-center font-mono text-body tabular"
               />
               <div className="mt-2 flex gap-1.5">
                 {mismatch && (
                   <button
                     type="button"
                     onClick={() => save(suggestion!, close)}
-                    className="flex-1 rounded-md border border-warn bg-warn-soft py-1 font-mono text-[11.5px] font-medium text-warn"
+                    className="flex-1 rounded-md border border-warn bg-warn-soft py-1 font-mono text-small font-medium text-warn"
                   >
                     Lưu {suggestion} SP
                   </button>
@@ -157,12 +157,12 @@ export function PointsEditor({
                 <button
                   type="button"
                   onClick={() => save(draft === '' ? null : Number(draft), close)}
-                  className="flex-1 rounded-md bg-accent py-1 text-[12px] font-medium text-white hover:bg-accent-2"
+                  className="flex-1 rounded-lg bg-accent shadow-card py-1.5 text-small font-semibold text-on-accent hover:bg-accent-2"
                 >
                   Lưu
                 </button>
               </div>
-              <p className="mt-2 text-[11px] leading-relaxed text-ink-3">
+              <p className="mt-2 text-caption leading-relaxed text-ink-3">
                 Point task cha là tổng point task con
                 {suggestion != null && (
                   <>
@@ -175,7 +175,7 @@ export function PointsEditor({
             </>
           )}
 
-          {note && <p className="mt-2 text-[11px] text-crit">{note}</p>}
+          {note && <p className="mt-2 text-caption text-crit">{note}</p>}
         </>
       )}
     </Popover>
@@ -225,7 +225,7 @@ export function PointsRollup({
   const matches = value !== null && value === childTotal
 
   return (
-    <span className="font-mono text-[11px] text-ink-3">
+    <span className="font-mono text-caption text-ink-3">
       {childCount} task con · tổng {childTotal} SP
       {matches && <span className="text-good"> · khớp ✓</span>}
     </span>

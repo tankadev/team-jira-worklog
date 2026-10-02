@@ -58,7 +58,7 @@ export function DayBar({
   return (
     <span
       title={title}
-      className="relative block h-[5px] overflow-hidden rounded-[3px] bg-surface-2"
+      className="relative block h-[5px] overflow-hidden rounded-[5px] bg-surface-2"
     >
       {dayOff && (
         <span
@@ -73,7 +73,7 @@ export function DayBar({
         />
       )}
       <span
-        className={'absolute inset-y-0 rounded-[3px] ' + tone}
+        className={'absolute inset-y-0 rounded-[5px] ' + tone}
         style={{ left: `${left}%`, width: `${pct * share}%` }}
       />
     </span>

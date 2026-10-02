@@ -128,30 +128,30 @@ export function ProgressEditor({
     <>
       <header className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <div className="font-mono text-[10.5px] uppercase tracking-[0.09em] text-ink-3">
+          <div className="eyebrow text-ink-2">
             Tự lưu khi bạn ngừng gõ · feature xong thì xoá dòng đó
           </div>
-          <h1 className="text-xl font-semibold tracking-tight">Feature report</h1>
+          <h1 className="text-title font-semibold tracking-tight">Feature report</h1>
         </div>
         <div className="flex items-center gap-2">
-          {status === 'saved' && <span className="text-[12px] text-good">Đã lưu ✓</span>}
+          {status === 'saved' && <span className="text-small text-good">Đã lưu ✓</span>}
           {status === 'error' && (
-            <span className="text-[12px] text-crit">{errorMsg || 'Không lưu được'}</span>
+            <span className="text-small text-crit">{errorMsg || 'Không lưu được'}</span>
           )}
           <button
             type="button"
             onClick={saveNow}
             disabled={status === 'saving'}
-            className="rounded-md bg-accent px-3 py-1 text-[12.5px] font-medium text-white hover:bg-accent-2 disabled:opacity-50"
+            className="rounded-lg bg-accent shadow-card px-3 py-1.5 text-body font-semibold text-on-accent hover:bg-accent-2 disabled:opacity-50"
           >
             {status === 'saving' ? 'Đang lưu…' : 'Lưu tiến độ'}
           </button>
         </div>
       </header>
 
-      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
         {/* ── editor ── */}
-        <section className="rounded-[9px] border border-line bg-surface p-[17px]">
+        <section className="card p-5">
           <div className="mb-3 flex flex-wrap gap-3">
             <label className="flex flex-1 flex-col gap-[5px]">
               <span className="text-xs font-medium text-ink-2">Member</span>
@@ -159,7 +159,7 @@ export function ProgressEditor({
                 value={member}
                 onChange={(e) => setMember(e.target.value)}
                 placeholder="Tên member"
-                className="w-full rounded-md border border-line bg-ground px-2.5 py-1.5 text-[13.5px]"
+                className="w-full rounded-lg border border-line bg-ground px-3 py-2 text-emph"
               />
             </label>
             <label className="flex w-[170px] flex-col gap-[5px]">
@@ -168,7 +168,7 @@ export function ProgressEditor({
                 type="date"
                 value={reportDate}
                 onChange={(e) => setReportDate(e.target.value)}
-                className="w-full rounded-md border border-line bg-ground px-2.5 py-1.5 text-[13px]"
+                className="w-full rounded-lg border border-line bg-ground px-3 py-2 text-body"
               />
             </label>
           </div>
@@ -181,19 +181,19 @@ export function ProgressEditor({
                     value={it.prefix}
                     onChange={(e) => patchItem(i, { prefix: e.target.value })}
                     placeholder="FR"
-                    className="w-16 rounded-[4px] border border-line bg-ground px-2 py-1 text-center font-mono text-[12px] text-epic-ink"
+                    className="w-16 rounded-[4px] border border-line bg-ground px-2 py-1 text-center font-mono text-small text-epic-ink"
                   />
                   <input
                     value={it.feature}
                     onChange={(e) => patchItem(i, { feature: e.target.value })}
                     placeholder="[Mobile Lite] Tên feature…"
-                    className="flex-1 rounded-md border border-line bg-ground px-2.5 py-1 text-[13.5px] font-medium"
+                    className="flex-1 rounded-md border border-line bg-ground px-2.5 py-1 text-emph font-medium"
                   />
                   <button
                     type="button"
                     onClick={() => removeItem(i)}
                     aria-label="Xoá feature"
-                    className="grid size-6 place-items-center rounded-md text-[15px] leading-none text-ink-3 hover:bg-surface-2 hover:text-crit"
+                    className="grid size-6 place-items-center rounded-md text-lead leading-none text-ink-3 hover:bg-surface-2 hover:text-crit"
                   >
                     ×
                   </button>
@@ -209,20 +209,20 @@ export function ProgressEditor({
           <button
             type="button"
             onClick={addItem}
-            className="mt-3 rounded-md border border-line-strong bg-surface px-2.5 py-1 text-[12.5px] hover:bg-surface-2"
+            className="mt-3 rounded-lg border border-line-strong bg-surface px-3 py-1.5 font-medium text-body hover:bg-surface-2"
           >
             + Feature
           </button>
         </section>
 
         {/* ── preview ── */}
-        <section className="rounded-[9px] border border-line bg-surface p-[17px] lg:sticky lg:top-5">
+        <section className="card p-5 lg:sticky lg:top-5">
           <div className="mb-2.5 flex items-center justify-between gap-2">
-            <div className="font-mono text-[10.5px] uppercase tracking-[0.09em] text-ink-3">
+            <div className="eyebrow text-ink-2">
               Nội dung gửi group
             </div>
             <div className="flex items-center gap-2.5">
-              <label className="flex select-none items-center gap-1.5 text-[12px] text-ink-2">
+              <label className="flex select-none items-center gap-1.5 text-small text-ink-2">
                 <input
                   type="checkbox"
                   checked={markdown}
@@ -234,7 +234,7 @@ export function ProgressEditor({
               <button
                 type="button"
                 onClick={copy}
-                className="rounded-md bg-accent px-3 py-[5px] text-[12.5px] font-medium text-white hover:bg-accent-2"
+                className="rounded-lg bg-accent shadow-card px-3 py-1.5 text-body font-semibold text-on-accent hover:bg-accent-2"
               >
                 {copied ? 'Đã copy ✓' : 'Copy'}
               </button>
@@ -242,7 +242,7 @@ export function ProgressEditor({
           </div>
           <pre
             id="progress-preview"
-            className="overflow-x-auto whitespace-pre-wrap rounded-md border border-line bg-ground px-4 py-3.5 font-mono text-[12.5px] leading-[1.7]"
+            className="overflow-x-auto whitespace-pre-wrap rounded-md border border-line bg-ground px-4 py-3.5 font-mono text-body leading-[1.7]"
           >
             {preview}
           </pre>
@@ -264,7 +264,7 @@ function ProgressRow({
   const pct = progressPercent(value)
   return (
     <div className="grid grid-cols-[92px_1fr_78px] items-center gap-2.5 py-[3px]">
-      <span className="text-[12px] text-ink-2">{label}</span>
+      <span className="text-small text-ink-2">{label}</span>
       <div className="h-[7px] overflow-hidden rounded-full bg-surface-2">
         <i
           className="block h-full rounded-full bg-accent transition-[width] duration-200"
@@ -275,7 +275,7 @@ function ProgressRow({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder="Todo"
-        className="rounded-[6px] border border-line bg-ground px-2 py-1 text-right font-mono text-[12px]"
+        className="rounded-[6px] border border-line bg-ground px-2 py-1 text-right font-mono text-small"
       />
     </div>
   )

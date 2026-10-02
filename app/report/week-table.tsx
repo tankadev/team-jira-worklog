@@ -24,14 +24,14 @@ export function WeekTable({
 
   return (
     <>
-      <table className="w-full border-collapse text-[13px]">
+      <table className="w-full border-collapse text-body">
         <thead>
           <tr>
-            <th className="border-b border-line pb-[7px] text-left font-mono text-[10.5px] font-medium uppercase tracking-[0.07em] text-ink-3">
+            <th className="border-b border-line pb-[7px] text-left eyebrow text-ink-2">
               Ngày
             </th>
             <th className="w-[44%] border-b border-line pb-[7px]" />
-            <th className="border-b border-line pb-[7px] text-right font-mono text-[10.5px] font-medium uppercase tracking-[0.07em] text-ink-3">
+            <th className="border-b border-line pb-[7px] text-right eyebrow text-ink-2">
               Giờ
             </th>
           </tr>
@@ -61,7 +61,7 @@ export function WeekTable({
                   {label(d)}
                 </td>
                 <td className="border-b border-line py-[7px]">
-                  <div className="h-[5px] overflow-hidden rounded-[3px] bg-surface-2">
+                  <div className="h-[5px] overflow-hidden rounded-[5px] bg-surface-2">
                     <div className={'h-full ' + tone} style={{ width: `${pct}%` }} />
                   </div>
                 </td>

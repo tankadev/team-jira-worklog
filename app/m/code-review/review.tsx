@@ -68,9 +68,9 @@ export function CodeReview({
       <header className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <div>
           <div className={CTITLE}>Module · review PR & tài liệu bằng Claude Code</div>
-          <h1 className="text-xl font-semibold tracking-tight">Code review</h1>
+          <h1 className="text-title font-semibold tracking-tight">Code review</h1>
         </div>
-        <div className="flex overflow-hidden rounded-md border border-line-strong text-[12.5px]">
+        <div className="flex overflow-hidden rounded-md border border-line-strong text-body">
           <TabBtn on={tab === 'items'} onClick={() => setTab('items')}>
             Hồ sơ
           </TabBtn>
@@ -165,15 +165,15 @@ function Dashboard({
           {counts.running > 0 && ` · ${counts.running} đang chạy`}
           {counts.queued > 0 && ` · ${counts.queued} chờ`}
         </div>
-        {msg && <span className="text-[12px] text-ink-2">{msg}</span>}
-        <label className="ml-auto flex items-center gap-1.5 text-[12px] text-ink-2">
+        {msg && <span className="text-small text-ink-2">{msg}</span>}
+        <label className="ml-auto flex items-center gap-1.5 text-small text-ink-2">
           <input type="checkbox" checked={archived} onChange={(e) => setArchived(e.target.checked)} />
           Xem lưu trữ
         </label>
       </div>
 
       {items.length === 0 ? (
-        <p className="text-[12.5px] text-ink-2">
+        <p className="text-body text-ink-2">
           Chưa có gì.{' '}
           <button type="button" onClick={onNew} className="text-accent-ink underline underline-offset-2">
             Chọn PR để review
@@ -181,9 +181,9 @@ function Dashboard({
         </p>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full text-[12.5px]">
+          <table className="w-full text-body">
             <thead>
-              <tr className="border-b border-line text-left text-[11px] text-ink-3">
+              <tr className="border-b border-line text-left text-caption text-ink-3">
                 <th className="py-1.5 pr-2 font-medium">PR / Tài liệu</th>
                 <th className="px-2 font-medium">Repo</th>
                 <th className="px-2 font-medium">Vòng</th>
@@ -205,7 +205,7 @@ function Dashboard({
                         {i.kind === 'doc' ? '📄 ' : i.prNumber ? `#${i.prNumber} ` : '⎇ '}
                         {i.title}
                       </Link>
-                      <div className="mt-0.5 font-mono text-[11px] text-ink-3">
+                      <div className="mt-0.5 font-mono text-caption text-ink-3">
                         {i.kind === 'pr'
                           ? `${i.headRef} → ${i.baseRef}${i.author ? ` · ${i.author}` : ''}${i.latest?.docs.length ? ` · 📎 ${i.latest.docs.length} tài liệu` : ''}${i.links.length ? ` · 🔗 ${i.links.length} PR liên kết` : ''}`
                           : `${i.latest?.docs.length ?? 0} file${i.headRef ? ` · đối chiếu ${i.headRef}` : ''}`}
@@ -217,24 +217,24 @@ function Dashboard({
                       <div className="flex flex-wrap items-center gap-1.5">
                         {st && <RoundPill s={st} />}
                         {newSha && !isLive && (
-                          <span className="rounded bg-warn-soft px-1.5 py-[1px] text-[11px] font-medium text-warn" title={newSha}>
+                          <span className="rounded bg-warn-soft px-1.5 py-[1px] text-caption font-medium text-warn" title={newSha}>
                             🔔 Có commit mới
                           </span>
                         )}
                         {replies > 0 && (
                           <Link
                             href={`/m/code-review/${i.id}?tab=discussion`}
-                            className="rounded bg-blue-soft px-1.5 py-[1px] text-[11px] font-medium text-blue-ink"
+                            className="rounded bg-blue-soft px-1.5 py-[1px] text-caption font-medium text-blue-ink"
                           >
                             💬 {replies} phản hồi mới
                           </Link>
                         )}
-                        <span className="text-[11px] text-ink-3">
+                        <span className="text-caption text-ink-3">
                           <Ago epoch={i.latest?.endedAt ?? i.latest?.createdAt} />
                         </span>
                       </div>
                       {st === 'failed' && i.latest?.message && (
-                        <div className="mt-0.5 max-w-[360px] truncate text-[11px] text-crit" title={i.latest.message}>
+                        <div className="mt-0.5 max-w-[360px] truncate text-caption text-crit" title={i.latest.message}>
                           {i.latest.message}
                         </div>
                       )}
@@ -330,7 +330,7 @@ function NewPr({
 
   if (!repos.length) {
     return (
-      <div className={CARD + ' text-[12.5px] text-ink-2'}>
+      <div className={CARD + ' text-body text-ink-2'}>
         Chưa có repo nào.{' '}
         <button type="button" onClick={onConfig} className="text-accent-ink underline underline-offset-2">
           Thêm repo trong Cấu hình
@@ -376,20 +376,20 @@ function NewPr({
           </select>
           {repo?.githubRepo && (
             <>
-              <span className="font-mono text-[11.5px] text-ink-3">{repo.githubRepo}</span>
+              <span className="font-mono text-small text-ink-3">{repo.githubRepo}</span>
               <button type="button" className={BTN} onClick={() => void load()} disabled={loading}>
                 {loading ? 'Đang tải…' : 'Tải lại'}
               </button>
             </>
           )}
-          {msg && <span className="text-[12px] text-crit">{msg}</span>}
+          {msg && <span className="text-small text-crit">{msg}</span>}
         </div>
 
         {repo?.githubRepo ? (
           <>
             <div className={CTITLE + ' mb-1.5'}>PR đang mở · chọn nhiều cái để review song song</div>
             {pulls.length === 0 && !loading ? (
-              <p className="text-[12.5px] text-ink-2">Không có PR nào đang mở.</p>
+              <p className="text-body text-ink-2">Không có PR nào đang mở.</p>
             ) : (
               <ul className="divide-y divide-line rounded-md border border-line">
                 {pulls.map((p) => {
@@ -411,16 +411,16 @@ function NewPr({
                           onChange={() => toggle(p.number)}
                         />
                         <div className="min-w-0 flex-1">
-                          <div className="text-[13px]">
+                          <div className="text-body">
                             <span className="font-mono text-ink-3">#{p.number}</span> {p.title}
-                            {p.draft && <span className="ml-1.5 rounded bg-surface-2 px-1 text-[10.5px] text-ink-3">draft</span>}
+                            {p.draft && <span className="ml-1.5 rounded bg-surface-2 px-1 text-caption text-ink-3">draft</span>}
                           </div>
-                          <div className="font-mono text-[11px] text-ink-3">
+                          <div className="font-mono text-caption text-ink-3">
                             {p.headRef} → {p.baseRef} · {p.author}
                           </div>
                         </div>
-                        <span className={`shrink-0 text-[11.5px] ${state.c}`}>{state.t}</span>
-                        <a href={p.url} target="_blank" rel="noreferrer" className="shrink-0 text-[11.5px] text-ink-3 hover:text-accent-ink" onClick={(e) => e.stopPropagation()}>
+                        <span className={`shrink-0 text-small ${state.c}`}>{state.t}</span>
+                        <a href={p.url} target="_blank" rel="noreferrer" className="shrink-0 text-small text-ink-3 hover:text-accent-ink" onClick={(e) => e.stopPropagation()}>
                           ↗
                         </a>
                       </label>
@@ -440,10 +440,10 @@ function NewPr({
               'Mô tả chức năng, TDD… Claude sẽ kiểm tra PR có làm đúng và đủ theo tài liệu không. Áp dụng cho mọi PR đang chọn; các vòng Review tiếp tự dùng lại.',
             )}
             <details className="mt-2 rounded-md border border-line px-3 py-2" open={links.length > 0}>
-              <summary className="cursor-pointer text-[12.5px] text-ink-2">
+              <summary className="cursor-pointer text-body text-ink-2">
                 🔗 Liên kết PR ở repo khác{links.length ? ` · ${links.length}` : ' (không bắt buộc)'}
               </summary>
-              <p className="mb-2 mt-1 text-[11.5px] text-ink-3">
+              <p className="mb-2 mt-1 text-small text-ink-3">
                 Vd PR SDK mà PR iOS này dựa vào (hoặc ngược lại). Claude đọc thêm diff và code của PR kia để soi chỗ nối giữa hai bên. Áp dụng cho mọi PR đang chọn.
               </p>
               <LinkPicker repos={repos} value={links} onChange={setLinks} preferNot={repoId} />
@@ -452,11 +452,11 @@ function NewPr({
               <button type="button" className={BTN_PRI} disabled={busy || !canRun || picked.size === 0} onClick={submit}>
                 {busy && attach.count ? 'Đang tải tài liệu…' : `Review ${picked.size || ''} PR`}
               </button>
-              {!canRun && <span className="text-[12px] text-crit">Claude CLI chưa sẵn sàng.</span>}
+              {!canRun && <span className="text-small text-crit">Claude CLI chưa sẵn sàng.</span>}
             </div>
           </>
         ) : (
-          <p className="text-[12.5px] text-ink-2">Repo này chưa gắn GitHub — review theo nhánh ở dưới.</p>
+          <p className="text-body text-ink-2">Repo này chưa gắn GitHub — review theo nhánh ở dưới.</p>
         )}
       </div>
 
@@ -502,11 +502,11 @@ function BranchForm({ repo, repos, canRun, onDone }: { repo: RepoPreset; repos: 
         ))}
       </datalist>
       <div className="grid gap-2 sm:grid-cols-2">
-        <label className="text-[12px] text-ink-2">
+        <label className="text-small text-ink-2">
           Nhánh nguồn (head)
           <input list={`br-${repo.id}`} value={head} onChange={(e) => setHead(e.target.value)} className={INPUT} placeholder="feature/…" />
         </label>
-        <label className="text-[12px] text-ink-2">
+        <label className="text-small text-ink-2">
           Merge vào (base)
           <input list={`br-${repo.id}`} value={base} onChange={(e) => setBase(e.target.value)} className={INPUT} placeholder="develop" />
         </label>
@@ -515,7 +515,7 @@ function BranchForm({ repo, repos, canRun, onDone }: { repo: RepoPreset; repos: 
       <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} className={INPUT + ' mt-2'} placeholder="Ghi chú cho Claude (không bắt buộc)" />
       {attach.section('Mô tả chức năng, TDD… Claude sẽ kiểm tra code trên nhánh có làm đúng và đủ theo tài liệu không.')}
       <details className="mt-2 rounded-md border border-line px-3 py-2" open={links.length > 0}>
-        <summary className="cursor-pointer text-[12.5px] text-ink-2">
+        <summary className="cursor-pointer text-body text-ink-2">
           🔗 Liên kết PR ở repo khác{links.length ? ` · ${links.length}` : ' (không bắt buộc)'}
         </summary>
         <div className="mt-2">
@@ -542,7 +542,7 @@ function BranchForm({ repo, repos, canRun, onDone }: { repo: RepoPreset; repos: 
         >
           Review
         </button>
-        {msg && <span className="text-[12px] text-ink-2">{msg}</span>}
+        {msg && <span className="text-small text-ink-2">{msg}</span>}
       </div>
     </div>
   )
@@ -597,7 +597,7 @@ function DocPicker({
       {docs.length > 0 && (
         <ul className="mt-2 flex flex-col gap-1.5">
           {docs.map((d, i) => (
-            <li key={i} className="flex items-center gap-2 text-[12.5px]">
+            <li key={i} className="flex items-center gap-2 text-body">
               <select
                 value={d.role}
                 onChange={(e) =>
@@ -609,7 +609,7 @@ function DocPicker({
                     }),
                   )
                 }
-                className="rounded-md border border-line bg-ground px-1.5 py-0.5 text-[12px]"
+                className="rounded-md border border-line bg-ground px-1.5 py-0.5 text-small"
               >
                 {(Object.keys(DOC_ROLE_LABEL) as DocRole[]).map((r) => (
                   <option key={r} value={r}>
@@ -621,7 +621,7 @@ function DocPicker({
                 <select
                   value={d.templateId ?? ''}
                   onChange={(e) => setDocs((all) => all.map((x, j) => (j === i ? { ...x, templateId: e.target.value, touched: true } : x)))}
-                  className="max-w-[180px] rounded-md border border-line bg-ground px-1.5 py-0.5 text-[12px]"
+                  className="max-w-[180px] rounded-md border border-line bg-ground px-1.5 py-0.5 text-small"
                   title="Mẫu tài liệu file này phải theo"
                 >
                   <option value="">📐 Không mẫu</option>
@@ -633,7 +633,7 @@ function DocPicker({
                 </select>
               )}
               <span className="truncate">{d.file.name}</span>
-              <span className="text-[11px] text-ink-3">{(d.file.size / 1024 / 1024).toFixed(1)} MB</span>
+              <span className="text-caption text-ink-3">{(d.file.size / 1024 / 1024).toFixed(1)} MB</span>
               <button type="button" className="text-ink-3 hover:text-crit" onClick={() => setDocs((all) => all.filter((_, j) => j !== i))}>
                 ✕
               </button>
@@ -683,12 +683,12 @@ export function useAttachments() {
     msg,
     section: (hint: string) => (
       <details className="mt-3 rounded-md border border-line px-3 py-2" open={docs.length > 0}>
-        <summary className="cursor-pointer text-[12.5px] text-ink-2">
+        <summary className="cursor-pointer text-body text-ink-2">
           📎 Đính kèm tài liệu để đối chiếu với code{docs.length ? ` · ${docs.length} file` : ' (không bắt buộc)'}
         </summary>
-        <p className="mb-2 mt-1 text-[11.5px] text-ink-3">{hint}</p>
+        <p className="mb-2 mt-1 text-small text-ink-3">{hint}</p>
         <DocPicker docs={docs} setDocs={setDocs} />
-        {msg && <p className="mt-1 text-[12px] text-crit">{msg}</p>}
+        {msg && <p className="mt-1 text-small text-crit">{msg}</p>}
       </details>
     ),
   }
@@ -784,7 +784,7 @@ function NewDoc({ repos, templates, canRun }: { repos: RepoPreset[]; templates: 
       <div className="flex flex-col gap-2.5">
         <input value={title} onChange={(e) => setTitle(e.target.value)} className={INPUT} placeholder="Tên hồ sơ — vd: TDD Payment v2" />
         <div className="grid gap-2 sm:grid-cols-2">
-          <label className="text-[12px] text-ink-2">
+          <label className="text-small text-ink-2">
             Đối chiếu với code của repo
             <select
               value={repoId}
@@ -800,7 +800,7 @@ function NewDoc({ repos, templates, canRun }: { repos: RepoPreset[]; templates: 
             </select>
           </label>
           {repoId && (
-            <label className="text-[12px] text-ink-2">
+            <label className="text-small text-ink-2">
               Ở nhánh
               <input list="doc-branches" value={ref} onChange={(e) => setRef(e.target.value)} className={INPUT} placeholder="develop / feature/…" />
               <datalist id="doc-branches">
@@ -811,7 +811,7 @@ function NewDoc({ repos, templates, canRun }: { repos: RepoPreset[]; templates: 
             </label>
           )}
         </div>
-        <div className="text-[12px] text-ink-2">
+        <div className="text-small text-ink-2">
           Tài liệu — mỗi file chọn loại và <span className="font-medium">📐 mẫu</span> nó phải theo (vd Mô tả chức năng: không mẫu · TDD iOS: mẫu iOS · TDD SDK: mẫu SDK). Mẫu được đoán sẵn theo tên file.
           {templates.length === 0 && <span className="text-ink-3"> Chưa có mẫu nào — thêm ở tab Cấu hình → Mẫu tài liệu.</span>}
         </div>
@@ -826,8 +826,8 @@ function NewDoc({ repos, templates, canRun }: { repos: RepoPreset[]; templates: 
           >
             {up.busy ? 'Đang tải lên…' : 'Review tài liệu'}
           </button>
-          {up.msg && <span className="text-[12px] text-ink-2">{up.msg}</span>}
-          {!canRun && <span className="text-[12px] text-crit">Claude CLI chưa sẵn sàng.</span>}
+          {up.msg && <span className="text-small text-ink-2">{up.msg}</span>}
+          {!canRun && <span className="text-small text-crit">Claude CLI chưa sẵn sàng.</span>}
         </div>
       </div>
     </div>
@@ -850,7 +850,7 @@ function Config({ repos, runner, onClaude }: { repos: RepoPreset[]; runner: Runn
     <div className="flex flex-col gap-4">
       <div className={CARD}>
         <div className={CTITLE + ' mb-1'}>Repo review</div>
-        <p className="mb-3 text-[12px] text-ink-2">
+        <p className="mb-3 text-small text-ink-2">
           Mỗi repo trỏ tới một bản clone chỉ dùng để review. App sẽ <code>git fetch</code> vào đó và tạo worktree tạm cho từng vòng review — không checkout gì trong clone.
         </p>
         <div className="flex flex-col gap-3">
@@ -868,7 +868,7 @@ function Config({ repos, runner, onClaude }: { repos: RepoPreset[]; runner: Runn
                 className={INPUT + ' mt-2'}
                 placeholder={'Checklist riêng của repo này — vd:\n- UI chỉ cập nhật trên main thread\n- closure giữ self phải [weak self]\n- public API của SDK đổi thì phải ghi CHANGELOG'}
               />
-              <button type="button" className="mt-1.5 text-[12px] text-ink-3 hover:text-crit" onClick={() => setList((l) => l.filter((_, j) => j !== i))}>
+              <button type="button" className="mt-1.5 text-small text-ink-3 hover:text-crit" onClick={() => setList((l) => l.filter((_, j) => j !== i))}>
                 Xoá repo này
               </button>
             </div>
@@ -892,9 +892,9 @@ function Config({ repos, runner, onClaude }: { repos: RepoPreset[]; runner: Runn
           >
             Lưu repo
           </button>
-          {msg && <span className="text-[12px] text-ink-2">{msg}</span>}
+          {msg && <span className="text-small text-ink-2">{msg}</span>}
         </div>
-        <p className="mt-2 text-[11.5px] text-ink-3">
+        <p className="mt-2 text-small text-ink-3">
           GitHub token dùng chung với Settings → GitHub token (cần quyền đọc repo private).
         </p>
       </div>
@@ -902,20 +902,20 @@ function Config({ repos, runner, onClaude }: { repos: RepoPreset[]; runner: Runn
       <div className={CARD}>
         <div className={CTITLE + ' mb-2'}>Claude Code CLI</div>
         <div className="grid gap-2 sm:grid-cols-3">
-          <label className="text-[12px] text-ink-2">
+          <label className="text-small text-ink-2">
             Số review chạy song song
             <input type="number" min={1} max={6} value={r.concurrency} onChange={(e) => setR({ ...r, concurrency: Number(e.target.value) })} className={INPUT} />
           </label>
-          <label className="text-[12px] text-ink-2">
+          <label className="text-small text-ink-2">
             Model (trống = mặc định của CLI)
             <input value={r.model} onChange={(e) => setR({ ...r, model: e.target.value })} className={INPUT + ' font-mono'} placeholder="opus / sonnet / …" />
           </label>
-          <label className="text-[12px] text-ink-2">
+          <label className="text-small text-ink-2">
             Đường dẫn claude (trống = tự tìm)
             <input value={r.claudeBin} onChange={(e) => setR({ ...r, claudeBin: e.target.value })} className={INPUT + ' font-mono'} placeholder="~/.local/bin/claude" />
           </label>
         </div>
-        <label className="mt-2 block text-[12px] text-ink-2">
+        <label className="mt-2 block text-small text-ink-2">
           Quy tắc chung cho mọi review
           <textarea value={r.globalRules} onChange={(e) => setR({ ...r, globalRules: e.target.value })} rows={3} className={INPUT} placeholder="Áp cho mọi repo, trước quy tắc riêng của từng repo." />
         </label>
@@ -991,7 +991,7 @@ export function LinkPicker({
       {value.length > 0 && (
         <ul className="mb-2 flex flex-wrap gap-1.5">
           {value.map((l, i) => (
-            <li key={i} className="flex items-center gap-1.5 rounded-md border border-line bg-surface-2 px-2 py-0.5 text-[12px]">
+            <li key={i} className="flex items-center gap-1.5 rounded-md border border-line bg-surface-2 px-2 py-0.5 text-small">
               🔗 <span className="font-medium">{linkLabel(l, name(l.repoId))}</span>
               <span className="max-w-[260px] truncate text-ink-3">{l.title}</span>
               <button type="button" className="text-ink-3 hover:text-crit" onClick={() => onChange(value.filter((_, j) => j !== i))}>
@@ -1046,7 +1046,7 @@ export function LinkPicker({
             </button>
           </>
         )}
-        {msg && <span className="text-[12px] text-crit">{msg}</span>}
+        {msg && <span className="text-small text-crit">{msg}</span>}
       </div>
     </div>
   )
@@ -1093,14 +1093,14 @@ function TemplatesManager({ templates, repos }: { templates: DocTemplate[]; repo
   return (
     <div className={CARD}>
       <div className={CTITLE + ' mb-1'}>📐 Mẫu tài liệu</div>
-      <p className="mb-3 text-[12px] text-ink-2">
+      <p className="mb-3 text-small text-ink-2">
         Mẫu TDD iOS / TDD SDK… mà tài liệu phải theo. Khi review tài liệu và chọn mẫu, Claude đọc mẫu trước rồi kiểm tra tài liệu có đủ mục, đúng cấu trúc, mục nào để trống hay chung chung. Nhận PDF, Markdown (.md) hoặc .txt.
       </p>
       <div className="flex flex-col gap-3">
         {list.map((t, i) => (
           <div key={i} className="rounded-md border border-line p-3">
             <input value={t.name} onChange={(e) => patch(i, { name: e.target.value })} className={INPUT} placeholder="Tên mẫu — vd: TDD iOS" />
-            <div className="mt-2 flex flex-wrap items-center gap-2 text-[12px] text-ink-2">
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-small text-ink-2">
               <span>Mặc định cho repo:</span>
               {repos.map((r) => (
                 <label key={r.id} className="flex items-center gap-1">
@@ -1119,7 +1119,7 @@ function TemplatesManager({ templates, repos }: { templates: DocTemplate[]; repo
               {t.files.length > 0 && (
                 <ul className="mb-1.5 flex flex-col gap-1">
                   {t.files.map((f, k) => (
-                    <li key={k} className="flex items-center gap-2 text-[12.5px]">
+                    <li key={k} className="flex items-center gap-2 text-body">
                       📄 <span className="truncate">{f.name}</span>
                       <button
                         type="button"
@@ -1137,7 +1137,7 @@ function TemplatesManager({ templates, repos }: { templates: DocTemplate[]; repo
                 disabled={uploading !== null}
                 onFiles={(files) => void upload(i, files)}
               />
-              {uploading === i && <span className="ml-2 text-[12px] text-ink-3">Đang tải lên…</span>}
+              {uploading === i && <span className="ml-2 text-small text-ink-3">Đang tải lên…</span>}
             </div>
             <textarea
               value={t.note}
@@ -1146,7 +1146,7 @@ function TemplatesManager({ templates, repos }: { templates: DocTemplate[]; repo
               className={INPUT + ' mt-2'}
               placeholder={'Checklist bắt buộc (không bắt buộc nếu file mẫu đã đủ) — vd:\n- Phải có sequence diagram cho luồng chính\n- Bảng API: endpoint, request, response, mã lỗi\n- Mục Error handling & Test plan không được để trống'}
             />
-            <button type="button" className="mt-1.5 text-[12px] text-ink-3 hover:text-crit" onClick={() => setList((l) => l.filter((_, j) => j !== i))}>
+            <button type="button" className="mt-1.5 text-small text-ink-3 hover:text-crit" onClick={() => setList((l) => l.filter((_, j) => j !== i))}>
               Xoá mẫu này
             </button>
           </div>
@@ -1170,7 +1170,7 @@ function TemplatesManager({ templates, repos }: { templates: DocTemplate[]; repo
         >
           Lưu mẫu
         </button>
-        {msg && <span className="text-[12px] text-ink-2">{msg}</span>}
+        {msg && <span className="text-small text-ink-2">{msg}</span>}
       </div>
     </div>
   )

@@ -50,7 +50,7 @@ export function DayOffButton({
           tabIndex={0}
           title={kind ? DAY_OFF_LABEL[kind] : `Đánh dấu ngày nghỉ · ${label}`}
           className={
-            'grid size-[18px] shrink-0 place-items-center rounded text-[11px] leading-none transition-opacity ' +
+            'grid size-[18px] shrink-0 place-items-center rounded text-caption leading-none transition-opacity ' +
             (kind
               ? 'text-ot opacity-100'
               : open
@@ -71,7 +71,7 @@ export function DayOffButton({
               onClick={() => set(k, close)}
               aria-pressed={kind === k}
               className={
-                'block w-full rounded px-2 py-[5px] text-left text-[12px] ' +
+                'block w-full rounded px-2 py-[5px] text-left text-small ' +
                 (kind === k
                   ? 'bg-accent-soft font-medium text-accent-ink'
                   : 'hover:bg-surface-2')
@@ -84,7 +84,7 @@ export function DayOffButton({
             <button
               type="button"
               onClick={() => set(null, close)}
-              className="mt-0.5 block w-full rounded border-t border-line px-2 py-[5px] text-left text-[12px] text-ink-3 hover:text-crit"
+              className="mt-0.5 block w-full rounded border-t border-line px-2 py-[5px] text-left text-small text-ink-3 hover:text-crit"
             >
               Bỏ đánh dấu
             </button>

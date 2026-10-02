@@ -1,3 +1,4 @@
+import { splitDod } from '@/lib/jira/adf'
 import { getIssueDetail } from '@/lib/jira/issues'
 import { getProjectMeta } from '@/lib/jira/meta'
 import { getSprints } from '@/lib/jira/sprints'
@@ -96,6 +97,10 @@ export async function GET(request: Request) {
         sprintName: detail.sprintName,
         startDate: detail.startDate,
         dueDate: detail.dueDate,
+        storyPoints: detail.storyPoints,
+        // Plain text, split the way the composer's two fields are, so
+        // "Tạo nhanh từ task cha" can copy the parent into a subtask.
+        ...splitDod(detail.description),
       },
     })
   } catch (error) {

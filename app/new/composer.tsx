@@ -241,14 +241,14 @@ export function Composer({
     : (sprints.find((s) => s.id === sprintId)?.end ?? null)
 
   return (
-    <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+    <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
       {draftId && !created && (
-        <div className="flex flex-wrap items-center gap-2 rounded-md border border-accent/40 bg-accent-soft px-3.5 py-2 text-[12.5px] text-accent-ink lg:col-span-2">
+        <div className="flex flex-wrap items-center gap-2 rounded-md border border-accent/40 bg-accent-soft px-3.5 py-2 text-body text-accent-ink lg:col-span-2">
           <b className="font-mono font-semibold">Đang sửa draft</b>
           <span>— sửa xong bấm Lưu draft để cập nhật, hoặc Create on Jira để tạo thật.</span>
           <Link
             href="/new"
-            className="ml-auto rounded-md border border-accent/50 bg-surface px-[9px] py-0.5 text-[12px] hover:bg-surface-2"
+            className="ml-auto rounded-md border border-accent/50 bg-surface px-[9px] py-0.5 text-small hover:bg-surface-2"
           >
             <span className="inline-flex items-center gap-1.5">
               Bắt đầu task trống
@@ -258,14 +258,14 @@ export function Composer({
         </div>
       )}
 
-      <section className="rounded-[9px] border border-line bg-surface p-[17px]">
+      <section className="card p-5">
         <Field label="Bạn định làm gì?">
           <textarea
             rows={3}
             value={idea}
             onChange={(e) => setIdea(e.target.value)}
             placeholder="làm màn hình quên mật khẩu cho app mobile, gửi otp qua sms…"
-            className="w-full resize-y rounded-md border border-line bg-ground px-[10px] py-[7px] text-[13.5px] leading-[1.55]"
+            className="w-full resize-y rounded-lg border border-line bg-ground px-3 py-2 text-emph leading-[1.55]"
           />
         </Field>
 
@@ -274,7 +274,7 @@ export function Composer({
             type="button"
             onClick={generate}
             disabled={generating || !idea.trim()}
-            className="rounded-md bg-accent-soft px-[9px] py-1 text-[12.5px] font-medium text-accent-ink hover:brightness-95 disabled:opacity-60"
+            className="rounded-md bg-accent-soft px-[9px] py-1 text-body font-medium text-accent-ink hover:brightness-95 disabled:opacity-60"
           >
             {generating ? 'Đang sinh…' : '✦ Generate với Gemini'}
           </button>
@@ -295,15 +295,20 @@ export function Composer({
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="w-full rounded-md border border-line bg-ground px-[10px] py-[7px] text-[13.5px]"
+            className="w-full rounded-lg border border-line bg-ground px-3 py-2 text-emph"
           />
           {fullTitle && (
-            <div className="mt-1.5 rounded-md bg-surface-2 px-[10px] py-[7px] font-mono text-[12.5px] leading-[1.5] text-ink-2">
+            // Labelled as a preview so it no longer reads as a second, locked
+            // input sitting under the real one.
+            <div className="mt-2 flex items-baseline gap-2 rounded-lg border border-dashed border-line-strong px-3 py-2 text-body leading-[1.5] text-ink-2">
+              <span className="shrink-0 text-caption font-medium text-ink-3">Title trên Jira</span>
+              <span className="min-w-0 font-mono">
               {team.prefix && <span className="font-semibold text-blue">{team.prefix}</span>}
               {picked.length > 0 && (
                 <span className="font-semibold text-accent-ink">{picked.join('')}</span>
               )}{' '}
               {title.trim()}
+              </span>
             </div>
           )}
         </Field>
@@ -313,7 +318,7 @@ export function Composer({
             rows={6}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            className="w-full resize-y rounded-md border border-line bg-ground px-[10px] py-[7px] font-mono text-[12.5px] leading-[1.6]"
+            className="w-full resize-y rounded-lg border border-line bg-ground px-3 py-2 font-mono text-body leading-[1.6]"
           />
         </Field>
 
@@ -323,14 +328,14 @@ export function Composer({
             value={dod}
             onChange={(e) => setDod(e.target.value)}
             placeholder="- Gửi OTP thành công&#10;- OTP hết hạn sau 5 phút"
-            className="w-full resize-y rounded-md border border-line bg-ground px-[10px] py-[7px] font-mono text-[12.5px] leading-[1.6]"
+            className="w-full resize-y rounded-lg border border-line bg-ground px-3 py-2 font-mono text-body leading-[1.6]"
           />
         </Field>
       </section>
 
       <aside className="flex flex-col gap-3.5">
-        <section className="rounded-[9px] border border-line bg-surface p-[17px]">
-          <div className="mb-3 font-mono text-[10.5px] uppercase tracking-[0.09em] text-ink-3">
+        <section className="card p-5">
+          <div className="mb-3 eyebrow text-ink-2">
             Thuộc tính Jira
           </div>
 
@@ -346,7 +351,7 @@ export function Composer({
                     onClick={() => setTypeId(t.id)}
                     aria-pressed={typeId === t.id}
                     className={
-                      'rounded-md border px-[10px] py-[5px] text-[12.5px] ' +
+                      'rounded-md border px-[10px] py-[5px] text-body ' +
                       (typeId === t.id
                         ? 'border-accent bg-accent-soft font-semibold text-accent-ink'
                         : 'border-line bg-ground text-ink-2 hover:border-line-strong')
@@ -356,7 +361,7 @@ export function Composer({
                   </button>
                 ))}
             </div>
-            <p className="mt-1.5 text-[11.5px] leading-relaxed text-ink-3">
+            <p className="mt-1.5 text-small leading-relaxed text-ink-3">
               {isSubtask
                 ? 'Chỉ log giờ được vào Subtask. Epic lấy theo task cha.'
                 : 'Task bắt buộc thuộc một epic. Log giờ phải tạo Subtask bên dưới.'}
@@ -373,13 +378,13 @@ export function Composer({
                 currentSprintId={currentSprintId}
               />
               {parent && (
-                <div className="mt-1.5 flex flex-wrap items-center gap-1.5 rounded-md bg-surface-2 px-[9px] py-[6px] text-[12px] text-ink-3">
-                  <span className="text-[11px]">⛓</span> Jira tự lấy theo task cha
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5 rounded-md bg-surface-2 px-[9px] py-[6px] text-small text-ink-3">
+                  <span className="text-caption">⛓</span> Jira tự lấy theo task cha
                   {parent.epicName && (
-                    <b className="font-mono text-[12px] font-semibold text-ink">{parent.epicName}</b>
+                    <b className="font-mono text-small font-semibold text-ink">{parent.epicName}</b>
                   )}
                   {parent.sprintName && (
-                    <b className="font-mono text-[12px] font-semibold text-ink">
+                    <b className="font-mono text-small font-semibold text-ink">
                       {parent.sprintName}
                     </b>
                   )}
@@ -406,7 +411,7 @@ export function Composer({
                 epicMode
               />
               {epics.length === 0 && (
-                <p className="mt-1 text-[11.5px] text-ink-3">
+                <p className="mt-1 text-small text-ink-3">
                   Không tìm thấy epic nào đang mở trong project.
                 </p>
               )}
@@ -418,7 +423,7 @@ export function Composer({
               <select
                 value={sprintId ?? ''}
                 onChange={(e) => setSprintId(e.target.value ? Number(e.target.value) : null)}
-                className="w-full rounded-md border border-line bg-ground px-[10px] py-[7px] text-[13.5px]"
+                className="w-full rounded-lg border border-line bg-ground px-3 py-2 text-emph"
               >
                 <option value="">Không gán sprint</option>
                 {sprints.map((s) => (
@@ -452,14 +457,14 @@ export function Composer({
                   >
                     <b
                       className={
-                        'font-mono text-[15px] ' + (points === p ? 'text-accent-ink' : '')
+                        'font-mono text-lead ' + (points === p ? 'text-accent-ink' : '')
                       }
                     >
                       {p}
                     </b>
                     <span
                       className={
-                        'font-mono text-[10.5px] ' + (points === p ? 'text-accent-ink' : 'text-ink-3')
+                        'font-mono text-caption ' + (points === p ? 'text-accent-ink' : 'text-ink-3')
                       }
                     >
                       {budgets[p]}
@@ -468,25 +473,25 @@ export function Composer({
                 ))}
               </div>
               {pointsSuggested != null && pointsSuggested !== points ? (
-                <p className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11.5px] leading-relaxed text-ink-3">
+                <p className="mt-1.5 flex flex-wrap items-center gap-1.5 text-small leading-relaxed text-ink-3">
                   Gemini đề xuất <b className="font-mono font-semibold text-ink-2">{pointsSuggested}</b>
                   <button
                     type="button"
                     onClick={() => setPoints(pointsSuggested)}
-                    className="rounded border border-line px-1.5 py-px font-mono text-[11px] hover:border-accent hover:text-accent-ink"
+                    className="rounded border border-line px-1.5 py-px font-mono text-caption hover:border-accent hover:text-accent-ink"
                   >
                     dùng {pointsSuggested}
                   </button>
                   — đang giữ lựa chọn của bạn.
                 </p>
               ) : (
-                <p className="mt-1.5 text-[11.5px] leading-relaxed text-ink-3">
+                <p className="mt-1.5 text-small leading-relaxed text-ink-3">
                   Tối đa 3 point. Việc lớn hơn phải tách nhỏ thành nhiều task con.
                 </p>
               )}
             </Field>
           ) : (
-            <div className="mb-3 rounded-md bg-surface-2 px-[10px] py-[7px] text-[11.5px] leading-relaxed text-ink-3">
+            <div className="mb-3 rounded-md bg-surface-2 px-[10px] py-[7px] text-small leading-relaxed text-ink-3">
               <b className="font-medium text-ink-2">Chưa cần story point.</b> Point của task cha là
               tổng point các task con — tạo task con xong, board sẽ tính sẵn và cho điền một chạm.
             </div>
@@ -496,23 +501,23 @@ export function Composer({
           <Field label="Ngày" required hint="start date & due date">
             <div className="flex flex-col gap-1.5">
               <label className="flex items-center gap-2">
-                <span className="w-[36px] shrink-0 text-[12px] text-ink-3">Start</span>
+                <span className="w-[36px] shrink-0 text-small text-ink-3">Start</span>
                 <DateInput
                   value={startDate}
                   max={dueDate || undefined}
                   aria-label="Start date"
                   onChange={setStartDate}
-                  className="min-w-0 flex-1 rounded-md border border-line bg-ground px-[9px] py-[6px] font-mono text-[12.5px]"
+                  className="min-w-0 flex-1 rounded-lg border border-line bg-ground px-3 py-[7px] font-mono text-body"
                 />
               </label>
               <label className="flex items-center gap-2">
-                <span className="w-[36px] shrink-0 text-[12px] text-ink-3">Due</span>
+                <span className="w-[36px] shrink-0 text-small text-ink-3">Due</span>
                 <DateInput
                   value={dueDate}
                   min={startDate || undefined}
                   aria-label="Due date"
                   onChange={setDueDate}
-                  className="min-w-0 flex-1 rounded-md border border-line bg-ground px-[9px] py-[6px] font-mono text-[12.5px]"
+                  className="min-w-0 flex-1 rounded-lg border border-line bg-ground px-3 py-[7px] font-mono text-body"
                 />
               </label>
             </div>
@@ -523,7 +528,7 @@ export function Composer({
                   setStartDate(todayIn())
                   setDueDate(todayIn())
                 }}
-                className="rounded-full border border-line px-2 py-[2px] text-[11px] text-ink-2 hover:border-accent hover:text-accent-ink"
+                className="rounded-full border border-line px-2 py-[2px] text-caption text-ink-2 hover:border-accent hover:text-accent-ink"
               >
                 Hôm nay
               </button>
@@ -534,16 +539,16 @@ export function Composer({
                     setStartDate(todayIn())
                     setDueDate(targetSprintEnd)
                   }}
-                  className="rounded-full border border-line px-2 py-[2px] text-[11px] text-ink-2 hover:border-accent hover:text-accent-ink"
+                  className="rounded-full border border-line px-2 py-[2px] text-caption text-ink-2 hover:border-accent hover:text-accent-ink"
                 >
                   Hôm nay → hết sprint
                 </button>
               )}
             </div>
             {startDate && dueDate && dueDate < startDate ? (
-              <p className="mt-1.5 text-[11.5px] text-crit">Due date đang sớm hơn start date.</p>
+              <p className="mt-1.5 text-small text-crit">Due date đang sớm hơn start date.</p>
             ) : (
-              <p className="mt-1.5 text-[11.5px] leading-relaxed text-ink-3">
+              <p className="mt-1.5 text-small leading-relaxed text-ink-3">
                 Board mới yêu cầu mọi task đều có start date và due date.
               </p>
             )}
@@ -554,12 +559,12 @@ export function Composer({
 
           <div className="flex flex-wrap items-center justify-end gap-2">
             {note && (
-              <span className={'mr-auto text-[12px] ' + (note.ok ? 'text-good' : 'text-crit')}>
+              <span className={'mr-auto text-small ' + (note.ok ? 'text-good' : 'text-crit')}>
                 {note.message}
               </span>
             )}
             {!note && !datesOk && fullTitle && (
-              <span className="mr-auto text-[12px] text-warn">
+              <span className="mr-auto text-small text-warn">
                 Chọn start date và due date trước khi tạo
               </span>
             )}
@@ -567,7 +572,7 @@ export function Composer({
               type="button"
               onClick={saveDraft}
               disabled={saving}
-              className="rounded-md border border-line-strong bg-surface px-[9px] py-1 text-[12.5px] hover:bg-surface-2 disabled:opacity-60"
+              className="rounded-lg border border-line-strong bg-surface px-3 py-1.5 font-medium text-body hover:bg-surface-2 disabled:opacity-60"
             >
               {saving ? 'Đang lưu…' : 'Lưu draft'}
             </button>
@@ -580,7 +585,7 @@ export function Composer({
                   ? 'Tạo issue thật trên Jira'
                   : `Cần title và ${isSubtask ? 'task cha' : 'epic'}`
               }
-              className="rounded-md bg-accent px-3 py-1 text-[12.5px] font-medium text-white hover:bg-accent-2 disabled:opacity-60"
+              className="rounded-lg bg-accent shadow-card px-3 py-1.5 text-body font-semibold text-on-accent hover:bg-accent-2 disabled:opacity-60"
             >
               {creating ? 'Đang tạo…' : 'Create on Jira'}
             </button>
@@ -588,22 +593,22 @@ export function Composer({
         </section>
 
         {created && (
-          <section className="rounded-[9px] border border-good/40 bg-good-soft p-[17px]">
-            <div className="mb-1 font-mono text-[10.5px] uppercase tracking-[0.09em] text-good">
+          <section className="rounded-xl border border-good/40 bg-good-soft p-5">
+            <div className="mb-1 eyebrow text-good">
               Đã tạo trên Jira
             </div>
             <a
               href={created.url}
               target="_blank"
               rel="noreferrer"
-              className="font-mono text-[13px] font-semibold text-good underline underline-offset-2"
+              className="font-mono text-body font-semibold text-good underline underline-offset-2"
             >
               {created.key}
             </a>
             <div className="mt-2.5 flex gap-2">
               <Link
                 href="/"
-                className="rounded-md border border-line-strong bg-surface px-[9px] py-1 text-[12.5px] hover:bg-surface-2"
+                className="rounded-lg border border-line-strong bg-surface px-3 py-1.5 font-medium text-body hover:bg-surface-2"
               >
                 <span className="inline-flex items-center gap-1.5">
                   Về board để log giờ
@@ -614,11 +619,15 @@ export function Composer({
           </section>
         )}
 
-        <section className="rounded-[9px] border border-line bg-surface p-[17px]">
-          <div className="mb-2.5 font-mono text-[10.5px] uppercase tracking-[0.09em] text-ink-3">
+        {/* Collapsed: the raw field ids are for checking when something goes
+            wrong, not for reading on every task. */}
+        <details className="group card p-5">
+          <summary className="flex cursor-pointer list-none items-center gap-2 eyebrow text-ink-2 [&::-webkit-details-marker]:hidden">
+            <span className="inline-block text-[9px] text-ink-3 transition-transform group-open:rotate-90">▶</span>
             Sẽ gửi lên Jira
-          </div>
-          <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-2.5 gap-y-1 font-mono text-[11px]">
+            <span className="ml-auto text-caption font-normal text-ink-3">payload</span>
+          </summary>
+          <dl className="mt-3 grid grid-cols-[auto_minmax(0,1fr)] gap-x-2.5 gap-y-1 font-mono text-caption">
             <Row k="project" v={fieldIds.project} />
             <Row k="issuetype" v={`${typeId || '—'} ${type ? `(${type.name})` : ''}`} />
             {(isSubtask || parentKey) && <Row k="parent" v={parentKey ?? '—'} />}
@@ -630,12 +639,12 @@ export function Composer({
             )}
             <Row k="summary" v={fullTitle || '—'} />
           </dl>
-          <p className="mt-2 text-[11.5px] leading-relaxed text-ink-3">
+          <p className="mt-2 text-small leading-relaxed text-ink-3">
             {isSubtask
               ? 'Subtask không gửi epic — Jira lấy theo parent. Id field dò từ createmeta.'
               : 'Field parent ở đây mang nghĩa epic. Id field dò từ createmeta.'}
           </p>
-        </section>
+        </details>
 
         <TemplatePicker
           templates={templates}
@@ -680,7 +689,7 @@ function Field({
       <span className="flex items-center gap-2 text-xs font-medium text-ink-2">
         {label}
         {required && (
-          <span className="rounded-[3px] bg-crit-soft px-1.5 py-px font-mono text-[9.5px] font-semibold uppercase tracking-[0.05em] text-crit">
+          <span className="rounded-[5px] bg-crit-soft px-1.5 py-px chip-text text-crit">
             bắt buộc
           </span>
         )}

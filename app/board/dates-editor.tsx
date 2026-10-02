@@ -135,7 +135,7 @@ export function DatesEditor({
       <span
         title={readOnlyReason ?? (start || due ? `${start ?? '—'} → ${due ?? '—'}` : 'Chưa có ngày')}
         className={
-          'inline-flex h-6 items-center gap-1 rounded-[5px] border px-1.5 font-mono text-[10.5px] ' +
+          'inline-flex h-6 items-center gap-1 rounded-[5px] border px-1.5 font-mono text-caption ' +
           (tone ?? 'border-line bg-surface-2 text-ink-3')
         }
       >
@@ -165,7 +165,7 @@ export function DatesEditor({
                   : `${issueKey}: ${start} → ${due}`
           }
           className={
-            'inline-flex h-6 items-center gap-1 rounded-[5px] border px-1.5 font-mono text-[10.5px] disabled:opacity-60 ' +
+            'inline-flex h-6 items-center gap-1 rounded-[5px] border px-1.5 font-mono text-caption disabled:opacity-60 ' +
             (loggingPastDue
               // Amber, not red: nothing is broken and nothing is late — two
               // facts simply disagree, and which one is wrong is the user's to
@@ -236,20 +236,20 @@ export function DatesEditor({
             <button
               type="button"
               onClick={() => save({ startDate: null, dueDate: null }, close)}
-              className="rounded-md border border-line-strong bg-surface px-2 py-1 text-[11.5px] text-ink-2 hover:bg-surface-2"
+              className="rounded-md border border-line-strong bg-surface px-2 py-1 text-small text-ink-2 hover:bg-surface-2"
             >
               Xoá
             </button>
             <button
               type="button"
               onClick={() => save({ startDate: start, dueDate: due }, close)}
-              className="flex-1 rounded-md bg-accent py-1 text-[12px] font-medium text-white hover:bg-accent-2"
+              className="flex-1 rounded-lg bg-accent shadow-card py-1.5 text-small font-semibold text-on-accent hover:bg-accent-2"
             >
               Lưu
             </button>
           </div>
 
-          {note && <p className="mt-2 text-[11px] text-crit">{note}</p>}
+          {note && <p className="mt-2 text-caption text-crit">{note}</p>}
         </>
       )}
     </Popover>
@@ -271,14 +271,14 @@ function DateField({
 }) {
   return (
     <label className="flex items-center gap-2">
-      <span className="w-[34px] shrink-0 text-[11.5px] text-ink-3">{label}</span>
+      <span className="w-[34px] shrink-0 text-small text-ink-3">{label}</span>
       <DateInput
         value={value ?? ''}
         min={min}
         max={max}
         aria-label={label}
         onChange={(v) => onChange(v || null)}
-        className="min-w-0 flex-1 rounded-md border border-line bg-ground px-2 py-1 font-mono text-[12px]"
+        className="min-w-0 flex-1 rounded-md border border-line bg-ground px-2 py-1 font-mono text-small"
       />
     </label>
   )
@@ -304,7 +304,7 @@ function Preset({ label, onClick }: { label: string; onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="rounded-full border border-line px-2 py-[2px] text-[11px] text-ink-2 hover:border-accent hover:text-accent-ink"
+      className="rounded-full border border-line px-2 py-[2px] text-caption text-ink-2 hover:border-accent hover:text-accent-ink"
     >
       {label}
     </button>

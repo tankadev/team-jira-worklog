@@ -37,14 +37,14 @@ export function JiraDown({
 
   if (!blocked) {
     return (
-      <div className="rounded-[9px] border border-crit/40 bg-crit-soft p-[17px]">
-        <div className="mb-1 font-mono text-[10.5px] uppercase tracking-[0.09em] text-crit">
+      <div className="rounded-xl border border-crit/40 bg-crit-soft p-5">
+        <div className="mb-1 eyebrow text-crit">
           Không kết nối được Jira{status ? ` · HTTP ${status}` : ''}
         </div>
-        <p className="text-[13px] text-ink">{message}</p>
+        <p className="text-body text-ink">{message}</p>
         <Link
           href="/settings"
-          className="mt-3 inline-block rounded-md border border-line-strong bg-surface px-[9px] py-1 text-[12.5px] hover:bg-surface-2"
+          className="mt-3 inline-block rounded-lg border border-line-strong bg-surface px-3 py-1.5 font-medium text-body hover:bg-surface-2"
         >
           <span className="inline-flex items-center gap-1.5">
             Kiểm tra Settings
@@ -56,12 +56,12 @@ export function JiraDown({
   }
 
   return (
-    <div className="rounded-[9px] border border-warn/50 bg-warn-soft p-[17px]">
-      <div className="mb-1 font-mono text-[10.5px] uppercase tracking-[0.09em] text-warn">
+    <div className="rounded-xl border border-warn/50 bg-warn-soft p-5">
+      <div className="mb-1 eyebrow text-warn">
         {blocked === 'allowlist' ? 'Jira chặn IP này' : 'Không tới được Jira'}
       </div>
       <h1 className="text-lg font-semibold tracking-tight">Bật VPN lên rồi tải lại</h1>
-      <p className="mt-2 max-w-prose text-[13px] leading-relaxed text-ink-2">
+      <p className="mt-2 max-w-prose text-body leading-relaxed text-ink-2">
         {blocked === 'allowlist' ? (
           <>
             Jira nhận được request nhưng từ chối vì IP hiện tại không nằm trong allowlist —
@@ -83,7 +83,7 @@ export function JiraDown({
         <Link
           href={retryHref || '/'}
           prefetch={false}
-          className="rounded-md bg-accent px-3 py-1.5 text-[12.5px] font-medium text-white hover:bg-accent-2"
+          className="rounded-lg bg-accent shadow-card px-3 py-1.5 text-body font-semibold text-on-accent hover:bg-accent-2"
         >
           <span className="inline-flex items-center gap-1.5">
             Thử lại
@@ -92,7 +92,7 @@ export function JiraDown({
         </Link>
         <Link
           href="/settings"
-          className="rounded-md border border-line-strong bg-surface px-[9px] py-1 text-[12.5px] hover:bg-surface-2"
+          className="rounded-lg border border-line-strong bg-surface px-3 py-1.5 font-medium text-body hover:bg-surface-2"
         >
           <span className="inline-flex items-center gap-1.5">
             Settings
@@ -104,7 +104,7 @@ export function JiraDown({
       {/* Kept, and kept small. It is the line that matters when the guess above
           is wrong, and the only way to tell this apart from a token that
           expired on the same afternoon. */}
-      <p className="mt-3 border-t border-warn/25 pt-2 font-mono text-[11px] text-warn">
+      <p className="mt-3 border-t border-warn/25 pt-2 font-mono text-caption text-warn">
         {status ? `HTTP ${status} · ` : ''}
         {message}
       </p>

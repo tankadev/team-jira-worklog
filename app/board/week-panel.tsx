@@ -35,8 +35,8 @@ export function WeekPanel({
 
   return (
     <aside className="flex flex-col gap-3.5 lg:sticky lg:top-5">
-      <section className="rounded-[9px] border border-line bg-surface p-[17px]">
-        <div className="mb-2.5 font-mono text-[10.5px] uppercase tracking-[0.09em] text-ink-3">
+      <section className="card p-5">
+        <div className="mb-2.5 eyebrow text-ink-2">
           Tuần {dayLabel(days[0]).slice(3)} – {dayLabel(days[6]).slice(3)}
         </div>
 
@@ -58,7 +58,7 @@ export function WeekPanel({
               >
                 <span
                   className={
-                    'font-mono text-[11px] ' +
+                    'font-mono text-caption ' +
                     (d === today ? 'font-semibold text-accent-ink' : quota === 0 ? 'text-ink-3' : 'text-ink-2')
                   }
                 >
@@ -77,7 +77,7 @@ export function WeekPanel({
                 />
                 <span
                   className={
-                    'text-right font-mono text-[11.5px] tabular ' + (hours ? '' : 'text-ink-3')
+                    'text-right font-mono text-small tabular ' + (hours ? '' : 'text-ink-3')
                   }
                 >
                   {hours ? hours.toFixed(hours % 1 === 0 ? 0 : 1) : '—'}
@@ -94,8 +94,8 @@ export function WeekPanel({
       </section>
 
       {shortDays.length > 0 && (
-        <section className="rounded-[9px] border border-line bg-surface p-[17px]">
-          <div className="mb-2.5 font-mono text-[10.5px] uppercase tracking-[0.09em] text-ink-3">
+        <section className="card p-5">
+          <div className="mb-2.5 eyebrow text-ink-2">
             Ngày chưa đủ định mức
           </div>
           <div className="flex flex-col">
@@ -105,7 +105,7 @@ export function WeekPanel({
                 <div
                   key={d}
                   className={
-                    'flex justify-between gap-2.5 py-[5px] text-[12.5px] ' +
+                    'flex justify-between gap-2.5 py-[5px] text-body ' +
                     (i ? 'border-t border-line' : '')
                   }
                 >
@@ -117,7 +117,7 @@ export function WeekPanel({
               )
             })}
           </div>
-          <p className="mt-2.5 text-[11.5px] leading-relaxed text-ink-3">
+          <p className="mt-2.5 text-small leading-relaxed text-ink-3">
             {rules.weekendCounts
               ? 'Cuối tuần đang được tính định mức như ngày thường.'
               : 'T7 và CN không tính định mức — giờ log vào vẫn cộng tổng.'}

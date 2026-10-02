@@ -3,8 +3,10 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { createPortal } from 'react-dom'
 
+import { logWorkAction, undoWorklogAction } from '@/app/actions'
 import { createIssueAction, generateAction } from '@/app/new/actions'
 import { sprintPrefix, withoutSprintPrefix } from '@/lib/sprint-name'
+import { defaultSubtaskDates, subtaskFromParent, subtaskPointsFrom } from '@/lib/subtask-from-parent'
 import { todayIn } from '@/lib/time'
 
 import { DateInput } from '../date-input'
@@ -51,6 +53,10 @@ interface ComposeContext {
     sprintName: string | null
     startDate: string | null
     dueDate: string | null
+    storyPoints: number | null
+    /** The parent's description and DoD as plain text, for "Tạo nhanh từ task cha". */
+    description: string
+    dod: string
   }
 }
 
@@ -260,6 +266,7 @@ function CreateIssueModal({
 
   function create() {
     if (!ctx?.issueTypeId) return
+    setLogged(null)
     startCreating(async () => {
       const res = await createIssueAction({
         templateId,
@@ -309,6 +316,89 @@ function CreateIssueModal({
     })
   }
 
+  /** The day the board is logging into — where "Log ngay" lands. */
+  const logDate = (() => {
+    const fromUrl = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('date') : null
+    return fromUrl && /^\d{4}-\d{2}-\d{2}$/.test(fromUrl) ? fromUrl : new Date().toLocaleDateString('sv')
+  })()
+  const [logged, setLogged] = useState<{ ids: string[]; message: string } | null>(null)
+  const [logging, startLogging] = useTransition()
+
+  const [fromParentBusy, startFromParent] = useTransition()
+
+  /**
+   * "Tạo nhanh từ task cha": fills the form from the parent so there is
+   * nothing to type — only to read, adjust and create. Nothing is written to
+   * Jira here; the create stays the user's own click.
+   *
+   * The title is the parent's own (its tags taken apart into chips); Gemini
+   * drafts the description and DoD from the parent's title and description,
+   * the same way "✦ Generate" drafts from an idea. Without it
+   * (no key, quota, outage) the parent's text is copied as is, so the button
+   * never leaves the form empty.
+   */
+  function generateFromParent() {
+    if (!ctx || isTask) return
+    const parts = subtaskFromParent(ctx.parent.summary, {
+      prefixes: ctx.prefixes,
+      teamPrefix: ctx.team.prefix,
+      sprintPattern: ctx.sprintPrefixPattern,
+    })
+    setJustCreated(null)
+    setTemplateId(undefined)
+    setIdea(parts.title)
+    setPicked([...(currentPrefix ? [currentPrefix] : []), ...parts.picked])
+    const parentPoints = subtaskPointsFrom(ctx.parent.storyPoints, 0)
+    if (parentPoints) {
+      setPoints(parentPoints)
+      setPointsPicked(true)
+    }
+    const dates = defaultSubtaskDates(logDate, ctx.parent.dueDate, ctx.parentSprintEnd)
+    if (ctx.supports.startDate && !startDate) setStartDate(dates.startDate)
+    if (ctx.supports.dueDate && !dueDate) setDueDate(dates.dueDate)
+
+    startFromParent(async () => {
+      const source = [parts.title, ctx.parent.description, ctx.parent.dod].filter(Boolean).join('\n\n')
+      const res = await generateAction(source, ctx.parent.summary)
+      // The title stays the parent's own words, so the subtask is recognisably
+      // the same piece of work on the board and in Jira; Gemini drafts the rest.
+      setTitle(parts.title)
+      if (res.ok && res.data) {
+        setDescription(res.data.description)
+        setDod(res.data.dod)
+        if (res.data.storyPoints && !parentPoints && !pointsPicked) setPoints(res.data.storyPoints)
+        setNote({ ok: true, message: `Đã điền theo ${parentKey} — xem lại rồi bấm Tạo trên Jira` })
+      } else {
+        setDescription(ctx.parent.description)
+        setDod(ctx.parent.dod)
+        setNote({
+          ok: false,
+          message: `Gemini không sinh được (${res.message}) — đã chép nguyên văn từ ${parentKey}, sửa lại nếu cần`,
+        })
+      }
+    })
+  }
+
+  function logNow(key: string, hours: number) {
+    startLogging(async () => {
+      const res = await logWorkAction({ issueKey: key, hours, date: logDate })
+      if (res.ok) setLogged({ ids: res.worklogIds ?? [], message: res.message })
+      else setNote(res)
+      if (res.ok || res.partial) refresh()
+    })
+  }
+
+  function undoLog(key: string) {
+    if (!logged?.ids.length) return
+    const ids = logged.ids
+    startLogging(async () => {
+      const res = await undoWorklogAction({ issueKey: key, worklogIds: ids })
+      setLogged(null)
+      setNote(res)
+      if (res.ok || res.partial) refresh()
+    })
+  }
+
   // Requires a real title, not just a lingering prefix chip: after a create the
   // title clears but the sprint prefix stays, so keying `canCreate` off the
   // combined string would leave the button armed to fire a prefix-only issue on
@@ -332,36 +422,36 @@ function CreateIssueModal({
       // Deliberately no backdrop-click-to-close: a create form holds several
       // minutes of typing, and a stray click outside must not throw it away.
       // Close is the ×, the "Đóng" button, or Escape.
-      className="fixed inset-0 z-[90] flex items-start justify-center overflow-auto bg-black/45 p-4 sm:p-8"
+      className="fixed inset-0 z-[90] flex items-start justify-center overflow-auto bg-black/55 backdrop-blur-[3px] p-4 sm:p-8"
     >
       <div
         role="dialog"
         aria-modal="true"
         aria-label={`Tạo ${isTask ? 'task' : 'task con'} dưới ${parentKey}`}
-        className="w-full max-w-[980px] rounded-xl border border-line-strong bg-surface shadow-2xl"
+        className="w-full max-w-[980px] rounded-2xl border border-line-strong bg-surface shadow-pop"
       >
         <header className="flex flex-wrap items-center gap-2 border-b border-line px-4 py-3">
-          <span className="rounded-[3px] bg-surface-2 px-1.5 py-0.5 font-mono text-[9.5px] font-semibold uppercase tracking-[0.06em] text-ink-3">
+          <span className="rounded-[5px] bg-surface-2 px-1.5 py-0.5 chip-text text-ink-3">
             {isTask ? 'Task' : 'Task con'}
           </span>
-          <h3 className="text-[14px] font-semibold">
+          <h3 className="text-emph font-semibold">
             Tạo dưới <span className="font-mono text-accent-ink">{parentKey}</span>
           </h3>
           <button
             type="button"
             onClick={onClose}
             aria-label="Đóng"
-            className="ml-auto grid size-7 place-items-center rounded-md text-[18px] leading-none text-ink-3 hover:bg-surface-2 hover:text-ink"
+            className="ml-auto grid size-7 place-items-center rounded-md text-xl leading-none text-ink-3 hover:bg-surface-2 hover:text-ink"
           >
             ×
           </button>
         </header>
 
         <div className="max-h-[74vh] overflow-auto px-4 py-4">
-          {loadError && <p className="text-[13px] text-crit">{loadError}</p>}
+          {loadError && <p className="text-body text-crit">{loadError}</p>}
 
           {!ctx && !loadError && (
-            <p className="flex items-center gap-2 text-[12.5px] text-ink-3">
+            <p className="flex items-center gap-2 text-body text-ink-3">
               <Spinner /> Đang tải…
             </p>
           )}
@@ -372,10 +462,10 @@ function CreateIssueModal({
               aria-live="polite"
               className="mb-4 flex items-center gap-2.5 rounded-lg border border-good/50 bg-good-soft px-3 py-2.5"
             >
-              <span className="grid size-6 shrink-0 place-items-center rounded-full bg-good text-[13px] font-bold text-white">
+              <span className="grid size-6 shrink-0 place-items-center rounded-full bg-good text-body font-bold text-white">
                 ✓
               </span>
-              <div className="text-[12.5px] leading-snug text-ink">
+              <div className="text-body leading-snug text-ink">
                 Đã tạo{' '}
                 <a
                   href={justCreated.url}
@@ -392,14 +482,71 @@ function CreateIssueModal({
                 {justCreated.warning && (
                   <span className="mt-1 block text-warn">⚠ {justCreated.warning}</span>
                 )}
+                {!isTask && (
+                  <span className="mt-2 flex flex-wrap items-center gap-1.5">
+                    {logged ? (
+                      <>
+                        <span className="text-good">{logged.message}</span>
+                        {logged.ids.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => undoLog(justCreated.key)}
+                            disabled={logging}
+                            className="rounded-md border border-line-strong bg-surface px-2 py-0.5 text-caption font-semibold text-ink-2 hover:bg-surface-2"
+                          >
+                            ↶ Hoàn tác
+                          </button>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-small text-ink-2">Log ngay vào {logDate.slice(8)}/{logDate.slice(5, 7)}:</span>
+                        {[0.5, 1, 2, 4, 8].map((h) => (
+                          <button
+                            key={h}
+                            type="button"
+                            disabled={logging}
+                            onClick={() => logNow(justCreated.key, h)}
+                            className="h-7 rounded-md border border-good/50 bg-surface px-2 font-mono text-caption font-semibold text-good hover:bg-good hover:text-white disabled:opacity-50"
+                          >
+                            {h}h
+                          </button>
+                        ))}
+                        {logging && <Spinner className="size-3 text-ink-3" />}
+                      </>
+                    )}
+                  </span>
+                )}
               </div>
             </div>
           )}
+
 
           {ctx && (
             <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_268px]">
               {/* ── content ── */}
               <div className="flex flex-col gap-3">
+                {!isTask && (
+                  <div className="flex flex-wrap items-center gap-3 rounded-xl border border-accent/40 bg-accent-soft/50 px-3.5 py-2.5">
+                    <div className="min-w-0 flex-1">
+                      <div className="text-body font-semibold text-ink">Tạo nhanh từ task cha</div>
+                      <div className="text-caption text-ink-3">
+                        Dựa vào tiêu đề và mô tả của{' '}
+                        <b className="font-mono text-ink-2">{parentKey}</b> để điền sẵn các ô bên dưới — xem
+                        lại rồi bấm Tạo.
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={generateFromParent}
+                      disabled={fromParentBusy || generating}
+                      className="shrink-0 rounded-lg bg-accent px-3.5 py-1.5 text-small font-semibold text-on-accent shadow-card hover:bg-accent-2 disabled:opacity-60"
+                    >
+                      {fromParentBusy ? <Working>Đang điền…</Working> : '✦ Tạo nhanh từ task cha'}
+                    </button>
+                  </div>
+                )}
+
                 <Field label="Bạn định làm gì?">
                   <div className="flex items-start gap-2">
                     <textarea
@@ -412,13 +559,13 @@ function CreateIssueModal({
                         setIdea(e.target.value)
                       }}
                       placeholder="viết unit test cho luồng exclude types…"
-                      className="w-full resize-y rounded-md border border-line bg-ground px-2.5 py-1.5 text-[13px] leading-relaxed"
+                      className="w-full resize-y rounded-lg border border-line bg-ground px-3 py-2 text-body leading-relaxed"
                     />
                     <button
                       type="button"
                       onClick={generate}
                       disabled={generating || !idea.trim()}
-                      className="shrink-0 rounded-md bg-accent-soft px-2.5 py-1.5 text-[12.5px] font-medium text-accent-ink hover:brightness-95 disabled:opacity-50"
+                      className="shrink-0 rounded-md bg-accent-soft px-2.5 py-1.5 text-body font-medium text-accent-ink hover:brightness-95 disabled:opacity-50"
                     >
                       {generating ? <Working>Đang sinh…</Working> : '✦ Generate'}
                     </button>
@@ -432,10 +579,10 @@ function CreateIssueModal({
                       setJustCreated(null)
                       setTitle(e.target.value)
                     }}
-                    className="w-full rounded-md border border-line bg-ground px-2.5 py-1.5 text-[13.5px]"
+                    className="w-full rounded-lg border border-line bg-ground px-3 py-2 text-emph"
                   />
                   {fullTitle && (
-                    <div className="mt-1.5 rounded-md bg-surface-2 px-2.5 py-1.5 font-mono text-[12px] leading-relaxed text-ink-2">
+                    <div className="mt-1.5 rounded-md bg-surface-2 px-2.5 py-1.5 font-mono text-small leading-relaxed text-ink-2">
                       {teamPrefix && <span className="font-semibold text-blue">{teamPrefix}</span>}
                       {picked.length > 0 && (
                         <span className="font-semibold text-accent-ink">{picked.join('')}</span>
@@ -451,7 +598,7 @@ function CreateIssueModal({
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     placeholder="- Gemini sẽ điền, sửa lại thoải mái"
-                    className="w-full resize-y rounded-md border border-line bg-ground px-2.5 py-1.5 font-mono text-[12px] leading-relaxed"
+                    className="w-full resize-y rounded-lg border border-line bg-ground px-3 py-2 font-mono text-small leading-relaxed"
                   />
                 </Field>
 
@@ -461,19 +608,19 @@ function CreateIssueModal({
                     value={dod}
                     onChange={(e) => setDod(e.target.value)}
                     placeholder="- Test chạy xanh trên CI"
-                    className="w-full resize-y rounded-md border border-line bg-ground px-2.5 py-1.5 font-mono text-[12px] leading-relaxed"
+                    className="w-full resize-y rounded-lg border border-line bg-ground px-3 py-2 font-mono text-small leading-relaxed"
                   />
                 </Field>
               </div>
 
               {/* ── settings ── */}
               <aside className="flex flex-col gap-3">
-                <div className="flex flex-col gap-1 rounded-md bg-surface-2 px-2.5 py-2 text-[11.5px] text-ink-3">
+                <div className="flex flex-col gap-1 rounded-md bg-surface-2 px-2.5 py-2 text-small text-ink-3">
                   <span className="flex items-center gap-1.5">
-                    <span className="text-[11px]">⛓</span>
+                    <span className="text-caption">⛓</span>
                     {isTask ? 'Thuộc epic' : 'Theo task cha'}
                   </span>
-                  <b className="font-mono text-[11.5px] font-semibold text-ink">
+                  <b className="font-mono text-small font-semibold text-ink">
                     {ctx.parent.key} · {ctx.parent.summary.slice(0, 40)}
                   </b>
                   {!isTask && ctx.parent.epicSummary && (
@@ -493,7 +640,7 @@ function CreateIssueModal({
                           type="button"
                           onClick={() => applyTemplate(t)}
                           className={
-                            'rounded-full border px-[10px] py-[3px] text-[11.5px] ' +
+                            'rounded-full border px-[10px] py-[3px] text-small ' +
                             (t.id === templateId
                               ? 'border-accent bg-accent-soft font-semibold text-accent-ink'
                               : 'border-line text-ink-2 hover:border-accent hover:text-accent-ink')
@@ -513,9 +660,9 @@ function CreateIssueModal({
                     {teamPrefix && (
                       <span
                         title="Bắt buộc cho task của team — luôn đứng đầu title"
-                        className="inline-flex items-center gap-1 rounded-full border border-blue bg-blue-soft px-[10px] py-[3px] font-mono text-[11.5px] font-semibold text-blue"
+                        className="inline-flex items-center gap-1 rounded-full border border-blue bg-blue-soft px-[10px] py-[3px] font-mono text-small font-semibold text-blue"
                       >
-                        <span className="text-[9px]">🔒</span>
+                        <span className="text-micro">🔒</span>
                         {teamPrefix}
                       </span>
                     )}
@@ -532,14 +679,14 @@ function CreateIssueModal({
                             )
                           }
                           className={
-                            'inline-flex items-center gap-1.5 rounded-full border px-[10px] py-[3px] font-mono text-[11.5px] ' +
+                            'inline-flex items-center gap-1.5 rounded-full border px-[10px] py-[3px] font-mono text-small ' +
                             (on
                               ? 'border-accent bg-accent-soft font-semibold text-accent-ink'
                               : 'border-line bg-surface text-ink-2 hover:border-accent hover:text-accent-ink')
                           }
                         >
                           {on && (
-                            <span className="-ml-0.5 grid size-3.5 place-items-center rounded-full bg-accent text-[9px] font-bold text-white">
+                            <span className="-ml-0.5 grid size-3.5 place-items-center rounded-full bg-accent text-micro font-bold text-on-accent">
                               {index + 1}
                             </span>
                           )}
@@ -549,7 +696,7 @@ function CreateIssueModal({
                     })}
                   </div>
                   {ctx.team.label && (
-                    <p className="text-[11px] leading-relaxed text-ink-3">
+                    <p className="text-caption leading-relaxed text-ink-3">
                       Tự gắn label{' '}
                       <b className="font-mono text-ink-2">{ctx.team.label}</b> — thiếu label này
                       task sẽ không hiện trên board của team.
@@ -561,23 +708,23 @@ function CreateIssueModal({
                 <Field label="Ngày" hint="bắt buộc">
                   <div className="flex flex-col gap-1.5">
                     <label className="flex items-center gap-2">
-                      <span className="w-[34px] shrink-0 text-[11.5px] text-ink-3">Start</span>
+                      <span className="w-[34px] shrink-0 text-small text-ink-3">Start</span>
                       <DateInput
                         value={startDate}
                         max={dueDate || undefined}
                         aria-label="Start date"
                         onChange={setStartDate}
-                        className="min-w-0 flex-1 rounded-md border border-line bg-ground px-2 py-1 font-mono text-[12px]"
+                        className="min-w-0 flex-1 rounded-md border border-line bg-ground px-2 py-1 font-mono text-small"
                       />
                     </label>
                     <label className="flex items-center gap-2">
-                      <span className="w-[34px] shrink-0 text-[11.5px] text-ink-3">Due</span>
+                      <span className="w-[34px] shrink-0 text-small text-ink-3">Due</span>
                       <DateInput
                         value={dueDate}
                         min={startDate || undefined}
                         aria-label="Due date"
                         onChange={setDueDate}
-                        className="min-w-0 flex-1 rounded-md border border-line bg-ground px-2 py-1 font-mono text-[12px]"
+                        className="min-w-0 flex-1 rounded-md border border-line bg-ground px-2 py-1 font-mono text-small"
                       />
                     </label>
                   </div>
@@ -600,7 +747,7 @@ function CreateIssueModal({
                     )}
                   </div>
                   {startDate && dueDate && dueDate < startDate && (
-                    <p className="text-[11px] text-crit">Due date đang sớm hơn start date.</p>
+                    <p className="text-caption text-crit">Due date đang sớm hơn start date.</p>
                   )}
                 </Field>
                 )}
@@ -610,7 +757,7 @@ function CreateIssueModal({
                     <select
                       value={sprintId ?? ''}
                       onChange={(e) => setSprintId(e.target.value ? Number(e.target.value) : null)}
-                      className="w-full rounded-md border border-line bg-ground px-2.5 py-1.5 text-[13px]"
+                      className="w-full rounded-lg border border-line bg-ground px-3 py-2 text-body"
                     >
                       <option value="">Không gán sprint</option>
                       {ctx.sprints.map((s) => (
@@ -620,7 +767,7 @@ function CreateIssueModal({
                         </option>
                       ))}
                     </select>
-                    <p className="text-[11px] leading-relaxed text-ink-3">
+                    <p className="text-caption leading-relaxed text-ink-3">
                       Chưa cần story point — point task cha là tổng point task con.
                     </p>
                   </Field>
@@ -640,7 +787,7 @@ function CreateIssueModal({
                           aria-pressed={points === p}
                           title={`${p} point ≈ ${ctx.budgets[p]}`}
                           className={
-                            'flex-1 border-l border-line py-[5px] font-mono text-[12.5px] first:border-l-0 ' +
+                            'flex-1 border-l border-line py-[5px] font-mono text-body first:border-l-0 ' +
                             (points === p
                               ? 'bg-accent-soft font-semibold text-accent-ink'
                               : 'bg-surface text-ink-2 hover:bg-surface-2')
@@ -650,7 +797,7 @@ function CreateIssueModal({
                         </button>
                       ))}
                     </div>
-                    <p className="text-[11px] text-ink-3">
+                    <p className="text-caption text-ink-3">
                       {points ? `${points} point ≈ ${ctx.budgets[points]}` : 'Tối đa 3 point.'}
                     </p>
                   </Field>
@@ -658,7 +805,7 @@ function CreateIssueModal({
 
                 {created.length > 0 && (
                   <div className="rounded-md border border-good/40 bg-good-soft px-2.5 py-2">
-                    <div className="mb-1 font-mono text-[10px] uppercase tracking-[0.07em] text-good">
+                    <div className="mb-1 eyebrow text-good">
                       Đã tạo {created.length}
                     </div>
                     <div className="flex flex-wrap gap-x-2.5 gap-y-1">
@@ -668,7 +815,7 @@ function CreateIssueModal({
                           href={c.url}
                           target="_blank"
                           rel="noreferrer"
-                          className="font-mono text-[11.5px] font-semibold text-good underline-offset-2 hover:underline"
+                          className="font-mono text-small font-semibold text-good underline-offset-2 hover:underline"
                         >
                           {c.key}
                         </a>
@@ -683,26 +830,26 @@ function CreateIssueModal({
 
         <footer className="flex flex-wrap items-center gap-2 rounded-b-xl border-t border-line bg-surface-2 px-4 py-2.5">
           {note && (
-            <span className={'text-[12px] ' + (note.ok ? 'text-good' : 'text-crit')}>
+            <span className={'text-small ' + (note.ok ? 'text-good' : 'text-crit')}>
               {note.message}
             </span>
           )}
           {!note && ctx && !datesOk && title.trim() && (
-            <span className="text-[12px] text-warn">Chọn start date và due date trước khi tạo</span>
+            <span className="text-small text-warn">Chọn start date và due date trước khi tạo</span>
           )}
           <span className="ml-auto flex items-center gap-2">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-md border border-line-strong bg-surface px-2.5 py-1 text-[12.5px] hover:bg-surface-2"
+              className="rounded-lg border border-line-strong bg-surface px-3 py-1.5 font-medium text-body hover:bg-surface-2"
             >
               Đóng
             </button>
             <button
               type="button"
-              onClick={create}
+              onClick={() => create()}
               disabled={!canCreate}
-              className="rounded-md bg-accent px-3 py-1 text-[12.5px] font-medium text-white hover:bg-accent-2 disabled:opacity-50"
+              className="rounded-lg bg-accent shadow-card px-3 py-1.5 text-body font-semibold text-on-accent hover:bg-accent-2 disabled:opacity-50"
             >
               {creating ? <Working>Đang tạo…</Working> : 'Tạo trên Jira'}
             </button>
@@ -719,7 +866,7 @@ function DatePreset({ label, onClick }: { label: string; onClick: () => void }) 
     <button
       type="button"
       onClick={onClick}
-      className="rounded-full border border-line px-2 py-[2px] text-[11px] text-ink-2 hover:border-accent hover:text-accent-ink"
+      className="rounded-full border border-line px-2 py-[2px] text-caption text-ink-2 hover:border-accent hover:text-accent-ink"
     >
       {label}
     </button>

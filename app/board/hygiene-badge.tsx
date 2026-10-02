@@ -24,7 +24,7 @@ export function HygieneBadge({ hygiene }: { hygiene: IssueHygiene }) {
     <span
       title={hygiene.problems.join(' · ')}
       className={
-        'inline-flex h-[18px] items-center gap-1 rounded-[3px] border px-1.5 font-mono text-[9.5px] font-semibold uppercase tracking-[0.06em] ' +
+        'inline-flex h-[18px] items-center gap-1 rounded-[5px] border px-1.5 chip-text ' +
         (structural ? 'border-crit bg-crit-soft text-crit' : 'border-warn bg-warn-soft text-warn')
       }
     >

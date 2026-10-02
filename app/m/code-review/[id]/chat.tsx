@@ -80,34 +80,34 @@ export const ChatPanel = forwardRef<
       <div className={CARD} id="chat">
         <div className="mb-2 flex flex-wrap items-center gap-2">
           <div className={CTITLE}>💬 Trao đổi với Claude về vòng review này</div>
-          <span className="text-[11.5px] text-ink-3">
+          <span className="text-small text-ink-3">
             Claude nối lại đúng phiên đã review — hỏi lại, phản biện, nhờ sửa comment. Thay đổi chỉ áp dụng khi bạn bấm.
           </span>
         </div>
 
         <div ref={box} className="flex max-h-[520px] flex-col gap-2 overflow-y-auto">
           {messages.length === 0 && (
-            <p className="text-[12.5px] text-ink-3">
+            <p className="text-body text-ink-3">
               Ví dụ: “Finding #3 có chắc không? Chỗ đó đã check nil ở caller rồi.” · “Viết lại comment chung ngắn hơn.” ·
               “Bỏ các nit, gộp 2 finding về threading.” · “Xem kỹ thêm file X.”
             </p>
           )}
           {messages.map((m) =>
             m.role === 'user' ? (
-              <div key={m.id} className="ml-auto max-w-[85%] whitespace-pre-wrap rounded-lg bg-accent-soft px-3 py-2 text-[13px] text-ink">
+              <div key={m.id} className="ml-auto max-w-[85%] whitespace-pre-wrap rounded-lg bg-accent-soft px-3 py-2 text-body text-ink">
                 {m.body}
               </div>
             ) : (
-              <div key={m.id} className="max-w-[92%] rounded-lg bg-surface-2 px-3 py-2 text-[13px]">
+              <div key={m.id} className="max-w-[92%] rounded-lg bg-surface-2 px-3 py-2 text-body">
                 {m.state === 'running' ? (
                   <div className="text-ink-2">
                     <span className="animate-pulse">Claude đang xem lại…</span>
                     {m.activity.map((a, i) => (
-                      <div key={i} className="truncate font-mono text-[11px] text-ink-3">
+                      <div key={i} className="truncate font-mono text-caption text-ink-3">
                         {a.text}
                       </div>
                     ))}
-                    <button type="button" className="mt-1 text-[11.5px] text-ink-3 hover:text-crit" onClick={() => void cancelChatAction(m.id).then(load)}>
+                    <button type="button" className="mt-1 text-small text-ink-3 hover:text-crit" onClick={() => void cancelChatAction(m.id).then(load)}>
                       Huỷ
                     </button>
                   </div>
@@ -165,7 +165,7 @@ export const ChatPanel = forwardRef<
               🗣 Cập nhật xưng hô “{addressOf(addressee)}” vào bản review
             </button>
           )}
-          {msg && <span className="text-[12px] text-ink-2">{msg}</span>}
+          {msg && <span className="text-small text-ink-2">{msg}</span>}
         </div>
       </div>
     )
@@ -189,7 +189,7 @@ function Proposal({
   const adds = changes.add ?? []
   return (
     <div className="mt-2 rounded-md border border-line bg-surface px-2.5 py-2">
-      <div className="flex flex-wrap items-center gap-2 text-[12px]">
+      <div className="flex flex-wrap items-center gap-2 text-small">
         <span className="font-semibold">Đề xuất sửa bản review</span>
         <span className="text-ink-3">
           {[
@@ -214,7 +214,7 @@ function Proposal({
         </span>
       </div>
       {open && (
-        <div className="mt-2 flex flex-col gap-2 text-[12.5px]">
+        <div className="mt-2 flex flex-col gap-2 text-body">
           {updates.map((u, i) => {
             const f = byId.get(u.id)
             return (
@@ -237,7 +237,7 @@ function Proposal({
             <div key={`a${i}`} className="border-l-2 border-accent pl-2">
               <div className="font-medium">
                 ➕ [{a.severity}] {a.title}{' '}
-                <span className="font-mono text-[11px] text-ink-3">
+                <span className="font-mono text-caption text-ink-3">
                   {a.location || (a.file ? `${a.file}${a.line ? `:${a.line}` : ''}` : '')}
                 </span>
               </div>

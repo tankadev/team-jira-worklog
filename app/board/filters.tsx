@@ -156,7 +156,7 @@ export function BoardFilters({
   const past = sprints.filter((s) => !s.current)
 
   const control =
-    'rounded-md border border-line bg-surface px-[9px] py-[5px] text-[12.5px] text-ink disabled:opacity-60'
+    'h-9 rounded-lg border border-line bg-surface px-3 shadow-card hover:border-line-strong text-body text-ink disabled:opacity-60'
 
   return (
     <div className="mb-2.5 flex flex-wrap items-center gap-1.5">
@@ -269,7 +269,7 @@ export function BoardFilters({
             go(q)
           }}
           disabled={pending}
-          className="rounded-md border border-line px-[9px] py-[5px] text-[12.5px] text-ink-3 hover:border-line-strong hover:text-ink disabled:opacity-60"
+          className="rounded-md border border-line px-[9px] py-[5px] text-body text-ink-3 hover:border-line-strong hover:text-ink disabled:opacity-60"
         >
           Bỏ lọc
         </button>

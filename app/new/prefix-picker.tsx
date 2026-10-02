@@ -72,9 +72,9 @@ export function PrefixPicker({
         {teamPrefix && (
           <span
             title="Bắt buộc cho task của team — luôn đứng đầu title"
-            className="inline-flex items-center gap-1 rounded-full border border-blue bg-blue-soft px-[11px] py-[3px] font-mono text-[11.5px] font-semibold text-blue"
+            className="inline-flex items-center gap-1 rounded-full border border-blue bg-blue-soft px-[11px] py-[3px] font-mono text-small font-semibold text-blue"
           >
-            <span className="text-[9px]">🔒</span>
+            <span className="text-micro">🔒</span>
             {teamPrefix}
           </span>
         )}
@@ -88,14 +88,14 @@ export function PrefixPicker({
               onClick={() => toggle(label)}
               aria-pressed={on}
               className={
-                'inline-flex items-center gap-1.5 rounded-full border px-[11px] py-[3px] font-mono text-[11.5px] ' +
+                'inline-flex items-center gap-1.5 rounded-full border px-[11px] py-[3px] font-mono text-small ' +
                 (on
                   ? 'border-accent bg-accent-soft font-semibold text-accent-ink'
                   : 'border-line bg-surface text-ink-2 hover:border-accent hover:text-accent-ink')
               }
             >
               {on && (
-                <span className="-ml-0.5 grid size-3.5 place-items-center rounded-full bg-accent text-[9px] font-bold text-white">
+                <span className="-ml-0.5 grid size-3.5 place-items-center rounded-full bg-accent text-micro font-bold text-on-accent">
                   {index + 1}
                 </span>
               )}
@@ -108,13 +108,13 @@ export function PrefixPicker({
           type="button"
           onClick={add}
           disabled={saving}
-          className="rounded-full border border-dashed border-line px-[11px] py-[3px] font-mono text-[11.5px] text-ink-3 hover:border-solid hover:text-ink disabled:opacity-60"
+          className="rounded-full border border-dashed border-line px-[11px] py-[3px] font-mono text-small text-ink-3 hover:border-solid hover:text-ink disabled:opacity-60"
         >
           {saving ? <Working>Đang lưu…</Working> : '+ tiền tố khác'}
         </button>
       </div>
 
-      <p className="text-[11.5px] leading-relaxed text-ink-3">
+      <p className="text-small leading-relaxed text-ink-3">
         {teamPrefix ? (
           <>
             <code className="font-mono text-blue">{teamPrefix}</code> là bắt buộc, không bỏ được

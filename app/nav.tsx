@@ -6,20 +6,31 @@ import { useEffect, useTransition } from 'react'
 
 import { refreshDataAction } from './refresh-actions'
 
+import { Icon, LogoMark, type IconName } from './icons'
+
 // Core stays fixed; Settings sits at the end. Enabled modules slot in between,
 // under their own heading, via the `modules` prop the server layout supplies.
-const CORE = [
-  { href: '/', label: 'Task board' },
-  { href: '/find', label: 'Tìm & nhận task' },
-  { href: '/new', label: 'Task mới' },
-  { href: '/report', label: 'Daily report' },
+const CORE: Array<{ href: string; label: string; icon: IconName }> = [
+  { href: '/', label: 'Task board', icon: 'kanban' },
+  { href: '/find', label: 'Tìm & nhận task', icon: 'search-check' },
+  { href: '/new', label: 'Task mới', icon: 'square-pen' },
+  { href: '/report', label: 'Daily report', icon: 'clipboard-list' },
 ]
 
+const MODULE_ICONS: Record<string, IconName> = {
+  '/m/progress': 'chart-line',
+  '/m/ios-publish': 'phone-upload',
+  '/m/sdk-release': 'package',
+  '/m/releases': 'rocket',
+  '/m/code-review': 'pull-request',
+}
+
 export function Nav({
-  label,
+  context,
   modules = [],
 }: {
-  label?: string
+  /** What the app is pointed at — shown so an empty list reads as "empty for VT". */
+  context?: { project: string; board?: string; team?: string | null }
   modules?: Array<{ href: string; label: string }>
 }) {
   const pathname = usePathname()
@@ -28,43 +39,100 @@ export function Nav({
     href === '/' ? pathname === '/' : pathname.startsWith(href)
 
   return (
-    <aside className="flex flex-row items-center gap-5 border-b border-line bg-surface px-3 py-4 md:sticky md:top-0 md:h-screen md:flex-col md:items-stretch md:border-b-0 md:border-r">
-      <div className="flex items-center gap-2 px-2">
+    <aside className="sticky top-0 z-30 flex flex-col gap-2 border-b border-line bg-surface/90 px-3 pt-3 backdrop-blur md:h-screen md:gap-5 md:border-b-0 md:border-r md:bg-surface md:px-3 md:py-4 md:backdrop-blur-none">
+      <div className="flex items-center gap-2.5 px-1.5">
+        <span
+          aria-hidden
+          className="grid size-8 shrink-0 place-items-center rounded-[9px] bg-gradient-to-br from-accent-2 to-accent text-on-accent shadow-card ring-1 ring-inset ring-white/15"
+        >
+          <LogoMark className="size-[19px]" />
+        </span>
         <div className="min-w-0 flex-1">
-          <b className="block text-[15px] font-semibold tracking-tight">Jira Logwork</b>
-          {label && <span className="font-mono text-[10.5px] text-ink-3">{label}</span>}
+          <b className="block truncate text-emph font-semibold tracking-tight">Jira Logwork</b>
+          {context && (
+            <span className="block truncate font-mono text-micro text-ink-3 md:hidden" title={contextTitle(context)}>
+              {context.project}
+              {context.board ? ` · #${context.board}` : ''}
+            </span>
+          )}
         </div>
-        {/* Beside the brand rather than pinned to the bottom: with `mt-auto` on a
-            full-height column it drifted to the end of a long board, out of reach
-            without scrolling back. */}
-        <RefreshButton />
-        <ThemeToggle />
+        {/* Beside the brand on a phone; on a wide screen they move into the
+            context strip below, where they no longer crowd the name. Never
+            pinned to the bottom: on a long board that drifted out of reach. */}
+        <span className="flex md:hidden">
+          <RefreshButton />
+          <ThemeToggle />
+        </span>
       </div>
 
-      <nav className="flex flex-1 flex-row gap-px md:flex-none md:flex-col">
+      {context && (
+        <div className="mx-0.5 hidden items-center gap-1 rounded-xl border border-line bg-surface-2/60 py-1 pl-3 pr-1 md:flex">
+          <div className="min-w-0 flex-1" title={contextTitle(context)}>
+            <div className="truncate font-mono text-caption font-semibold text-ink-2">
+              {context.project}
+              {context.board && <span className="font-normal text-ink-3"> · #{context.board}</span>}
+            </div>
+            {context.team && (
+              <div className="flex items-center gap-1.5 text-micro text-ink-3">
+                <span className="size-1.5 shrink-0 rounded-full bg-accent" />
+                team <span className="truncate font-mono text-ink-2">{context.team}</span>
+              </div>
+            )}
+          </div>
+          <RefreshButton />
+          <ThemeToggle />
+        </div>
+      )}
+
+      {/* A single scrolling row on a phone — wrapping four labels into a 390px
+          bar broke "Tìm & nhận task" over four lines. */}
+      <nav className="-mx-3 flex flex-row gap-1 overflow-x-auto px-3 pb-2 [scrollbar-width:none] md:mx-0 md:flex-col md:gap-0.5 md:overflow-visible md:px-0 md:pb-0">
+        <div className="mb-1 hidden px-2.5 text-micro font-medium text-ink-3 md:block">Làm việc</div>
         {CORE.map((item) => (
-          <NavLink key={item.href} href={item.href} label={item.label} active={isActive(item.href)} />
+          <NavLink key={item.href} {...item} active={isActive(item.href)} />
         ))}
 
         {modules.length > 0 && (
           <>
-            <div className="mt-3 hidden px-[9px] pb-1 font-mono text-[9.5px] uppercase tracking-[0.09em] text-ink-3 md:block">
+            <div className="mb-1 mt-4 hidden px-2.5 text-micro font-medium text-ink-3 md:block">
               Modules
             </div>
             {modules.map((item) => (
-              <NavLink key={item.href} href={item.href} label={item.label} active={isActive(item.href)} />
+              <NavLink
+                key={item.href}
+                href={item.href}
+                label={item.label}
+                icon={MODULE_ICONS[item.href] ?? 'puzzle'}
+                active={isActive(item.href)}
+              />
             ))}
           </>
         )}
 
-        <div className="mt-3 hidden md:block" />
-        <NavLink href="/settings" label="Settings" active={isActive('/settings')} />
+        <div className="mt-4 hidden md:block" />
+        <NavLink href="/settings" label="Settings" icon="settings" active={isActive('/settings')} />
       </nav>
     </aside>
   )
 }
 
-function NavLink({ href, label, active }: { href: string; label: string; active: boolean }) {
+function contextTitle(c: { project: string; board?: string; team?: string | null }) {
+  return [`Project ${c.project}`, c.board && `board ${c.board}`, c.team && `team ${c.team}`]
+    .filter(Boolean)
+    .join(' · ')
+}
+
+function NavLink({
+  href,
+  label,
+  icon,
+  active,
+}: {
+  href: string
+  label: string
+  icon: IconName
+  active: boolean
+}) {
   const router = useRouter()
   return (
     <Link
@@ -77,13 +145,19 @@ function NavLink({ href, label, active }: { href: string; label: string; active:
       onFocus={() => router.prefetch(href)}
       aria-current={active ? 'page' : undefined}
       className={
-        'flex items-center justify-between gap-2 rounded-md px-[9px] py-[7px] text-sm transition-colors ' +
+        'group relative flex shrink-0 items-center gap-2.5 whitespace-nowrap rounded-lg px-2.5 py-[7px] text-body transition-colors ' +
         (active
           ? 'bg-accent-soft font-semibold text-accent-ink'
           : 'text-ink-2 hover:bg-surface-2 hover:text-ink')
       }
     >
-      {label}
+      <Icon
+        name={icon}
+        className={
+          'size-[17px] shrink-0 ' + (active ? 'text-accent' : 'text-ink-3 group-hover:text-ink-2')
+        }
+      />
+      <span className="flex-1">{label}</span>
       <LinkSpinner />
     </Link>
   )
@@ -126,9 +200,9 @@ function RefreshButton() {
       disabled={pending}
       title="Làm mới dữ liệu Jira"
       aria-label="Làm mới dữ liệu Jira"
-      className="grid size-7 shrink-0 place-items-center rounded-md border border-line text-ink-3 hover:border-line-strong hover:text-ink disabled:opacity-60"
+      className="grid size-8 shrink-0 place-items-center rounded-lg text-ink-3 hover:bg-surface-2 hover:text-ink disabled:opacity-60"
     >
-      <span className={'text-[15px] leading-none ' + (pending ? 'inline-block animate-spin' : '')}>↻</span>
+      <Icon name="refresh" className={'size-4 ' + (pending ? 'animate-spin' : '')} />
     </button>
   )
 }
@@ -163,17 +237,12 @@ function ThemeToggle() {
       onClick={toggle}
       title="Đổi nền sáng / tối"
       aria-label="Đổi nền sáng / tối"
-      className="grid size-7 shrink-0 place-items-center rounded-md border border-line text-ink-3 hover:border-line-strong hover:text-ink"
+      className="grid size-8 shrink-0 place-items-center rounded-lg text-ink-3 hover:bg-surface-2 hover:text-ink"
     >
       {/* sun — shown while the dark theme is on, i.e. "go light" */}
-      <svg viewBox="0 0 16 16" aria-hidden className="theme-icon-dark size-[15px]" fill="none" stroke="currentColor" strokeWidth="1.3">
-        <circle cx="8" cy="8" r="3.1" />
-        <path d="M8 1.4v1.7M8 12.9v1.7M14.6 8h-1.7M3.1 8H1.4M12.67 3.33l-1.2 1.2M4.53 11.47l-1.2 1.2M12.67 12.67l-1.2-1.2M4.53 4.53l-1.2-1.2" strokeLinecap="round" />
-      </svg>
+      <Icon name="sun" className="theme-icon-dark size-4" />
       {/* moon — shown while the light theme is on, i.e. "go dark" */}
-      <svg viewBox="0 0 16 16" aria-hidden className="theme-icon-light size-[15px]" fill="none" stroke="currentColor" strokeWidth="1.3">
-        <path d="M13.5 9.4A5.8 5.8 0 0 1 6.6 2.5a5.8 5.8 0 1 0 6.9 6.9Z" strokeLinejoin="round" />
-      </svg>
+      <Icon name="moon" className="theme-icon-light size-4" />
     </button>
   )
 }

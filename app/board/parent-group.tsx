@@ -15,10 +15,10 @@ import {
 } from "@/lib/settings";
 import { formatDuration } from "@/lib/time";
 
-import { CreateIssueButton } from "./create-issue";
 import { DatesEditor } from "./dates-editor";
 import { HygieneBadge } from "./hygiene-badge";
 import { PointsEditor, PointsRollup } from "./points-editor";
+import { QuickSubtask } from "./quick-subtask";
 import { SprintFixButton } from "./sprint-fix";
 import { StatusPill } from "./status-pill";
 import { SubtaskRow } from "./subtask-row";
@@ -40,6 +40,7 @@ export function ParentGroup({
   sprintEnd = null,
   datesSupported = true,
   dayLoggedSeconds = 0,
+  dayQuotaHours = 0,
   myAccountId = null,
   currentSprint = null,
 }: {
@@ -57,6 +58,8 @@ export function ParentGroup({
    * the whole day, not on this row.
    */
   dayLoggedSeconds?: number;
+  /** The selected day's quota, so a row can offer "log the rest of the day". */
+  dayQuotaHours?: number;
   /** Whose board this is, for deciding what may be edited on the parent. */
   myAccountId?: string | null;
   /** The sprint on screen, so a sprintless parent can be put into it. */
@@ -103,26 +106,26 @@ export function ParentGroup({
   const loggedTotal = group.childTimeSpentTotal;
 
   return (
-    <article className="rounded-[9px] border border-line bg-surface">
-      <header className="rounded-t-[9px] border-b border-line bg-surface-2 px-3.5 py-2.5">
+    <article className="card overflow-hidden">
+      <header className="border-b border-line bg-surface-2/70 px-4 py-3">
         <div className="flex flex-wrap items-center gap-2">
           {!isOrphan && (
             <>
               {/* Tier marker, matching the Epic badge above it: the three levels
                   should be identifiable without counting indentation. */}
-              <span className="rounded-[3px] bg-blue-soft px-1.5 py-0.5 font-mono text-[9.5px] font-semibold uppercase tracking-[0.06em] text-blue">
+              <span className="rounded-[5px] bg-blue-soft px-1.5 py-0.5 chip-text text-blue">
                 Task cha
               </span>
               {/* The Jira issue type is separate — a parent may be a Task, a Bug
                   or an Improve, and which one matters when reading the board. */}
-              <span className="inline-flex items-center gap-1 rounded-[3px] border border-line-strong px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-[0.06em] text-ink-3">
+              <span className="inline-flex items-center gap-1 rounded-[5px] border border-line-strong px-1.5 py-0.5 chip-text text-ink-3">
                 <TypeIcon name={group.issueTypeName} className="size-3" />
                 {group.issueTypeName}
               </span>
             </>
           )}
 
-          <span className="font-mono text-[11.5px] font-semibold text-ink-2">
+          <span className="font-mono text-small font-semibold text-ink-2">
             {isOrphan ? "—" : group.key}
           </span>
 
@@ -140,7 +143,7 @@ export function ParentGroup({
           {!isOrphan && loggedButTodo(loggedTotal, group.statusName) && (
             <span
               title={`${group.key} đã log ${formatDuration(loggedTotal)} nhưng vẫn đang To Do — nhớ chuyển trạng thái`}
-              className="inline-flex h-[18px] items-center rounded-[3px] border border-warn bg-warn-soft px-1.5 font-mono text-[9.5px] font-semibold uppercase tracking-[0.06em] text-warn"
+              className="inline-flex h-[18px] items-center rounded-[5px] border border-warn bg-warn-soft px-1.5 chip-text text-warn"
             >
               ⚠ vẫn To Do
             </span>
@@ -151,7 +154,7 @@ export function ParentGroup({
           {group.outOfSprint && (
             <span
               title={`${group.key} không thuộc sprint nào — task con của bạn vẫn hiện ở đây để log giờ`}
-              className="inline-flex h-[18px] items-center rounded-[3px] border border-warn bg-warn-soft px-1.5 font-mono text-[9.5px] font-semibold uppercase tracking-[0.06em] text-warn"
+              className="inline-flex h-[18px] items-center rounded-[5px] border border-warn bg-warn-soft px-1.5 chip-text text-warn"
             >
               ⚠ chưa gán sprint
             </span>
@@ -168,7 +171,7 @@ export function ParentGroup({
           {ownedByOther && group.assigneeName && (
             <span
               title={lockReason}
-              className="inline-flex h-[18px] items-center gap-1 rounded-[3px] border border-line-strong px-1.5 font-mono text-[9.5px] uppercase tracking-[0.06em] text-ink-3"
+              className="inline-flex h-[18px] items-center gap-1 rounded-[5px] border border-line-strong px-1.5 chip-text text-ink-3"
             >
               🔒 {group.assigneeName}
             </span>
@@ -176,7 +179,7 @@ export function ParentGroup({
 
           <span className="ml-auto flex flex-wrap items-center gap-2">
             {loggedTotal > 0 && (
-              <span className="font-mono text-[11px] text-ink-3">
+              <span className="font-mono text-caption text-ink-3">
                 đã log {formatDuration(loggedTotal)}
               </span>
             )}
@@ -206,7 +209,7 @@ export function ParentGroup({
           </span>
         </div>
 
-        <div className="mt-1.5 text-[13px]">{group.summary}</div>
+        <div className="mt-2 text-emph font-semibold leading-snug tracking-[-0.005em]">{group.summary}</div>
 
         {!isOrphan && (
           <div className="mt-1">
@@ -220,7 +223,7 @@ export function ParentGroup({
       </header>
 
       <div className="flex flex-col">
-        {group.subtasks.map((subtask) => (
+        {group.subtasks.map((subtask, i) => (
           <SubtaskRow
             key={subtask.key}
             subtask={subtask}
@@ -234,20 +237,25 @@ export function ParentGroup({
             team={team}
             datesSupported={datesSupported}
             dayLoggedMinutes={Math.round(dayLoggedSeconds / 60)}
+            dayQuotaHours={dayQuotaHours}
             schedule={schedule}
             dayOff={dayOff ?? null}
+            // Only the orphan group has no add-row after it to carry the line on.
+            railEnd={isOrphan && i === group.subtasks.length - 1}
           />
         ))}
 
-        {/* Sits after the last subtask, where "one more" naturally belongs —
-            the header is already carrying status and points. */}
+        {/* Sits after the last subtask, where "one more" naturally belongs.
+            A line to type into rather than a button to a dialog: most subtasks
+            are a short title away from being logged against. */}
         {!isOrphan && (
-          <CreateIssueButton
+          <QuickSubtask
             parentKey={group.key}
-            className="flex w-full items-center gap-1.5 border-t border-line px-3.5 py-2 text-left text-[12px] text-ink-3 hover:bg-surface-2 hover:text-accent-ink"
-          >
-            + Task con cho {group.key}
-          </CreateIssueButton>
+            date={date}
+            isToday={isToday}
+            presets={presets}
+            sprintEnd={sprintEnd}
+          />
         )}
       </div>
     </article>

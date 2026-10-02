@@ -49,8 +49,8 @@ export function DraftList({
   }
 
   return (
-    <section className="rounded-[9px] border border-line bg-surface p-[17px]">
-      <div className="mb-2.5 font-mono text-[10.5px] uppercase tracking-[0.09em] text-ink-3">
+    <section className="card p-5">
+      <div className="mb-2.5 eyebrow text-ink-2">
         Draft đã lưu ({items.length})
       </div>
 
@@ -67,7 +67,7 @@ export function DraftList({
               <Link
                 href={`/new?draft=${d.id}`}
                 className={
-                  'min-w-0 flex-1 truncate text-[12.5px] ' +
+                  'min-w-0 flex-1 truncate text-body ' +
                   (active ? 'font-semibold text-accent-ink' : 'hover:text-accent-ink')
                 }
                 title={d.title}
@@ -81,7 +81,7 @@ export function DraftList({
                 </span>
               </Link>
 
-              <span className="shrink-0 font-mono text-[11px] text-ink-3">{when(d.updatedAt)}</span>
+              <span className="shrink-0 font-mono text-caption text-ink-3">{when(d.updatedAt)}</span>
 
               {confirming === d.id ? (
                 <span className="flex shrink-0 items-center gap-1">
@@ -89,14 +89,14 @@ export function DraftList({
                     type="button"
                     disabled={pending}
                     onClick={() => remove(d.id)}
-                    className="rounded px-1.5 py-0.5 text-[11px] font-medium text-crit hover:bg-crit-soft disabled:opacity-60"
+                    className="rounded px-1.5 py-0.5 text-caption font-medium text-crit hover:bg-crit-soft disabled:opacity-60"
                   >
                     {pending ? <Working>Đang xoá…</Working> : 'Xoá?'}
                   </button>
                   <button
                     type="button"
                     onClick={() => setConfirming(null)}
-                    className="rounded px-1 py-0.5 text-[11px] text-ink-3 hover:text-ink"
+                    className="rounded px-1 py-0.5 text-caption text-ink-3 hover:text-ink"
                   >
                     huỷ
                   </button>
@@ -105,7 +105,7 @@ export function DraftList({
                 <button
                   type="button"
                   onClick={() => setConfirming(d.id)}
-                  className="shrink-0 rounded px-1 text-[13px] leading-none text-ink-3 hover:text-crit"
+                  className="shrink-0 rounded px-1 text-body leading-none text-ink-3 hover:text-crit"
                   aria-label={`Xoá draft ${d.title}`}
                   title="Xoá draft"
                 >

@@ -68,15 +68,15 @@ export function TemplateManager({ initial }: { initial: T[] }) {
   }
 
   return (
-    <section className="rounded-[9px] border border-line bg-surface p-[17px]">
+    <section className="card p-5">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <div className="font-mono text-[10.5px] uppercase tracking-[0.09em] text-ink-3">
+        <div className="eyebrow text-ink-2">
           Template report
         </div>
         <button
           type="button"
           onClick={addNew}
-          className="rounded-md border border-dashed border-line-strong px-[9px] py-1 text-[12px] text-ink-3 hover:border-solid hover:text-ink"
+          className="rounded-md border border-dashed border-line-strong px-[9px] py-1 text-small text-ink-3 hover:border-solid hover:text-ink"
         >
           + Template mới
         </button>
@@ -92,7 +92,7 @@ export function TemplateManager({ initial }: { initial: T[] }) {
               setResult(null)
             }}
             className={
-              'rounded-full border px-[11px] py-[3px] text-[11.5px] ' +
+              'rounded-full border px-[11px] py-[3px] text-small ' +
               (t.id === active?.id
                 ? 'border-accent bg-accent-soft font-semibold text-accent-ink'
                 : 'border-line text-ink-2 hover:border-line-strong hover:text-ink')
@@ -111,7 +111,7 @@ export function TemplateManager({ initial }: { initial: T[] }) {
             <input
               value={active.name}
               onChange={(e) => patch(active.id, { name: e.target.value })}
-              className="w-full rounded-md border border-line bg-ground px-[10px] py-[7px] text-[13.5px]"
+              className="w-full rounded-lg border border-line bg-ground px-3 py-2 text-emph"
             />
           </label>
 
@@ -121,15 +121,15 @@ export function TemplateManager({ initial }: { initial: T[] }) {
               rows={10}
               value={active.body}
               onChange={(e) => patch(active.id, { body: e.target.value })}
-              className="w-full resize-y rounded-md border border-line bg-ground px-[10px] py-[7px] font-mono text-[12.5px] leading-[1.6]"
+              className="w-full resize-y rounded-lg border border-line bg-ground px-3 py-2 font-mono text-body leading-[1.6]"
             />
           </label>
 
           <details className="rounded-md border border-line bg-ground px-3 py-2">
-            <summary className="cursor-pointer text-[12px] text-ink-2">Biến dùng được</summary>
+            <summary className="cursor-pointer text-small text-ink-2">Biến dùng được</summary>
             <div className="mt-2 grid gap-x-3 gap-y-1 sm:grid-cols-2">
               {PLACEHOLDERS.map(([token, desc]) => (
-                <div key={token} className="flex gap-2 text-[11.5px]">
+                <div key={token} className="flex gap-2 text-small">
                   <code className="shrink-0 font-mono text-accent-ink">{token}</code>
                   <span className="text-ink-3">{desc}</span>
                 </div>
@@ -139,7 +139,7 @@ export function TemplateManager({ initial }: { initial: T[] }) {
 
           <div className="flex flex-wrap items-center justify-end gap-2">
             {result && (
-              <span className={'mr-auto text-[12px] ' + (result.ok ? 'text-good' : 'text-crit')}>
+              <span className={'mr-auto text-small ' + (result.ok ? 'text-good' : 'text-crit')}>
                 {result.message}
               </span>
             )}
@@ -159,7 +159,7 @@ export function TemplateManager({ initial }: { initial: T[] }) {
                         )
                     })
                   }
-                  className="rounded-md border border-line-strong px-[9px] py-1 text-[12.5px] hover:bg-surface-2 disabled:opacity-60"
+                  className="rounded-md border border-line-strong px-[9px] py-1 text-body hover:bg-surface-2 disabled:opacity-60"
                 >
                   {pending ? <Working>Đang đổi…</Working> : 'Đặt mặc định'}
                 </button>
@@ -176,7 +176,7 @@ export function TemplateManager({ initial }: { initial: T[] }) {
                       }
                     })
                   }
-                  className="rounded-md border border-line px-[9px] py-1 text-[12.5px] text-crit hover:border-crit disabled:opacity-60"
+                  className="rounded-md border border-line px-[9px] py-1 text-body text-crit hover:border-crit disabled:opacity-60"
                 >
                   {pending ? <Working>Đang xoá…</Working> : 'Xoá'}
                 </button>
@@ -187,7 +187,7 @@ export function TemplateManager({ initial }: { initial: T[] }) {
               type="button"
               disabled={pending}
               onClick={save}
-              className="rounded-md bg-accent px-3 py-1 text-[12.5px] font-medium text-white hover:bg-accent-2 disabled:opacity-60"
+              className="rounded-lg bg-accent shadow-card px-3 py-1.5 text-body font-semibold text-on-accent hover:bg-accent-2 disabled:opacity-60"
             >
               {pending ? <Working>Đang lưu…</Working> : 'Lưu template'}
             </button>

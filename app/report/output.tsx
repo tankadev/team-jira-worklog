@@ -65,14 +65,14 @@ export function ReportOutput({
   }
 
   return (
-    <section className="rounded-[9px] border border-line bg-surface p-[17px]">
+    <section className="card p-5">
       <div className="mb-2.5 flex flex-wrap items-center justify-between gap-3">
-        <div className="font-mono text-[10.5px] uppercase tracking-[0.09em] text-ink-3">
+        <div className="eyebrow text-ink-2">
           Nội dung report
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
           <NavSpinner />
-          <label className="flex items-center gap-1.5 text-[12.5px] text-ink-2 select-none">
+          <label className="flex items-center gap-1.5 text-body text-ink-2 select-none">
             <input
               type="checkbox"
               checked={showKey}
@@ -83,7 +83,7 @@ export function ReportOutput({
             Mã task
           </label>
           <label
-            className="flex items-center gap-1.5 text-[12.5px] text-ink-2 select-none"
+            className="flex items-center gap-1.5 text-body text-ink-2 select-none"
             title="Đưa các task đang In Progress của bạn vào phần Today"
           >
             <input
@@ -99,7 +99,7 @@ export function ReportOutput({
             value={templateId || ''}
             disabled={pending}
             onChange={(e) => pickTemplate(e.target.value)}
-            className="rounded-md border border-line bg-surface px-[9px] py-[5px] text-[12.5px] disabled:opacity-60"
+            className="h-9 rounded-lg border border-line bg-surface px-3 shadow-card hover:border-line-strong text-body disabled:opacity-60"
           >
             {templates.map((t) => (
               <option key={t.id} value={t.id}>
@@ -111,7 +111,7 @@ export function ReportOutput({
           <button
             type="button"
             onClick={copy}
-            className="rounded-md bg-accent px-3 py-[5px] text-[12.5px] font-medium text-white hover:bg-accent-2"
+            className="rounded-lg bg-accent shadow-card px-3 py-1.5 text-body font-semibold text-on-accent hover:bg-accent-2"
           >
             {copied ? 'Đã copy ✓' : 'Copy'}
           </button>
@@ -120,13 +120,13 @@ export function ReportOutput({
 
       <pre
         id="report-body"
-        className="overflow-x-auto whitespace-pre rounded-md border border-line bg-ground px-4 py-3.5 font-mono text-[12.5px] leading-[1.7]"
+        className="whitespace-pre-wrap break-words rounded-xl border border-line bg-ground px-4 py-3.5 font-mono text-small leading-[1.75]"
       >
         {body}
       </pre>
 
       {empty && (
-        <p className="mt-2.5 text-[11.5px] leading-relaxed text-ink-3">
+        <p className="mt-2.5 text-small leading-relaxed text-ink-3">
           Ngày này chưa có worklog nào của bạn, nên phần <b>Previous day</b> đang trống. Đổi ngày ở
           góc trên, hoặc log giờ ở Task board rồi quay lại.
         </p>

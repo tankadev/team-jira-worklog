@@ -27,9 +27,9 @@ async function newTaskPage(props: PageProps<'/new'>) {
 
   if (!getSetting(SETTING_KEYS.jiraApiToken)) {
     return (
-      <div className="rounded-[9px] border border-line bg-surface p-[17px]">
-        <span className="text-[13px]">Chưa cấu hình Jira — </span>
-        <Link href="/settings" className="text-[13px] text-accent-ink underline underline-offset-2">
+      <div className="card p-5">
+        <span className="text-body">Chưa cấu hình Jira — </span>
+        <Link href="/settings" className="text-body text-accent-ink underline underline-offset-2">
           mở Settings
         </Link>
       </div>
@@ -64,11 +64,11 @@ async function newTaskPage(props: PageProps<'/new'>) {
   return (
     <>
       <header className="mb-4">
-        <div className="font-mono text-[10.5px] uppercase tracking-[0.09em] text-ink-3">
+        <div className="eyebrow text-ink-2">
           Draft · chưa tạo trên Jira
         </div>
-        <h1 className="text-xl font-semibold tracking-tight">Task mới</h1>
-        <p className="mt-1 text-[12.5px] text-ink-3">
+        <h1 className="text-title font-semibold tracking-tight">Task mới</h1>
+        <p className="mt-1 text-body text-ink-3">
           Mô tả bằng lời của bạn, Gemini dựng title / description / DoD. Sửa thoải mái trước khi tạo.
         </p>
       </header>

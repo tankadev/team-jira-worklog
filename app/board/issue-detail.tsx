@@ -99,7 +99,7 @@ export function IssueDetail({ issueKey, onClose }: { issueKey: string; onClose: 
 
   return (
     <div
-      className="fixed inset-0 z-[90] flex items-start justify-center overflow-auto bg-black/45 p-6 sm:p-10"
+      className="fixed inset-0 z-[90] flex items-start justify-center overflow-auto bg-black/55 backdrop-blur-[3px] p-6 sm:p-10"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose()
       }}
@@ -108,7 +108,7 @@ export function IssueDetail({ issueKey, onClose }: { issueKey: string; onClose: 
         role="dialog"
         aria-modal="true"
         aria-label={`Chi tiết ${issueKey}`}
-        className="w-full max-w-[620px] rounded-xl border border-line-strong bg-surface shadow-2xl"
+        className="w-full max-w-[620px] rounded-2xl border border-line-strong bg-surface shadow-pop"
       >
         <header className="flex flex-wrap items-center gap-2 border-b border-line px-4 py-3">
           <TypeIcon name={detail?.issueTypeName || 'Subtask'} className="size-3.5" />
@@ -116,7 +116,7 @@ export function IssueDetail({ issueKey, onClose }: { issueKey: string; onClose: 
             href={detail?.url ?? '#'}
             target="_blank"
             rel="noreferrer"
-            className="font-mono text-[12px] font-semibold text-accent-ink underline-offset-2 hover:underline"
+            className="font-mono text-small font-semibold text-accent-ink underline-offset-2 hover:underline"
             title="Mở trên Jira"
           >
             {issueKey}
@@ -128,17 +128,17 @@ export function IssueDetail({ issueKey, onClose }: { issueKey: string; onClose: 
             type="button"
             onClick={onClose}
             aria-label="Đóng"
-            className="ml-auto grid size-7 place-items-center rounded-md text-[18px] leading-none text-ink-3 hover:bg-surface-2 hover:text-ink"
+            className="ml-auto grid size-7 place-items-center rounded-md text-xl leading-none text-ink-3 hover:bg-surface-2 hover:text-ink"
           >
             ×
           </button>
         </header>
 
         <div className="max-h-[70vh] overflow-auto px-4 py-4">
-          {error && <p className="text-[13px] text-crit">{error}</p>}
+          {error && <p className="text-body text-crit">{error}</p>}
 
           {!detail && !error && (
-            <p className="flex items-center gap-2 text-[12.5px] text-ink-3">
+            <p className="flex items-center gap-2 text-body text-ink-3">
               <Spinner /> Đang tải chi tiết…
             </p>
           )}
@@ -153,7 +153,7 @@ export function IssueDetail({ issueKey, onClose }: { issueKey: string; onClose: 
                 onDirtyChange={setTitleDirty}
               />
 
-              <dl className="mt-3 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-[12px]">
+              <dl className="mt-3 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-small">
                 {detail.parentKey && (
                   <Row label="Task cha">
                     <span className="font-mono text-ink-2">{detail.parentKey}</span>
@@ -206,14 +206,14 @@ export function IssueDetail({ issueKey, onClose }: { issueKey: string; onClose: 
         </div>
 
         <footer className="flex flex-wrap items-center gap-2 rounded-b-xl border-t border-line bg-surface-2 px-4 py-2.5">
-          <span className="font-mono text-[11px] text-ink-3">
+          <span className="font-mono text-caption text-ink-3">
             Esc để đóng · bấm mã task để mở trên Jira
           </span>
           <a
             href={detail?.url ?? '#'}
             target="_blank"
             rel="noreferrer"
-            className="ml-auto rounded-md border border-line-strong bg-surface px-2.5 py-1 text-[12px] hover:bg-surface"
+            className="ml-auto rounded-lg border border-line-strong bg-surface px-3 py-1.5 font-medium text-small hover:bg-surface"
           >
             Mở trên Jira ↗
           </a>
@@ -295,7 +295,7 @@ function EditableTitle({
   if (!editing)
     return (
       <h2
-        className="group cursor-text text-[15px] font-semibold leading-snug"
+        className="group cursor-text text-lead font-semibold leading-snug"
         onClick={() => {
           setText(summary)
           setErr('')
@@ -304,7 +304,7 @@ function EditableTitle({
         title="Bấm để sửa tiêu đề"
       >
         {summary}
-        <span className="ml-1.5 align-middle text-[11px] font-normal text-ink-3 opacity-0 transition-opacity group-hover:opacity-100">
+        <span className="ml-1.5 align-middle text-caption font-normal text-ink-3 opacity-0 transition-opacity group-hover:opacity-100">
           ✎ sửa
         </span>
       </h2>
@@ -333,14 +333,14 @@ function EditableTitle({
             setErr('')
           }
         }}
-        className="w-full resize-y rounded-md border border-line bg-ground px-2.5 py-1.5 text-[15px] font-semibold leading-snug disabled:opacity-60"
+        className="w-full resize-y rounded-lg border border-line bg-ground px-3 py-2 text-lead font-semibold leading-snug disabled:opacity-60"
       />
       <div className="mt-1.5 flex flex-wrap items-center gap-2">
         <button
           type="button"
           onClick={save}
           disabled={saving}
-          className="rounded-md bg-accent px-2.5 py-1 text-[12px] font-medium text-white hover:bg-accent-2 disabled:opacity-60"
+          className="rounded-lg bg-accent shadow-card px-2.5 py-1.5 text-small font-semibold text-on-accent hover:bg-accent-2 disabled:opacity-60"
         >
           {saving ? 'Đang lưu…' : 'Lưu'}
         </button>
@@ -351,13 +351,13 @@ function EditableTitle({
             setErr('')
           }}
           disabled={saving}
-          className="rounded-md border border-line px-2.5 py-1 text-[12px] text-ink-2"
+          className="rounded-md border border-line px-2.5 py-1 text-small text-ink-2"
         >
           Huỷ
         </button>
-        <span className="text-[11px] text-ink-3">Enter để lưu · Esc để huỷ</span>
+        <span className="text-caption text-ink-3">Enter để lưu · Esc để huỷ</span>
       </div>
-      {err && <p className="mt-1 text-[12px] text-crit">{err}</p>}
+      {err && <p className="mt-1 text-small text-crit">{err}</p>}
     </div>
   )
 }
@@ -439,13 +439,13 @@ function EditableDescription({
     return (
       <div className="mt-4 border-t border-line pt-3.5">
         <div className="mb-1.5 flex items-center justify-between gap-2">
-          <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-ink-3">
+          <span className="eyebrow text-ink-2">
             Mô tả
           </span>
           <button
             type="button"
             onClick={open}
-            className="text-[11.5px] text-accent-ink underline underline-offset-2"
+            className="text-small text-accent-ink underline underline-offset-2"
           >
             ✎ sửa
           </button>
@@ -453,7 +453,7 @@ function EditableDescription({
         {blocks.length > 0 ? (
           blocks.map((b, i) => <Block key={i} block={b} />)
         ) : (
-          <p className="text-[12.5px] text-ink-3">Task này chưa có mô tả.</p>
+          <p className="text-body text-ink-3">Task này chưa có mô tả.</p>
         )}
       </div>
     )
@@ -462,7 +462,7 @@ function EditableDescription({
   return (
     <div className="mt-4 border-t border-line pt-3.5">
       <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
-        <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-ink-3">
+        <span className="eyebrow text-ink-2">
           Mô tả
         </span>
         <button
@@ -474,7 +474,7 @@ function EditableDescription({
               ? 'Tiêu đề đang sửa chưa lưu — Gemini viết theo tiêu đề đã lưu, nên hãy bấm Lưu ở tiêu đề trước.'
               : `Nhờ Gemini viết lại theo tiêu đề đã lưu:\n${title}\nChỉ điền vào ô — chưa ghi lên Jira.`
           }
-          className="flex items-center gap-1.5 rounded-md border border-line px-2 py-1 text-[11.5px] text-ink-2 hover:bg-surface-2 disabled:opacity-40"
+          className="flex items-center gap-1.5 rounded-md border border-line px-2 py-1 text-small text-ink-2 hover:bg-surface-2 disabled:opacity-40"
         >
           {asking ? <Spinner /> : '✨'} {asking ? 'Đang viết…' : 'Gemini viết lại'}
         </button>
@@ -482,33 +482,33 @@ function EditableDescription({
 
       {/* Nút xám mà không nói lý do thì người dùng chỉ thấy nó hỏng. */}
       {titleDirty && (
-        <p className="mb-2 text-[11.5px] text-warn">
+        <p className="mb-2 text-small text-warn">
           Tiêu đề đang sửa chưa lưu — Gemini viết theo tiêu đề <b>đã lưu</b>.
           Bấm <b>Lưu</b> ở tiêu đề trước rồi hãy viết lại.
         </p>
       )}
 
       <label className="block">
-        <span className="text-[11px] text-ink-3">Nội dung — mỗi dòng bắt đầu bằng “- ” là một gạch đầu dòng</span>
+        <span className="text-caption text-ink-3">Nội dung — mỗi dòng bắt đầu bằng “- ” là một gạch đầu dòng</span>
         <textarea
           value={desc}
           rows={6}
           disabled={busy}
           onChange={(e) => setDesc(e.target.value)}
           onKeyDown={onEscape}
-          className="mt-1 w-full resize-y rounded-md border border-line bg-ground px-2.5 py-1.5 text-[12.5px] leading-relaxed disabled:opacity-60"
+          className="mt-1 w-full resize-y rounded-lg border border-line bg-ground px-3 py-2 text-body leading-relaxed disabled:opacity-60"
         />
       </label>
 
       <label className="mt-2 block">
-        <span className="text-[11px] text-ink-3">Definition of Done</span>
+        <span className="text-caption text-ink-3">Definition of Done</span>
         <textarea
           value={dod}
           rows={4}
           disabled={busy}
           onChange={(e) => setDod(e.target.value)}
           onKeyDown={onEscape}
-          className="mt-1 w-full resize-y rounded-md border border-line bg-ground px-2.5 py-1.5 text-[12.5px] leading-relaxed disabled:opacity-60"
+          className="mt-1 w-full resize-y rounded-lg border border-line bg-ground px-3 py-2 text-body leading-relaxed disabled:opacity-60"
         />
       </label>
 
@@ -517,7 +517,7 @@ function EditableDescription({
           type="button"
           onClick={save}
           disabled={busy}
-          className="rounded-md bg-accent px-2.5 py-1 text-[12px] font-medium text-white hover:bg-accent-2 disabled:opacity-60"
+          className="rounded-lg bg-accent shadow-card px-2.5 py-1.5 text-small font-semibold text-on-accent hover:bg-accent-2 disabled:opacity-60"
         >
           {saving ? 'Đang lưu…' : 'Lưu mô tả'}
         </button>
@@ -528,15 +528,15 @@ function EditableDescription({
             setNote(null)
           }}
           disabled={busy}
-          className="rounded-md border border-line px-2.5 py-1 text-[12px] text-ink-2"
+          className="rounded-md border border-line px-2.5 py-1 text-small text-ink-2"
         >
           Huỷ
         </button>
-        <span className="text-[11px] text-ink-3">Esc để huỷ</span>
+        <span className="text-caption text-ink-3">Esc để huỷ</span>
       </div>
 
       {note && (
-        <p className={`mt-1.5 text-[12px] ${note.ok ? 'text-ink-3' : 'text-crit'}`}>
+        <p className={`mt-1.5 text-small ${note.ok ? 'text-ink-3' : 'text-crit'}`}>
           {note.text}
         </p>
       )}
@@ -565,19 +565,19 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 function Block({ block }: { block: AdfBlock }) {
   if (block.kind === 'heading') {
     return (
-      <h3 className="mb-1.5 mt-3 text-[13px] font-semibold first:mt-0">{block.text}</h3>
+      <h3 className="mb-1.5 mt-3 text-body font-semibold first:mt-0">{block.text}</h3>
     )
   }
   if (block.kind === 'bullets') {
     return (
-      <ul className="mb-2.5 flex list-disc flex-col gap-1 pl-4 text-[12.5px] leading-relaxed">
+      <ul className="mb-2.5 flex list-disc flex-col gap-1 pl-4 text-body leading-relaxed">
         {block.items.map((item, i) => (
           <li key={i}>{item}</li>
         ))}
       </ul>
     )
   }
-  return <p className="mb-2.5 text-[12.5px] leading-relaxed">{block.text}</p>
+  return <p className="mb-2.5 text-body leading-relaxed">{block.text}</p>
 }
 
 /** Status colour for a pill rendered outside this file. */

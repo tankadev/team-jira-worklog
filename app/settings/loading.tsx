@@ -8,7 +8,7 @@ export default function SettingsLoading() {
         <Shimmer className="h-6 w-28" />
       </header>
 
-      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="flex flex-col gap-4">
           <CardSkeleton lines={6} />
           <CardSkeleton lines={3} />

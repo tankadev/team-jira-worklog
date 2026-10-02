@@ -74,7 +74,7 @@ export function DatePicker({
   }
 
   const arrow =
-    'h-[30px] w-[26px] rounded-md border border-line-strong bg-surface leading-none text-ink-2 hover:bg-surface-2 hover:text-ink disabled:opacity-50'
+    'h-9 w-9 rounded-lg border border-line-strong bg-surface leading-none text-ink-2 hover:bg-surface-2 hover:text-ink disabled:opacity-50'
 
   return (
     <div className="flex flex-col items-end gap-1">
@@ -82,7 +82,7 @@ export function DatePicker({
           belongs on the control it describes, where it costs no vertical room. */}
       <span
         className={
-          'flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.09em] ' +
+          'flex items-center gap-1.5 eyebrow ' +
           (isToday ? 'text-ink-3' : 'text-ot')
         }
       >
@@ -106,7 +106,7 @@ export function DatePicker({
             onClick={openCalendar}
             disabled={pending}
             className={
-              'flex h-[30px] items-center gap-2 rounded-md border px-[11px] font-mono text-[12.5px] hover:bg-surface-2 disabled:opacity-60 ' +
+              'flex h-9 items-center gap-2 rounded-md border px-[11px] font-mono text-body hover:bg-surface-2 disabled:opacity-60 ' +
               (isToday
                 ? 'border-line-strong bg-surface'
                 : 'border-ot bg-ot-soft font-semibold text-ot')
@@ -144,7 +144,7 @@ export function DatePicker({
           <button
             onClick={() => go(todayIn())}
             disabled={pending}
-            className="ml-1 h-[30px] rounded-md border border-line-strong bg-surface px-[9px] text-[12.5px] hover:bg-surface-2 disabled:opacity-60"
+            className="ml-1 h-9 rounded-md border border-line-strong bg-surface px-[9px] text-body hover:bg-surface-2 disabled:opacity-60"
           >
             Hôm nay
           </button>

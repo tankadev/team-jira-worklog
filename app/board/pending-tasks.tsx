@@ -1,16 +1,8 @@
 import type { SprintTask } from '@/lib/jira/types'
-import { statusTone } from '@/lib/jira/types'
 
 import { CreateIssueButton } from './create-issue'
+import { StatusPill } from './status-pill'
 import { TypeIcon } from './type-icon'
-
-const TONE: Record<string, string> = {
-  todo: 'bg-surface-2 text-ink-2',
-  prog: 'bg-accent-soft text-accent-ink',
-  test: 'bg-warn-soft text-warn',
-  ver: 'bg-blue-soft text-blue',
-  done: 'bg-good-soft text-good',
-}
 
 /**
  * Standard-level issues assigned to the user that hold no subtask of theirs.
@@ -25,42 +17,37 @@ export function PendingTasks({ tasks, title }: { tasks: SprintTask[]; title?: st
   if (!tasks.length) return null
 
   return (
-    <section className="mt-3 rounded-[9px] border border-dashed border-line-strong bg-surface p-[15px]">
-      <div className="mb-1 font-mono text-[10.5px] uppercase tracking-[0.09em] text-ink-3">
+    <section className="mt-5 rounded-[14px] border border-dashed border-line-strong bg-surface/60 p-4">
+      <div className="mb-1 eyebrow text-ink-2">
         {title ?? 'Task của bạn chưa có task con để log'}
       </div>
-      <p className="mb-3 text-[11.5px] leading-relaxed text-ink-3">
-        Những task này thuộc epic bình thường, chỉ là chưa có task con nào bên dưới — mà giờ chỉ
-        log được vào task con.
+      <p className="mb-3 text-small leading-relaxed text-ink-3">
+        Giờ chỉ log được vào task con. Bấm <b className="font-medium text-ink-2">+ Task con</b> rồi{' '}
+        <b className="font-medium text-ink-2">Tạo nhanh từ task cha</b> để điền sẵn từ tiêu đề và mô tả
+        của task đó.
       </p>
 
       <div className="flex flex-col gap-2">
         {tasks.map((t) => (
           <div
             key={t.key}
-            className="flex flex-wrap items-center gap-2.5 rounded-md border border-line bg-ground px-3.5 py-2.5"
+            className="flex flex-wrap items-center gap-x-3 gap-y-2 overflow-hidden rounded-xl border border-line bg-surface px-4 py-3 shadow-card"
           >
-            <span className="font-mono text-[11.5px] font-semibold text-accent-ink">{t.key}</span>
+            <span className="font-mono text-small font-semibold text-accent-ink">{t.key}</span>
 
-            <span className="inline-flex items-center gap-1 rounded-[3px] bg-blue-soft px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-[0.06em] text-blue">
+            <span className="inline-flex items-center gap-1 rounded-[5px] bg-blue-soft px-1.5 py-0.5 chip-text text-blue">
               <TypeIcon name={t.issueTypeName} className="size-3" />
               {t.issueTypeName}
             </span>
 
-            <span
-              className={
-                'rounded-[4px] px-[7px] py-[3px] text-[10px] font-bold uppercase tracking-[0.05em] ' +
-                TONE[statusTone(t.statusName)]
-              }
-            >
-              {t.statusName}
-            </span>
+            {/* The same pill as a parent's header — click to change status. */}
+            <StatusPill issueKey={t.key} statusName={t.statusName} />
 
-            <span className="min-w-[180px] flex-1">
-              <span className="block text-[13px]">{t.summary}</span>
+            <span className="min-w-[260px] flex-1 basis-[320px]">
+              <span className="block text-body font-medium leading-snug">{t.summary}</span>
               {t.epicKey && (
-                <span className="mt-0.5 flex items-center gap-1 text-[11px] text-ink-3">
-                  <span className="text-[10px]">⛓</span>
+                <span className="mt-0.5 flex items-center gap-1 text-caption text-ink-3">
+                  <span className="text-micro">⛓</span>
                   <span className="font-mono">{t.epicKey}</span>
                   {t.epicName && <span className="truncate">· {t.epicName}</span>}
                 </span>
@@ -68,18 +55,20 @@ export function PendingTasks({ tasks, title }: { tasks: SprintTask[]; title?: st
             </span>
 
             {t.storyPoints !== null && (
-              <span className="rounded bg-surface-2 px-[7px] py-0.5 font-mono text-[11px] text-ink-3">
+              <span className="rounded bg-surface-2 px-[7px] py-0.5 font-mono text-caption text-ink-3">
                 SP {t.storyPoints}
               </span>
             )}
 
-            <span className="font-mono text-[11.5px] text-ink-3">
-              {t.subtaskCount === 0 ? 'chưa có task con' : `${t.subtaskCount} task con`}
-            </span>
+            {/* "No subtask yet" is what this whole section means; only a count
+                is worth saying. */}
+            {t.subtaskCount > 0 && (
+              <span className="text-small text-ink-3">{t.subtaskCount} task con</span>
+            )}
 
             <CreateIssueButton
               parentKey={t.key}
-              className="rounded-md bg-accent px-[9px] py-1 text-[12.5px] font-medium text-white hover:bg-accent-2"
+              className="ml-auto rounded-lg bg-accent px-3 py-1.5 text-small font-semibold text-on-accent shadow-card hover:bg-accent-2"
             >
               + Task con
             </CreateIssueButton>

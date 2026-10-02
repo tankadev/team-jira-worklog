@@ -178,14 +178,14 @@ export function StatusPill({
       <span
         title={readOnlyReason ?? current}
         className={
-          "inline-flex items-center gap-1 rounded-[4px] px-[6px] py-[3px] font-bold uppercase tracking-[0.05em] opacity-80 " +
-          (compact ? "max-w-[192px] text-[9.5px]" : "text-[10px]") +
+          "inline-flex items-center gap-1 rounded-[5px] px-[7px] py-[3px] status-text opacity-80 " +
+          (compact ? "max-w-[220px]" : "") +
           " " +
           TONE[statusTone(current)]
         }
       >
         <span className="truncate">{current}</span>
-        <em className="shrink-0 text-[8px] not-italic opacity-70">🔒</em>
+        <em className="shrink-0 text-[9px] not-italic opacity-70">🔒</em>
       </span>
     );
   }
@@ -199,8 +199,8 @@ export function StatusPill({
         disabled={pending}
         title={`${current} — bấm để đổi trạng thái`}
         className={
-          "inline-flex items-center gap-1 rounded-[4px] px-[6px] py-[3px] font-bold uppercase tracking-[0.05em] disabled:opacity-60 " +
-          (compact ? "max-w-[192px] text-[9.5px]" : "text-[10px]") +
+          "inline-flex items-center gap-1 rounded-[5px] px-[7px] py-[3px] status-text disabled:opacity-60 " +
+          (compact ? "max-w-[220px]" : "") +
           " " +
           TONE[statusTone(current)]
         }
@@ -213,7 +213,7 @@ export function StatusPill({
         ) : (
           <>
             <span className="truncate">{current}</span>
-            <em className="shrink-0 text-[7px] not-italic opacity-70">▾</em>
+            <em className="shrink-0 text-[9px] not-italic opacity-70">▾</em>
           </>
         )}
       </button>
@@ -239,19 +239,19 @@ export function StatusPill({
                   : { top: at.top, left: at.left }
                 : undefined
             }
-            className="fixed z-40 flex max-h-64 min-w-[220px] flex-col overflow-y-auto rounded-md border border-line-strong bg-surface p-1 shadow-lg"
+            className="fixed z-40 flex max-h-64 min-w-[220px] flex-col overflow-y-auto rounded-lg border border-line-strong bg-surface p-1 shadow-pop"
           >
             {loading && (
-              <span className="flex items-center gap-1.5 px-2 py-1.5 text-[12px] text-ink-3">
+              <span className="flex items-center gap-1.5 px-2 py-1.5 text-small text-ink-3">
                 <span className="inline-block size-3 animate-spin rounded-full border-[1.5px] border-line-strong border-t-accent" />
                 Đang tải transition…
               </span>
             )}
             {error && (
-              <span className="px-2 py-1.5 text-[12px] text-crit">{error}</span>
+              <span className="px-2 py-1.5 text-small text-crit">{error}</span>
             )}
             {items?.length === 0 && (
-              <span className="px-2 py-1.5 text-[12px] text-ink-3">
+              <span className="px-2 py-1.5 text-small text-ink-3">
                 Không có transition khả dụng
               </span>
             )}
@@ -260,13 +260,13 @@ export function StatusPill({
                 key={t.id}
                 type="button"
                 onClick={() => choose(t)}
-                className="rounded px-2 py-1.5 text-left text-[12px] hover:bg-accent-soft hover:text-accent-ink"
+                className="rounded px-2 py-1.5 text-left text-small hover:bg-accent-soft hover:text-accent-ink"
               >
                 {/* Jira's transition name can differ from the status it lands on,
                     so show the destination status — that is what the user means. */}
                 {t.toStatusName}
                 {t.name !== t.toStatusName && (
-                  <span className="ml-1.5 text-[10.5px] text-ink-3">
+                  <span className="ml-1.5 text-caption text-ink-3">
                     ({t.name})
                   </span>
                 )}
@@ -277,7 +277,7 @@ export function StatusPill({
       )}
 
       {error && !open && (
-        <span className="ml-2 self-center text-[11px] text-crit">{error}</span>
+        <span className="ml-2 self-center text-caption text-crit">{error}</span>
       )}
     </span>
   );

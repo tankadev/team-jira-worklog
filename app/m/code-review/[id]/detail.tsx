@@ -130,11 +130,11 @@ export function ReviewDetail({
         <Link href="/m/code-review" className={CTITLE + ' hover:text-ink'}>
           ← Code review
         </Link>
-        <h1 className="mt-1 text-xl font-semibold tracking-tight">
+        <h1 className="mt-1 text-title font-semibold tracking-tight">
           {item.kind === 'doc' ? '📄 ' : item.prNumber ? <span className="text-ink-3">#{item.prNumber} </span> : null}
           {item.title}
         </h1>
-        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-ink-2">
+        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-small text-ink-2">
           {repoName && <span>{repoName}</span>}
           {item.kind === 'pr' ? (
             <span className="font-mono">
@@ -159,7 +159,7 @@ export function ReviewDetail({
       <ClaudeBanner check={claude} onChange={setClaude} />
 
       {onGithub && access.read && (
-        <div className="mb-3 flex w-fit overflow-hidden rounded-md border border-line-strong text-[12.5px]">
+        <div className="mb-3 flex w-fit overflow-hidden rounded-md border border-line-strong text-body">
           <TabBtn on={tab === 'review'} onClick={() => setTab('review')}>
             Kết quả review
           </TabBtn>
@@ -181,7 +181,7 @@ export function ReviewDetail({
               type="button"
               onClick={() => setSelected(r.id)}
               className={
-                'flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[12.5px] ' +
+                'flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-body ' +
                 (current?.id === r.id ? 'border-accent bg-accent-soft text-accent-ink' : 'border-line bg-surface hover:bg-surface-2')
               }
             >
@@ -193,9 +193,9 @@ export function ReviewDetail({
       )}
 
       {!loaded ? (
-        <div className={CARD + ' text-[12.5px] text-ink-3'}>Đang tải…</div>
+        <div className={CARD + ' text-body text-ink-3'}>Đang tải…</div>
       ) : !current ? (
-        <div className={CARD + ' text-[12.5px] text-ink-2'}>Chưa có vòng review nào.</div>
+        <div className={CARD + ' text-body text-ink-2'}>Chưa có vòng review nào.</div>
       ) : (
         <RoundPanel
           key={current.id}
@@ -229,7 +229,7 @@ function TemplateBar({ item, templates }: { item: ItemView; templates: DocTempla
   const [busy, start] = useTransition()
   const current = templates.find((t) => t.id === item.templateId)
   return (
-    <div className="-mt-2 mb-4 flex flex-wrap items-center gap-2 text-[12px]">
+    <div className="-mt-2 mb-4 flex flex-wrap items-center gap-2 text-small">
       <span className="text-ink-3" title="Dùng cho file TDD không tự chọn mẫu riêng">📐 Mẫu mặc định cho TDD chưa chọn mẫu:</span>
       <select value={value} onChange={(e) => setValue(e.target.value)} className="rounded-md border border-line bg-ground px-2 py-[3px]">
         <option value="">— Không dùng mẫu —</option>
@@ -276,7 +276,7 @@ function AddresseeBar({ item, addressee }: { item: ItemView; addressee: Addresse
   const dirty = !addressee || addressee.honorific !== honorific || addressee.handle !== cleanHandle(handle)
 
   return (
-    <div className="-mt-2 mb-2 flex flex-wrap items-center gap-2 text-[12px]">
+    <div className="-mt-2 mb-2 flex flex-wrap items-center gap-2 text-small">
       <span className="text-ink-3">🗣 Xưng hô với tác giả:</span>
       <div className="flex overflow-hidden rounded-md border border-line-strong">
         {HONORIFICS.map((h) => (
@@ -339,7 +339,7 @@ function LinksBar({ item, repos, linkedItems }: { item: ItemView; repos: RepoPre
   const saved = JSON.stringify(item.links) === JSON.stringify(links)
 
   return (
-    <div className="-mt-2 mb-4 text-[12px]">
+    <div className="-mt-2 mb-4 text-small">
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-ink-3">🔗 PR liên kết:</span>
         {item.links.length === 0 && <span className="text-ink-3">chưa có</span>}
@@ -370,7 +370,7 @@ function LinksBar({ item, repos, linkedItems }: { item: ItemView; repos: RepoPre
       </div>
       {editing && (
         <div className={CARD + ' mt-2 !p-3'}>
-          <p className="mb-2 text-[11.5px] text-ink-3">
+          <p className="mb-2 text-small text-ink-3">
             Vd PR SDK mà PR này dựa vào (hoặc PR iOS dùng SDK này). Claude đọc thêm diff + code của PR kia để soi chỗ nối giữa hai bên. Có hiệu lực từ vòng review tiếp theo.
           </p>
           <LinkPicker repos={repos} value={links} onChange={setLinks} preferNot={item.repoId} />
@@ -407,7 +407,7 @@ function DiscussionLabel() {
   return (
     <>
       Thảo luận GitHub
-      {waiting > 0 && <span className="ml-1.5 rounded-full bg-blue-soft px-1.5 text-[11px] text-blue-ink">{waiting}</span>}
+      {waiting > 0 && <span className="ml-1.5 rounded-full bg-blue-soft px-1.5 text-caption text-blue-ink">{waiting}</span>}
     </>
   )
 }
@@ -444,12 +444,12 @@ function RoundPanel({
   return (
     <div className="flex flex-col gap-4">
       <div className={CARD}>
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[12px] text-ink-2">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-small text-ink-2">
           <RoundPill s={round.state} />
           {round.verdict && (
             <span
               className={
-                'rounded px-1.5 py-[1px] text-[11px] font-semibold ' +
+                'rounded px-1.5 py-[1px] text-caption font-semibold ' +
                 (round.verdict === 'approve'
                   ? 'bg-good-soft text-good'
                   : round.verdict === 'request_changes'
@@ -502,8 +502,8 @@ function RoundPanel({
             )}
           </div>
         </div>
-        {round.message && <p className={'mt-2 text-[12.5px] ' + (round.state === 'done' ? 'text-ink-2' : 'text-crit')}>{round.message}</p>}
-        {round.state === 'queued' && <p className="mt-2 text-[12.5px] text-ink-2">Đang chờ tới lượt — số review song song đặt trong Cấu hình.</p>}
+        {round.message && <p className={'mt-2 text-body ' + (round.state === 'done' ? 'text-ink-2' : 'text-crit')}>{round.message}</p>}
+        {round.state === 'queued' && <p className="mt-2 text-body text-ink-2">Đang chờ tới lượt — số review song song đặt trong Cấu hình.</p>}
         {showLog && <LogView lines={log} live={live} />}
       </div>
 
@@ -521,7 +521,7 @@ function LogView({ lines, live }: { lines: ItemDetail['log']; live: boolean }) {
     if (el) el.scrollTop = el.scrollHeight
   }, [lines.length])
   return (
-    <div ref={ref} className="mt-3 max-h-[320px] overflow-y-auto rounded-md bg-ground p-2.5 font-mono text-[11.5px] leading-relaxed">
+    <div ref={ref} className="mt-3 max-h-[320px] overflow-y-auto rounded-md bg-ground p-2.5 font-mono text-small leading-relaxed">
       {lines.length === 0 ? (
         <div className="text-ink-3">{live ? 'Đang chuẩn bị (fetch, tạo worktree)…' : 'Không có log.'}</div>
       ) : (
@@ -532,7 +532,7 @@ function LogView({ lines, live }: { lines: ItemDetail['log']; live: boolean }) {
               l.kind === 'tool'
                 ? 'text-ink-2'
                 : l.kind === 'text'
-                  ? 'whitespace-pre-wrap py-0.5 font-sans text-[12px] text-ink'
+                  ? 'whitespace-pre-wrap py-0.5 font-sans text-small text-ink'
                   : l.kind === 'result'
                     ? 'text-good'
                     : 'text-crit'
@@ -632,14 +632,14 @@ function DoneRound({
     <>
       <div className="flex flex-wrap items-center gap-2">
         {round.round > 1 && item.kind === 'pr' && (
-          <span className="text-[12px] text-ink-2">
+          <span className="text-small text-ink-2">
             Vòng {round.round}: <span className="text-good">✓ {tally.fixed} đã sửa</span>
             {tally.partial > 0 && <span className="text-warn"> · ◐ {tally.partial} sửa chưa hết</span>}
             {tally.notFixed > 0 && <span className="text-crit"> · ✗ {tally.notFixed} chưa sửa</span>}
             <span> · {tally.fresh} vấn đề mới</span>
           </span>
         )}
-        {!isLatest && <span className="text-[11.5px] text-ink-3">Đây là vòng cũ — kết quả mới nhất ở vòng sau.</span>}
+        {!isLatest && <span className="text-small text-ink-3">Đây là vòng cũ — kết quả mới nhất ở vòng sau.</span>}
         <div className="ml-auto flex gap-1.5">
           <ChatShortcut />
           <CopyButton text={allClipboard(item.kind, findings)} label="Copy tất cả comment (markdown)" className={BTN_PRI} />
@@ -648,19 +648,19 @@ function DoneRound({
 
       {/* Claude's read of the round, for the reviewer only: no Copy, never posted. */}
       {summary.trim() && (
-        <div className="rounded-[9px] border border-dashed border-line-strong bg-surface-2 px-4 py-3">
+        <div className="rounded-xl border border-dashed border-line-strong bg-surface-2 px-4 py-3">
           <div className="mb-1 flex items-center gap-2">
             <span className={CTITLE}>📝 Nhận xét của Claude</span>
-            <span className="text-[11px] text-ink-3">chỉ để bạn xem — không gửi cho member</span>
+            <span className="text-caption text-ink-3">chỉ để bạn xem — không gửi cho member</span>
           </div>
-          <div className="whitespace-pre-wrap text-[13px] leading-relaxed text-ink-2">{summary}</div>
+          <div className="whitespace-pre-wrap text-body leading-relaxed text-ink-2">{summary}</div>
         </div>
       )}
 
       {isLatest && <SubmitReview round={round} findings={findings} onDone={onChanged} />}
       {isLatest && <AccessNote onGithub={item.kind === 'pr' && Boolean(item.prNumber) && Boolean(githubRepo)} />}
 
-      <div className="flex flex-wrap items-center gap-1.5 text-[12.5px]">
+      <div className="flex flex-wrap items-center gap-1.5 text-body">
         {(
           [
             ['live', 'Còn mở'],
@@ -684,13 +684,13 @@ function DoneRound({
       </div>
 
       {groups.length === 0 ? (
-        <div className={CARD + ' text-[12.5px] text-ink-2'}>
+        <div className={CARD + ' text-body text-ink-2'}>
           {findings.length === 0 ? 'Claude không thấy vấn đề nào. 🎉' : 'Không có mục nào ở bộ lọc này.'}
         </div>
       ) : (
         groups.map(([group, list]) => (
           <section key={group} className="flex flex-col gap-2">
-            <h2 className="font-mono text-[12px] font-semibold text-ink-2">
+            <h2 className="font-mono text-small font-semibold text-ink-2">
               {group} <span className="font-normal text-ink-3">· {list.length}</span>
             </h2>
             {list.map((f) => (
@@ -739,22 +739,22 @@ function FindingCard({
       <div className="flex flex-wrap items-center gap-1.5">
         <SeverityPill s={f.severity} />
         {kind === 'doc' && (
-          <span className="rounded bg-epic-soft px-1.5 py-[1px] text-[11px] font-medium text-epic-ink">
+          <span className="rounded bg-epic-soft px-1.5 py-[1px] text-caption font-medium text-epic-ink">
             {DOC_CATEGORY_LABEL[f.category as DocCategory] ?? f.category}
           </span>
         )}
         {(f.origin === 'carried' || f.status === 'dismissed') && <StatusPill s={f.status} />}
-        <span className="text-[13px] font-medium">{f.title}</span>
+        <span className="text-body font-medium">{f.title}</span>
         {kind === 'pr' &&
           f.category &&
           (/tài liệu/i.test(f.category) ? (
-            <span className="rounded bg-epic-soft px-1.5 py-[1px] text-[11px] font-medium text-epic-ink">📎 {f.category}</span>
+            <span className="rounded bg-epic-soft px-1.5 py-[1px] text-caption font-medium text-epic-ink">📎 {f.category}</span>
           ) : (
-            <span className="text-[11px] text-ink-3">· {f.category}</span>
+            <span className="text-caption text-ink-3">· {f.category}</span>
           ))}
       </div>
       {(loc || (kind === 'doc' && f.file)) && (
-        <div className="mt-1 flex flex-wrap items-center gap-2 font-mono text-[11.5px] text-ink-3">
+        <div className="mt-1 flex flex-wrap items-center gap-2 font-mono text-small text-ink-3">
           {kind === 'doc' && f.file && <span>{loc}</span>}
           {link ? (
             <a href={link} target="_blank" rel="noreferrer" className="hover:text-accent-ink">
@@ -773,7 +773,7 @@ function FindingCard({
         </div>
       )}
       {f.snippet && (
-        <pre className="mt-2 overflow-x-auto rounded-md bg-ground p-2 font-mono text-[11.5px] leading-[1.55]">
+        <pre className="mt-2 overflow-x-auto rounded-md bg-ground p-2 font-mono text-small leading-[1.55]">
           {f.snippet.split('\n').map((line, i) => {
             const n = f.snippetStart + i
             const hit = f.line && n >= f.line && n <= (f.endLine ?? f.line)
@@ -787,7 +787,7 @@ function FindingCard({
         </pre>
       )}
       {f.followNote && (
-        <p className="mt-2 rounded-md bg-surface-2 px-2.5 py-1.5 text-[12px] text-ink-2">
+        <p className="mt-2 rounded-md bg-surface-2 px-2.5 py-1.5 text-small text-ink-2">
           <span className="font-medium">Vòng này: </span>
           {f.followNote}
         </p>
@@ -806,7 +806,7 @@ function FindingCard({
         />
       ) : (
         <div
-          className="mt-2 cursor-text whitespace-pre-wrap text-[13px] leading-relaxed"
+          className="mt-2 cursor-text whitespace-pre-wrap text-body leading-relaxed"
           title="Bấm để sửa"
           onClick={() => setEditing(true)}
         >
@@ -890,7 +890,7 @@ function NextRound({
   return (
     <div className={CARD + ' mt-4'}>
       <div className={CTITLE + ' mb-1'}>{done ? 'Member đã sửa xong? Review tiếp' : 'Chạy lại'}</div>
-      <p className="mb-2 text-[12px] text-ink-2">
+      <p className="mb-2 text-small text-ink-2">
         {item.kind === 'pr'
           ? done
             ? 'Claude sẽ lấy commit mới nhất, xem phần vừa sửa so với vòng trước, đánh giá lại từng điểm còn mở và chỉ tìm vấn đề mới trong code vừa đổi.'
@@ -899,7 +899,7 @@ function NextRound({
       </p>
       {item.kind === 'doc' && <div className="mb-2">{up.picker}</div>}
       {item.kind === 'pr' && current.length > 0 && (
-        <p className="mb-2 text-[12px] text-ink-2">
+        <p className="mb-2 text-small text-ink-2">
           📎 Vòng sau vẫn đối chiếu với: {current.map((d) => `${DOC_ROLE_LABEL[d.role]}: ${d.name}`).join(' · ')}
           {attach.count > 0 && <span className="text-warn"> — sẽ được thay bằng {attach.count} file mới bên dưới</span>}
         </p>
@@ -920,7 +920,7 @@ function NextRound({
         <button type="button" className={item.kind === 'pr' ? BTN_PRI : BTN} disabled={busy || !canRun} onClick={again}>
           {item.kind === 'pr' ? (busy && attach.count ? 'Đang tải tài liệu…' : done ? 'Review tiếp' : 'Chạy lại') : 'Chạy lại với tài liệu cũ'}
         </button>
-        {(msg || up.msg) && <span className="text-[12px] text-ink-2">{msg || up.msg}</span>}
+        {(msg || up.msg) && <span className="text-small text-ink-2">{msg || up.msg}</span>}
       </div>
     </div>
   )

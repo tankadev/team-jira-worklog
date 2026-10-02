@@ -38,9 +38,9 @@ async function reportPage(props: PageProps<'/report'>) {
 
   if (!getSetting(SETTING_KEYS.jiraApiToken)) {
     return (
-      <div className="rounded-[9px] border border-line bg-surface p-[17px]">
-        <span className="text-[13px]">Chưa cấu hình Jira — </span>
-        <Link href="/settings" className="text-[13px] text-accent-ink underline underline-offset-2">
+      <div className="card p-5">
+        <span className="text-body">Chưa cấu hình Jira — </span>
+        <Link href="/settings" className="text-body text-accent-ink underline underline-offset-2">
           mở Settings
         </Link>
       </div>
@@ -144,15 +144,15 @@ async function reportPage(props: PageProps<'/report'>) {
     <NavProvider>
       <header className="mb-4 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <div className="font-mono text-[10.5px] uppercase tracking-[0.09em] text-ink-3">
+          <div className="eyebrow text-ink-2">
             Dựng từ worklog thật trên Jira
           </div>
-          <h1 className="text-xl font-semibold tracking-tight">Daily report</h1>
+          <h1 className="text-title font-semibold tracking-tight">Daily report</h1>
         </div>
         <ReportDatePicker date={date} label={formatDateVi(date)} />
       </header>
 
-      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_296px]">
+      <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[minmax(0,1fr)_296px]">
         <div className="flex flex-col gap-4">
           <ReportOutput
             body={body}
@@ -164,8 +164,8 @@ async function reportPage(props: PageProps<'/report'>) {
             empty={issues.length === 0}
           />
 
-          <section className="rounded-[9px] border border-line bg-surface p-[17px]">
-            <div className="mb-2.5 font-mono text-[10.5px] uppercase tracking-[0.09em] text-ink-3">
+          <section className="card p-5">
+            <div className="mb-2.5 eyebrow text-ink-2">
               Tuần này
             </div>
             <WeekTable
@@ -178,8 +178,8 @@ async function reportPage(props: PageProps<'/report'>) {
         </div>
 
         <aside className="flex flex-col gap-3.5 lg:sticky lg:top-5">
-          <section className="rounded-[9px] border border-line bg-surface p-[17px]">
-            <div className="mb-2.5 font-mono text-[10.5px] uppercase tracking-[0.09em] text-ink-3">
+          <section className="card p-5">
+            <div className="mb-2.5 eyebrow text-ink-2">
               Ngày {formatDateVi(date)}
             </div>
             <Stat label="Số task" value={String(dayIssueCount)} />
@@ -188,8 +188,8 @@ async function reportPage(props: PageProps<'/report'>) {
           </section>
 
           {shortDays.length > 0 && (
-            <section className="rounded-[9px] border border-line bg-surface p-[17px]">
-              <div className="mb-2.5 font-mono text-[10.5px] uppercase tracking-[0.09em] text-ink-3">
+            <section className="card p-5">
+              <div className="mb-2.5 eyebrow text-ink-2">
                 Ngày chưa đủ định mức
               </div>
               {shortDays.map((d) => (
@@ -204,8 +204,8 @@ async function reportPage(props: PageProps<'/report'>) {
           )}
 
           {current && (
-            <section className="rounded-[9px] border border-line bg-surface p-[17px]">
-              <div className="mb-2.5 font-mono text-[10.5px] uppercase tracking-[0.09em] text-ink-3">
+            <section className="card p-5">
+              <div className="mb-2.5 eyebrow text-ink-2">
                 {current.name} tới nay
               </div>
               <Stat label="Đã log" value={formatDuration(sprintSeconds)} />
@@ -220,21 +220,21 @@ async function reportPage(props: PageProps<'/report'>) {
             </section>
           )}
 
-          <section className="rounded-[9px] border border-line bg-surface p-[17px]">
-            <div className="mb-2.5 font-mono text-[10.5px] uppercase tracking-[0.09em] text-ink-3">
+          <section className="card p-5">
+            <div className="mb-2.5 eyebrow text-ink-2">
               Xuất
             </div>
             <div className="flex flex-col gap-1.5">
               <a
                 href={`/api/report/csv?from=${days[0]}&to=${days[6]}`}
-                className="rounded-md border border-line-strong bg-surface px-[9px] py-1 text-center text-[12.5px] hover:bg-surface-2"
+                className="rounded-lg border border-line-strong bg-surface px-3 py-1.5 font-medium text-center text-body hover:bg-surface-2"
               >
                 CSV tuần này
               </a>
               {sprintFrom && sprintTo && (
                 <a
                   href={`/api/report/csv?from=${sprintFrom}&to=${sprintTo}`}
-                  className="rounded-md border border-line-strong bg-surface px-[9px] py-1 text-center text-[12.5px] hover:bg-surface-2"
+                  className="rounded-lg border border-line-strong bg-surface px-3 py-1.5 font-medium text-center text-body hover:bg-surface-2"
                 >
                   CSV cả sprint
                 </a>
@@ -261,7 +261,7 @@ function Stat({
   tone?: 'warn'
 }) {
   return (
-    <div className="flex justify-between gap-2.5 border-t border-line py-[5px] text-[12.5px] first:border-t-0">
+    <div className="flex justify-between gap-2.5 border-t border-line py-[5px] text-body first:border-t-0">
       <span>{label}</span>
       <b className={'font-mono font-medium tabular ' + (tone === 'warn' ? 'text-warn' : '')}>
         {value}

@@ -61,35 +61,43 @@ export function EpicHeader({
   const subtaskCount = group.parents.reduce((n, p) => n + p.childCount, 0)
   const logged = group.parents.reduce((n, p) => n + p.childTimeSpentTotal, 0)
 
+  const isEpic = Boolean(group.key)
+
   return (
-    <div className="mb-2 mt-1 flex flex-wrap items-center gap-2 border-l-2 border-epic pl-2.5">
-      <span className="inline-flex items-center gap-1 rounded-[3px] bg-epic px-1.5 py-0.5 font-mono text-[9.5px] font-semibold uppercase tracking-[0.06em] text-white">
-        {/* The badge is solid purple, and Jira ships this icon in its own colour —
-            `brightness-0 invert` flattens any SVG to pure white, which is the only
-            way to recolour an <img> the browser treats as opaque. */}
-        <TypeIcon name="Epic" className="size-3 brightness-0 invert" />
-        Epic
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+      <span
+        className={
+          'grid size-8 shrink-0 place-items-center rounded-lg ' +
+          (isEpic ? 'bg-epic text-white shadow-card' : 'border border-dashed border-line-strong text-ink-3')
+        }
+      >
+        {/* Jira ships this icon in its own colour — `brightness-0 invert`
+            flattens any SVG to pure white on the purple tile. */}
+        <TypeIcon name="Epic" className={'size-4 ' + (isEpic ? 'brightness-0 invert' : 'opacity-50 grayscale')} />
       </span>
 
-      {group.key && (
-        <span className="font-mono text-[11.5px] font-semibold text-epic-ink">{group.key}</span>
-      )}
-
-      <span className="min-w-0 flex-1 truncate text-[12.5px] text-ink-2">{group.name}</span>
-
-      <span className="font-mono text-[11px] text-ink-3">
-        {taskCount} task · {subtaskCount} task con
-        {logged > 0 && <> · {formatDuration(logged)}</>}
-      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-x-2 text-caption">
+          <span className={'font-semibold ' + (isEpic ? 'text-epic-ink' : 'text-ink-3')}>Epic</span>
+          {group.key && <span className="whitespace-nowrap font-mono font-semibold text-epic-ink">{group.key}</span>}
+          <span className="whitespace-nowrap font-mono text-ink-3">
+            · {taskCount} task cha · {subtaskCount} task con
+            {logged > 0 && <> · {formatDuration(logged)}</>}
+          </span>
+        </div>
+        <div className="truncate text-emph font-semibold leading-snug text-ink" title={group.name}>
+          {group.name}
+        </div>
+      </div>
 
       {group.key && (
         <CreateIssueButton
           parentKey={group.key}
           mode="task"
           boardSprintId={boardSprintId}
-          className="rounded-md border border-epic/50 px-2 py-[2px] font-mono text-[11px] text-epic-ink hover:border-epic hover:bg-epic-soft"
+          className="shrink-0 rounded-lg border border-epic/50 bg-surface px-2.5 py-1 text-caption font-semibold text-epic-ink hover:border-epic hover:bg-epic-soft"
         >
-          + Task
+          + Task cha
         </CreateIssueButton>
       )}
     </div>

@@ -5,9 +5,9 @@ export default function ReportLoading() {
     <>
       <HeaderSkeleton />
 
-      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_296px]">
+      <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[minmax(0,1fr)_296px]">
         <div className="flex flex-col gap-4">
-          <section className="rounded-[9px] border border-line bg-surface p-[17px]">
+          <section className="card p-5">
             <div className="mb-2.5 flex items-center justify-between gap-3">
               <Shimmer className="h-2.5 w-32" />
               <div className="flex gap-1.5">

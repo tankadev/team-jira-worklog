@@ -111,7 +111,7 @@ export function AccessNote({ onGithub }: { onGithub: boolean }) {
   const [busy, start] = useTransition()
   if (!onGithub || gh.canWrite) return null
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-md border border-dashed border-line-strong bg-surface px-3 py-2 text-[12px] text-ink-2">
+    <div className="flex flex-wrap items-center gap-2 rounded-md border border-dashed border-line-strong bg-surface px-3 py-2 text-small text-ink-2">
       <span>🔒 {gh.access.reason || 'Token GitHub chưa có quyền ghi.'} Dùng nút Copy rồi tự dán comment trên GitHub.</span>
       <button type="button" className={BTN + ' ml-auto'} disabled={busy} onClick={() => start(() => gh.recheck())}>
         {busy ? 'Đang kiểm tra…' : 'Kiểm tra lại quyền'}
@@ -148,7 +148,7 @@ function ConfirmButton({
         setArmed(false)
         onConfirm()
       }}
-      className="rounded-md bg-warn px-2.5 py-1 text-[12.5px] font-medium text-white disabled:opacity-50"
+      className="rounded-md bg-warn px-2.5 py-1 text-body font-medium text-white disabled:opacity-50"
     >
       {confirm}
     </button>
@@ -187,8 +187,8 @@ export function FindingGithub({ f, onPosted }: { f: FindingView; onPosted: () =>
             })
           }
         />
-        {busy && <span className="text-[12px] text-ink-3">Đang gửi…</span>}
-        {msg && <span className="text-[12px] text-crit">{msg}</span>}
+        {busy && <span className="text-small text-ink-3">Đang gửi…</span>}
+        {msg && <span className="text-small text-crit">{msg}</span>}
       </span>
     )
   }
@@ -198,7 +198,7 @@ export function FindingGithub({ f, onPosted }: { f: FindingView; onPosted: () =>
     : undefined
   return (
     <div className="w-full">
-      <a href={f.ghUrl} target="_blank" rel="noreferrer" className="text-[12px] font-medium text-good hover:underline">
+      <a href={f.ghUrl} target="_blank" rel="noreferrer" className="text-small font-medium text-good hover:underline">
         ✓ Đã gửi lên PR{f.ghCommentId ? '' : ' (comment chung)'} ↗
       </a>
       {thread && <ThreadView thread={thread} skipFirst compact hideReply />}
@@ -235,7 +235,7 @@ function FollowUp({ f, onSent }: { f: FindingView; onSent: () => void }) {
   return (
     <div className="mt-2">
       {f.followSentUrl && (
-        <a href={f.followSentUrl} target="_blank" rel="noreferrer" className="mr-2 text-[12px] text-good hover:underline">
+        <a href={f.followSentUrl} target="_blank" rel="noreferrer" className="mr-2 text-small text-good hover:underline">
           ✓ Đã trả lời tiếp ↗
         </a>
       )}
@@ -245,7 +245,7 @@ function FollowUp({ f, onSent }: { f: FindingView; onSent: () => void }) {
         </button>
       ) : (
         <div className="rounded-md border border-line bg-surface-2 p-2">
-          <div className="mb-1 flex flex-wrap items-center gap-1.5 text-[11.5px] text-ink-3">
+          <div className="mb-1 flex flex-wrap items-center gap-1.5 text-small text-ink-3">
             <span>{f.ghCommentId ? 'Trả lời ngay trong thread của comment này' : 'Comment mới trên PR, có trích và link comment cũ'} · lấy nội dung từ:</span>
             {sources.map((s) => (
               <button
@@ -292,11 +292,11 @@ function FollowUp({ f, onSent }: { f: FindingView; onSent: () => void }) {
             <button type="button" className={BTN} onClick={() => setOpen(false)}>
               Đóng
             </button>
-            {busy && <span className="text-[12px] text-ink-3">Đang gửi…</span>}
+            {busy && <span className="text-small text-ink-3">Đang gửi…</span>}
           </div>
         </div>
       )}
-      {msg && <span className={'ml-2 text-[12px] ' + (msg.ok ? 'text-good' : 'text-crit')}>{msg.text}</span>}
+      {msg && <span className={'ml-2 text-small ' + (msg.ok ? 'text-good' : 'text-crit')}>{msg.text}</span>}
     </div>
   )
 }
@@ -307,7 +307,7 @@ function CommentView({ c, viewer }: { c: GhComment; viewer: string }) {
   const mine = c.author === viewer
   return (
     <div className={'rounded-md px-2.5 py-2 ' + (mine ? 'bg-accent-soft/50' : 'bg-surface-2')}>
-      <div className="mb-0.5 flex items-center gap-1.5 text-[11.5px]">
+      <div className="mb-0.5 flex items-center gap-1.5 text-small">
         {c.avatar && <img src={c.avatar} alt="" className="size-4 rounded-full" />}
         <span className="font-semibold">{c.author}</span>
         {mine && <span className="text-ink-3">(bạn)</span>}
@@ -315,7 +315,7 @@ function CommentView({ c, viewer }: { c: GhComment; viewer: string }) {
           <Ago epoch={Math.floor(Date.parse(c.createdAt) / 1000)} />
         </a>
       </div>
-      <div className="whitespace-pre-wrap text-[12.5px] leading-relaxed">{c.body}</div>
+      <div className="whitespace-pre-wrap text-body leading-relaxed">{c.body}</div>
     </div>
   )
 }
@@ -342,7 +342,7 @@ function ReplyBox({ onSend, placeholder }: { onSend: (body: string) => Promise<{
         >
           {busy ? 'Đang gửi…' : 'Gửi'}
         </button>
-        {msg && <span className="text-[12px] text-crit">{msg}</span>}
+        {msg && <span className="text-small text-crit">{msg}</span>}
       </div>
     </div>
   )
@@ -376,7 +376,7 @@ export function ThreadView({
 
   return (
     <div className={compact ? 'mt-2 border-l-2 border-line pl-2.5' : ''}>
-      <div className="flex flex-wrap items-center gap-2 text-[11.5px]">
+      <div className="flex flex-wrap items-center gap-2 text-small">
         {compact ? (
           <span className="text-ink-3">{shown.length ? `${shown.length} phản hồi` : 'Chưa có phản hồi'}</span>
         ) : (
@@ -434,7 +434,7 @@ export function DiscussionPanel() {
 
   if (!d) {
     return (
-      <div className={CARD + ' text-[12.5px] ' + (gh.error ? 'text-crit' : 'text-ink-3')}>
+      <div className={CARD + ' text-body ' + (gh.error ? 'text-crit' : 'text-ink-3')}>
         {gh.error || 'Đang tải thảo luận từ GitHub…'}
       </div>
     )
@@ -455,7 +455,7 @@ export function DiscussionPanel() {
           <div className={CTITLE}>
             Thread trên code · {d.threads.length - resolved} đang mở{resolved ? ` · ${resolved} đã xong` : ''}
           </div>
-          <label className="ml-auto flex items-center gap-1.5 text-[12px] text-ink-2">
+          <label className="ml-auto flex items-center gap-1.5 text-small text-ink-2">
             <input type="checkbox" checked={showResolved} onChange={(e) => setShowResolved(e.target.checked)} />
             Hiện thread đã xong
           </label>
@@ -464,7 +464,7 @@ export function DiscussionPanel() {
           </button>
         </div>
         {threads.length === 0 ? (
-          <p className="text-[12.5px] text-ink-3">Không có thread nào{resolved && !showResolved ? ' đang mở' : ''}.</p>
+          <p className="text-body text-ink-3">Không có thread nào{resolved && !showResolved ? ' đang mở' : ''}.</p>
         ) : (
           <div className="flex flex-col divide-y divide-line">
             {threads.map((t) => (
@@ -479,19 +479,19 @@ export function DiscussionPanel() {
       <div className={CARD}>
         <div className={CTITLE + ' mb-2'}>Conversation</div>
         <div className="flex flex-col gap-1.5">
-          {timeline.length === 0 && <p className="text-[12.5px] text-ink-3">Chưa có comment chung nào.</p>}
+          {timeline.length === 0 && <p className="text-body text-ink-3">Chưa có comment chung nào.</p>}
           {timeline.map((e, i) =>
             e.c ? (
               <CommentView key={`c${i}`} c={e.c} viewer={d.viewer} />
             ) : (
               <div key={`r${i}`} className="rounded-md border border-line px-2.5 py-2">
-                <div className="text-[11.5px]">
+                <div className="text-small">
                   <span className="font-semibold">{e.r!.author}</span> · {REVIEW_STATE[e.r!.state] ?? e.r!.state} ·{' '}
                   <a href={e.r!.url} target="_blank" rel="noreferrer" className="text-ink-3 hover:underline">
                     <Ago epoch={Math.floor(Date.parse(e.r!.submittedAt) / 1000)} />
                   </a>
                 </div>
-                {e.r!.body && <div className="mt-0.5 whitespace-pre-wrap text-[12.5px] leading-relaxed">{e.r!.body}</div>}
+                {e.r!.body && <div className="mt-0.5 whitespace-pre-wrap text-body leading-relaxed">{e.r!.body}</div>}
               </div>
             ),
           )}
@@ -541,11 +541,11 @@ export function SubmitReview({
     <div className={CARD}>
       <div className="flex flex-wrap items-center gap-2">
         <div className={CTITLE}>Gửi review lên GitHub</div>
-        <span className="text-[12px] text-ink-2">
+        <span className="text-small text-ink-2">
           {candidates.length ? `${candidates.length} điểm chưa gửi` : 'Đã gửi hết các điểm còn mở'}
         </span>
         {msg && (
-          <span className={'text-[12px] ' + (msg.ok ? 'text-good' : 'text-crit')}>
+          <span className={'text-small ' + (msg.ok ? 'text-good' : 'text-crit')}>
             {msg.text}{' '}
             {msg.url && (
               <a href={msg.url} target="_blank" rel="noreferrer" className="underline">
@@ -560,13 +560,13 @@ export function SubmitReview({
       </div>
       {open && (
         <div className="mt-3">
-          <p className="mb-2 text-[12px] text-ink-3">
+          <p className="mb-2 text-small text-ink-3">
             Gửi một lần: các điểm đã chọn thành comment inline; comment rời và điểm ngoài diff được liệt kê trong nội dung review. Tác giả nhận một thông báo.
           </p>
           <ul className="mb-2 max-h-[260px] overflow-y-auto rounded-md border border-line">
             {candidates.map((f) => (
               <li key={f.id} className="border-b border-line last:border-0">
-                <label className="flex cursor-pointer items-center gap-2 px-2.5 py-1.5 text-[12.5px] hover:bg-surface-2/60">
+                <label className="flex cursor-pointer items-center gap-2 px-2.5 py-1.5 text-body hover:bg-surface-2/60">
                   <input
                     type="checkbox"
                     checked={picked.has(f.id)}
@@ -581,7 +581,7 @@ export function SubmitReview({
                   />
                   <SeverityPill s={f.severity} />
                   <span className="truncate">{f.title}</span>
-                  <span className="ml-auto shrink-0 font-mono text-[11px] text-ink-3">
+                  <span className="ml-auto shrink-0 font-mono text-caption text-ink-3">
                     {where(f) || 'comment rời'} {f.inDiff ? '· trên dòng code' : '· trong nội dung'}
                   </span>
                 </label>
@@ -617,9 +617,9 @@ export function SubmitReview({
                 })
               }
             />
-            {busy && <span className="text-[12px] text-ink-3">Đang gửi…</span>}
+            {busy && <span className="text-small text-ink-3">Đang gửi…</span>}
           </div>
-          <p className="mt-2 text-[11.5px] text-ink-3">
+          <p className="mt-2 text-small text-ink-3">
             Không có "Duyệt" (Approve) ở đây: duyệt có thể kích hoạt auto-merge, nên module chỉ gửi Góp ý hoặc Yêu cầu sửa — duyệt thì bấm trên GitHub.
           </p>
         </div>
@@ -655,8 +655,8 @@ export function ReplyWithBody({ f, body, onSent }: { f: FindingView; body: strin
           })
         }
       />
-      {busy && <span className="text-[12px] text-ink-3">Đang gửi…</span>}
-      {msg && <span className={'text-[12px] ' + (msg.ok ? 'text-good' : 'text-crit')}>{msg.text}</span>}
+      {busy && <span className="text-small text-ink-3">Đang gửi…</span>}
+      {msg && <span className={'text-small ' + (msg.ok ? 'text-good' : 'text-crit')}>{msg.text}</span>}
     </span>
   )
 }

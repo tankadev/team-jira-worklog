@@ -59,7 +59,7 @@ export function SprintFixButton({
           (addsLabel ? ` và thêm label ${addsLabel}` : '') +
           ' — sửa cả trên Jira, không chỉ ở đây'
         }
-        className="inline-flex h-[18px] items-center gap-1 rounded-[3px] border border-warn bg-warn-soft px-1.5 font-mono text-[9.5px] font-semibold uppercase tracking-[0.06em] text-warn hover:brightness-110 disabled:opacity-60"
+        className="inline-flex h-[18px] items-center gap-1 rounded-[5px] border border-warn bg-warn-soft px-1.5 chip-text text-warn hover:brightness-110 disabled:opacity-60"
       >
         {/* Its own element, not a bare string: two adjacent text expressions
             merge into one anonymous flex item and `gap` never applies, which
@@ -67,7 +67,7 @@ export function SprintFixButton({
         <span aria-hidden>{pending ? <Spinner className="size-2.5" /> : '↳'}</span>
         <span>{addsLabel ? 'đưa vào sprint + label' : 'đưa vào sprint'}</span>
       </button>
-      {note && <span className="text-[11px] text-crit">{note}</span>}
+      {note && <span className="text-caption text-crit">{note}</span>}
     </span>
   )
 }

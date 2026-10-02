@@ -38,13 +38,13 @@ import {
   startReleaseAction,
 } from "./actions";
 
-const CARD = "rounded-[9px] border border-line bg-surface p-[17px]";
-const CTITLE = "font-mono text-[10.5px] uppercase tracking-[0.09em] text-ink-3";
+const CARD = "card p-5";
+const CTITLE = "eyebrow text-ink-2";
 const BTN =
-  "rounded-md border border-line-strong bg-surface px-2.5 py-1 text-[12.5px] hover:bg-surface-2 disabled:opacity-50";
+  "rounded-lg border border-line-strong bg-surface px-3 py-1.5 font-medium text-body hover:bg-surface-2 disabled:opacity-50";
 const BTN_PRI =
-  "rounded-md bg-accent px-3 py-1 text-[12.5px] font-medium text-white hover:bg-accent-2 disabled:opacity-50";
-const INPUT = "rounded-md border border-line bg-ground px-2.5 py-1.5 text-[12.5px]";
+  "rounded-lg bg-accent shadow-card px-3 py-1.5 text-body font-semibold text-on-accent hover:bg-accent-2 disabled:opacity-50";
+const INPUT = "rounded-lg border border-line bg-ground px-3 py-2 text-body";
 
 /**
  * A terminal, and deliberately the same one in both themes.
@@ -278,15 +278,15 @@ export function SdkRelease({ view, runs }: { view: SdkConfigView; runs: RunRow[]
         <header className="mb-4 flex flex-wrap items-end justify-between gap-4">
           <div>
             <div className={CTITLE}>Release iOS SDK</div>
-            <h1 className="text-xl font-semibold tracking-tight">Release SDK</h1>
-            <p className="mt-1 text-[12.5px] text-ink-3">
+            <h1 className="text-title font-semibold tracking-tight">Release SDK</h1>
+            <p className="mt-1 text-body text-ink-3">
               App <b>fetch</b>, <b>chuyển nhánh</b> và <b>fast-forward main</b> của repo
               swift, gợi ý tên version, kiểm điều kiện rồi chạy release. Lệnh build đọc{" "}
               <b className="text-ink-2">nhánh đang checkout</b>, không phải nhánh chọn trên
               màn hình.
             </p>
           </div>
-          <div className="flex overflow-hidden rounded-md border border-line-strong text-[12.5px]">
+          <div className="flex overflow-hidden rounded-md border border-line-strong text-body">
             <TabBtn on={tab === "run"} onClick={() => setTab("run")}>
               Chạy
             </TabBtn>
@@ -349,8 +349,8 @@ export function SdkRelease({ view, runs }: { view: SdkConfigView; runs: RunRow[]
                      */}
                     <div className="mt-2 rounded-[6px] border border-line border-l-[3px] border-l-accent bg-ground px-3 py-2.5">
                       <div className="flex items-baseline gap-1.5">
-                        <span className="shrink-0 text-[12px] text-accent-ink">⑂</span>
-                        <span className="min-w-0 break-all font-mono text-[13px] font-semibold text-accent-ink">
+                        <span className="shrink-0 text-small text-accent-ink">⑂</span>
+                        <span className="min-w-0 break-all font-mono text-body font-semibold text-accent-ink">
                           {head || "—"}
                         </span>
                       </div>
@@ -358,12 +358,12 @@ export function SdkRelease({ view, runs }: { view: SdkConfigView; runs: RunRow[]
                       {ready.headSubject && (
                         <p
                           title={ready.headSubject}
-                          className="mt-1.5 line-clamp-3 text-[15px] font-semibold leading-snug text-ink"
+                          className="mt-1.5 line-clamp-3 text-lead font-semibold leading-snug text-ink"
                         >
                           {ready.headSubject}
                         </p>
                       )}
-                      <p className="mt-1 text-[11px] text-ink-3">
+                      <p className="mt-1 text-caption text-ink-3">
                         <span className="font-mono">{ready.headSha.slice(0, 8)}</span>
                         {ready.headAuthor ? ` · ${ready.headAuthor}` : ""}
                         {ready.headAt ? ` · ${ago(ready.headAt)}` : ""}
@@ -389,7 +389,7 @@ export function SdkRelease({ view, runs }: { view: SdkConfigView; runs: RunRow[]
                         cannot be released from here — it has to be checked out
                         first, which is now one button rather than a paste. */}
                     {previewing && (
-                      <div className="mt-2 rounded-[5px] border border-crit bg-crit-soft px-2.5 py-2 text-[12px] leading-relaxed text-crit">
+                      <div className="mt-2 rounded-[5px] border border-crit bg-crit-soft px-2.5 py-2 text-small leading-relaxed text-crit">
                         <b>Repo chưa đứng ở nhánh này.</b> Đang ở{" "}
                         <span className="font-mono">{head}</span>, mà lệnh build chỉ đọc
                         nhánh đang checkout — nút Release bị khoá.
@@ -402,7 +402,7 @@ export function SdkRelease({ view, runs }: { view: SdkConfigView; runs: RunRow[]
                               ? "Cây làm việc còn thay đổi chưa commit — checkout sẽ mang chúng sang nhánh mới."
                               : `git fetch rồi git checkout ${pick}`
                           }
-                          className="mt-2 w-full rounded-md bg-crit px-3 py-1.5 text-[12.5px] font-medium text-white hover:opacity-90 disabled:opacity-50"
+                          className="mt-2 w-full rounded-md bg-crit px-3 py-1.5 text-body font-medium text-white hover:opacity-90 disabled:opacity-50"
                         >
                           {busy ? "Đang chuyển…" : `Fetch & chuyển sang ${pick}`}
                         </button>
@@ -411,7 +411,7 @@ export function SdkRelease({ view, runs }: { view: SdkConfigView; runs: RunRow[]
                             do it. Usually git's own words, which name the file
                             in the way and say what to move. */}
                         {switchNote && (
-                          <p className="mt-2 whitespace-pre-wrap border-t border-crit/30 pt-2 text-[11.5px] leading-relaxed text-crit">
+                          <p className="mt-2 whitespace-pre-wrap border-t border-crit/30 pt-2 text-small leading-relaxed text-crit">
                             <b>Chưa chuyển được.</b> {switchNote.text}
                           </p>
                         )}
@@ -419,7 +419,7 @@ export function SdkRelease({ view, runs }: { view: SdkConfigView; runs: RunRow[]
                     )}
                   </>
                 ) : (
-                  <p className="mt-2 text-[12.5px] text-ink-3">
+                  <p className="mt-2 text-body text-ink-3">
                     {busy ? "Đang đọc repo…" : note.text || "Chưa đọc được repo."}
                   </p>
                 )}
@@ -435,13 +435,13 @@ export function SdkRelease({ view, runs }: { view: SdkConfigView; runs: RunRow[]
                     onChange={(e) => setVersion(e.target.value)}
                     className={
                       INPUT +
-                      " mt-1 w-full font-mono text-[14px] " +
+                      " mt-1 w-full font-mono text-emph " +
                       (ready.proposal.confidence === "guess"
                         ? "border-warn bg-warn-soft/30"
                         : "")
                     }
                   />
-                  <p className="mt-1 text-[11.5px] text-ink-3">{ready.proposal.why}</p>
+                  <p className="mt-1 text-small text-ink-3">{ready.proposal.why}</p>
 
                   {/*
                    * The guide hands this choice to the person: a feature
@@ -451,14 +451,14 @@ export function SdkRelease({ view, runs }: { view: SdkConfigView; runs: RunRow[]
                    */}
                   {ready.proposal.alternatives.length > 0 && (
                     <div className="mt-1.5 flex flex-wrap items-center gap-1">
-                      <span className="text-[11px] text-ink-3">hoặc</span>
+                      <span className="text-caption text-ink-3">hoặc</span>
                       {ready.proposal.alternatives.map((a) => (
                         <button
                           key={a.version}
                           type="button"
                           onClick={() => setVersion(a.version)}
                           title={a.why}
-                          className="rounded border border-line px-1.5 py-[1px] font-mono text-[11px] text-ink-2 hover:bg-surface-2"
+                          className="rounded border border-line px-1.5 py-[1px] font-mono text-caption text-ink-2 hover:bg-surface-2"
                         >
                           {a.version}
                         </button>
@@ -466,7 +466,7 @@ export function SdkRelease({ view, runs }: { view: SdkConfigView; runs: RunRow[]
                     </div>
                   )}
                   {ready.proposal.warnings.map((w) => (
-                    <p key={w} className="mt-1 text-[11.5px] text-warn">
+                    <p key={w} className="mt-1 text-small text-warn">
                       ⚠ {w}
                     </p>
                   ))}
@@ -478,7 +478,7 @@ export function SdkRelease({ view, runs }: { view: SdkConfigView; runs: RunRow[]
                       disabled={!canRun || busy}
                       title="Build, tạo release, rồi push lên repo khách hàng."
                       className={
-                        "rounded-md bg-crit px-3 py-1 text-[12.5px] font-medium text-white " +
+                        "rounded-md bg-crit px-3 py-1 text-body font-medium text-white " +
                         "hover:opacity-90 disabled:opacity-50"
                       }
                     >
@@ -508,10 +508,10 @@ export function SdkRelease({ view, runs }: { view: SdkConfigView; runs: RunRow[]
                   {ready.checks
                     .filter((c) => c.state === "fail")
                     .map((c) => (
-                      <p key={c.id} className="mt-2 text-[12px] leading-relaxed text-crit">
+                      <p key={c.id} className="mt-2 text-small leading-relaxed text-crit">
                         <b>{c.label}</b> {c.detail}
                         {c.fix && (
-                          <span className="mt-1 block overflow-x-auto rounded bg-surface-2 px-2 py-1 font-mono text-[11px] text-ink-2">
+                          <span className="mt-1 block overflow-x-auto rounded bg-surface-2 px-2 py-1 font-mono text-caption text-ink-2">
                             {c.fix}
                           </span>
                         )}
@@ -521,7 +521,7 @@ export function SdkRelease({ view, runs }: { view: SdkConfigView; runs: RunRow[]
                   {note.text && (
                     <p
                       className={
-                        "mt-2 text-[12px] " + (note.ok ? "text-ink-2" : "text-crit")
+                        "mt-2 text-small " + (note.ok ? "text-ink-2" : "text-crit")
                       }
                     >
                       {note.text}
@@ -666,7 +666,7 @@ function ChangedFiles({
 }) {
   if (!files.total)
     return (
-      <p className="mt-1.5 text-[11px] text-ink-3">Commit này không đổi file nào.</p>
+      <p className="mt-1.5 text-caption text-ink-3">Commit này không đổi file nào.</p>
     );
 
   return (
@@ -674,7 +674,7 @@ function ChangedFiles({
       <button
         type="button"
         onClick={onOpen}
-        className="text-[11px] text-accent-ink underline underline-offset-2"
+        className="text-caption text-accent-ink underline underline-offset-2"
       >
         {files.total} file thay đổi
         {files.added > 0 || files.removed > 0 ? (
@@ -687,7 +687,7 @@ function ChangedFiles({
       {/* Câu này phải có mặt, không nhét vào tooltip: trên một commit merge,
           "3 file" mà không nói so với cái gì thì là một con số không đọc được. */}
       {files.merge && (
-        <p className="text-[10.5px] leading-snug text-ink-3">
+        <p className="text-caption leading-snug text-ink-3">
           commit merge — so với nhánh gốc của nó
         </p>
       )}
@@ -764,22 +764,22 @@ function DiffScreen({
     <div className="fixed inset-0 z-50 flex flex-col bg-ground">
       <header className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-line px-4 py-2.5">
         <div className="min-w-0 flex-1">
-          <p title={subject} className="truncate text-[13px] font-semibold text-ink">
+          <p title={subject} className="truncate text-body font-semibold text-ink">
             {subject}
           </p>
-          <p className="text-[11px] text-ink-3">
+          <p className="text-caption text-ink-3">
             <span className="font-mono">{sha.slice(0, 8)}</span> · {files.total} file
             {files.merge ? " · commit merge, so với nhánh gốc" : ""}
           </p>
         </div>
-        <span className="shrink-0 font-mono text-[12px]">
+        <span className="shrink-0 font-mono text-small">
           <span className="text-accent">+{files.added}</span>{" "}
           <span className="text-crit">−{files.removed}</span>
         </span>
         <button
           type="button"
           onClick={onClose}
-          className="shrink-0 rounded-md border border-line px-2.5 py-1 text-[12px] text-ink-2 hover:bg-surface-2"
+          className="shrink-0 rounded-md border border-line px-2.5 py-1 text-small text-ink-2 hover:bg-surface-2"
         >
           Đóng (Esc)
         </button>
@@ -797,54 +797,54 @@ function DiffScreen({
                 (f.path === pick ? "bg-accent-soft" : "hover:bg-surface-2")
               }
             >
-              <span className={`w-3 shrink-0 font-mono text-[11px] ${FILE_TONE[f.status] ?? "text-ink-3"}`}>
+              <span className={`w-3 shrink-0 font-mono text-caption ${FILE_TONE[f.status] ?? "text-ink-3"}`}>
                 {f.status}
               </span>
               {/* Tên file xuống dòng riêng, không nối đuôi thư mục: gộp một
                   dòng thì `break-all` cắt ngay giữa tên — "…/src/c" rồi
                   "lient.rs" — làm hỏng đúng phần đáng đọc nhất. */}
               <span className="min-w-0 flex-1">
-                <span className="block break-all font-mono text-[11.5px] font-semibold text-ink">
+                <span className="block break-all font-mono text-small font-semibold text-ink">
                   {f.path.slice(f.path.lastIndexOf("/") + 1)}
                 </span>
                 {f.path.includes("/") && (
-                  <span className="block break-all font-mono text-[10px] leading-snug text-ink-3">
+                  <span className="block break-all font-mono text-micro leading-snug text-ink-3">
                     {f.path.slice(0, f.path.lastIndexOf("/"))}
                   </span>
                 )}
               </span>
-              <span className="flex shrink-0 gap-1 font-mono text-[10.5px]">
+              <span className="flex shrink-0 gap-1 font-mono text-caption">
                 <Counts f={f} />
               </span>
             </button>
           ))}
           {files.total > files.files.length && (
-            <p className="px-3 py-2 text-[11px] text-ink-3">
+            <p className="px-3 py-2 text-caption text-ink-3">
               … còn {files.total - files.files.length} file nữa, không liệt kê
             </p>
           )}
         </nav>
 
         <section className="min-w-0 flex-1 overflow-auto">
-          <p className="sticky top-0 z-10 border-b border-line bg-surface-2 px-3 py-1.5 font-mono text-[11.5px] text-ink-2">
+          <p className="sticky top-0 z-10 border-b border-line bg-surface-2 px-3 py-1.5 font-mono text-small text-ink-2">
             {pick || "—"}
           </p>
-          {err && <p className="px-3 py-2 text-[12px] text-crit">{err}</p>}
+          {err && <p className="px-3 py-2 text-small text-crit">{err}</p>}
           {loading && !err && (
-            <p className="px-3 py-2 text-[12px] text-ink-3">Đang đọc…</p>
+            <p className="px-3 py-2 text-small text-ink-3">Đang đọc…</p>
           )}
           {!loading && !err && current?.binary && (
-            <p className="px-3 py-2 text-[12px] text-ink-3">
+            <p className="px-3 py-2 text-small text-ink-3">
               File nhị phân — không có diff dạng chữ.
             </p>
           )}
           {!loading && !err && !current?.binary && lines.length === 0 && (
-            <p className="px-3 py-2 text-[12px] text-ink-3">
+            <p className="px-3 py-2 text-small text-ink-3">
               Không có thay đổi dạng chữ trong file này.
             </p>
           )}
           {!loading && !err && lines.length > 0 && (
-            <table className="w-full border-collapse font-mono text-[11.5px]">
+            <table className="w-full border-collapse font-mono text-small">
               <tbody>
                 {lines.map((l, i) => (
                   <tr key={i} className={LINE_BG[l.kind]}>
@@ -868,7 +868,7 @@ function DiffScreen({
             </table>
           )}
           {diff?.truncated && (
-            <p className="px-3 py-2 text-[12px] text-warn">
+            <p className="px-3 py-2 text-small text-warn">
               Diff quá dài, đã cắt bớt phần cuối.
             </p>
           )}
@@ -979,10 +979,10 @@ function BranchPicker({
           id="sdk-branch-list"
           role="listbox"
           ref={listRef}
-          className="absolute left-0 right-0 top-full z-20 mt-1 max-h-[252px] overflow-y-auto rounded-md border border-line-strong bg-surface shadow-lg"
+          className="absolute left-0 right-0 top-full z-20 mt-1 max-h-[252px] overflow-y-auto rounded-lg border border-line-strong bg-surface shadow-pop"
         >
           {shown.length === 0 ? (
-            <p className="px-2.5 py-2 text-[12px] text-ink-3">Không có nhánh nào khớp.</p>
+            <p className="px-2.5 py-2 text-small text-ink-3">Không có nhánh nào khớp.</p>
           ) : (
             shown.map((b, i) => (
               <button
@@ -996,7 +996,7 @@ function BranchPicker({
                 onMouseEnter={() => setActive(i)}
                 onClick={() => take(b.name)}
                 className={
-                  "flex w-full items-center gap-1.5 px-2.5 py-[6px] text-left text-[12px] " +
+                  "flex w-full items-center gap-1.5 px-2.5 py-[6px] text-left text-small " +
                   (i === active ? "bg-surface-2 " : "") +
                   (b.name === selected ? "font-semibold text-accent-ink" : "")
                 }
@@ -1008,12 +1008,12 @@ function BranchPicker({
                   <Mark text={b.name} needle={needle} />
                 </span>
                 {b.name === head && (
-                  <span className="ml-auto shrink-0 text-[10px] text-ink-3">đang checkout</span>
+                  <span className="ml-auto shrink-0 text-micro text-ink-3">đang checkout</span>
                 )}
                 {b.remoteOnly && b.name !== head && (
                   <span
                     title="Chưa có nhánh này ở máy — app sẽ tạo nhánh theo dõi origin khi chuyển."
-                    className="ml-auto shrink-0 text-[10px] text-ink-3"
+                    className="ml-auto shrink-0 text-micro text-ink-3"
                   >
                     chỉ ở remote
                   </span>
@@ -1022,7 +1022,7 @@ function BranchPicker({
             ))
           )}
           {matches.length > LIMIT && (
-            <p className="border-t border-line px-2.5 py-1.5 text-[11px] text-ink-3">
+            <p className="border-t border-line px-2.5 py-1.5 text-caption text-ink-3">
               còn {matches.length - LIMIT} nhánh nữa — gõ thêm để lọc
             </p>
           )}
@@ -1048,16 +1048,16 @@ function RecentCard({ releases, branch }: { releases: SdkRelease[]; branch: stri
         <span className={CTITLE}>Bản gần nhất của nhánh này</span>
       </div>
       {releases.length === 0 ? (
-        <p className="mt-2 text-[12px] text-ink-3">
+        <p className="mt-2 text-small text-ink-3">
           Chưa có bản release nào từ <span className="font-mono">{branch || "—"}</span>.
         </p>
       ) : (
         <div className="mt-2 flex flex-col gap-1">
           {releases.map((r) => (
-            <div key={r.version} className="flex items-baseline gap-2 text-[12px]">
+            <div key={r.version} className="flex items-baseline gap-2 text-small">
               <span className="font-mono text-ink-2">{r.version}</span>
               <span
-                className="ml-auto shrink-0 font-mono text-[10.5px] text-ink-3"
+                className="ml-auto shrink-0 font-mono text-caption text-ink-3"
                 title={r.sha}
               >
                 {formatDayMonth(r.at, true)}
@@ -1232,10 +1232,10 @@ function RunCard({
     <section className={CARD + " flex min-h-[320px] flex-1 flex-col"}>
       <div className="flex flex-wrap items-center gap-2">
         <span className={CTITLE}>Log</span>
-        <span className="font-mono text-[12px] font-semibold">{run.version}</span>
+        <span className="font-mono text-small font-semibold">{run.version}</span>
         <span
           className={
-            "rounded-full px-2 py-[2px] text-[11px] font-medium " + RUN_TONE[run.state]
+            "rounded-full px-2 py-[2px] text-caption font-medium " + RUN_TONE[run.state]
           }
         >
           {RUN_LABEL[run.state]}
@@ -1243,12 +1243,12 @@ function RunCard({
         {/* Where the title bar used to carry it, next to the rest of the run's
             status rather than floating over the log. */}
         {run.state === "running" && (
-          <span title="bước đang chạy" className="font-mono text-[11px] text-good">
+          <span title="bước đang chạy" className="font-mono text-caption text-good">
             ● {phase}
           </span>
         )}
         {run.localOnly && (
-          <span className="rounded-[3px] border border-line-strong px-1.5 font-mono text-[10px] text-ink-3">
+          <span className="rounded-[5px] border border-line-strong px-1.5 font-mono text-micro text-ink-3">
             local-only
           </span>
         )}
@@ -1266,7 +1266,7 @@ function RunCard({
       {run.message && (
         <p
           className={
-            "mt-2 text-[12px] " + (run.state === "lost" ? "text-warn" : "text-ink-2")
+            "mt-2 text-small " + (run.state === "lost" ? "text-warn" : "text-ink-2")
           }
         >
           {run.message}
@@ -1367,7 +1367,7 @@ function RecoveryCard({
       <div className="flex items-baseline gap-2">
         <span
           className={
-            "rounded-full px-2 py-[2px] text-[10.5px] font-semibold " +
+            "rounded-full px-2 py-[2px] text-caption font-semibold " +
             (plan.state === "done"
               ? "bg-good text-white"
               : bad
@@ -1377,7 +1377,7 @@ function RecoveryCard({
         >
           {plan.state === "done" ? "ĐÃ XONG" : bad ? "CẦN DỌN" : "CÒN SÓT"}
         </span>
-        <b className={"text-[13px] " + (bad ? "text-crit" : "text-ink")}>{plan.title}</b>
+        <b className={"text-body " + (bad ? "text-crit" : "text-ink")}>{plan.title}</b>
         {/* Bốn bước làm tay xong thì phải có cách hỏi lại. Không có nút này,
             thẻ đứng nguyên như cũ và người dùng không biết mình đã xong. */}
         <button
@@ -1385,26 +1385,26 @@ function RecoveryCard({
           onClick={onRecheck}
           disabled={checking}
           title="Hỏi lại remote xem đã dọn xong chưa"
-          className="ml-auto shrink-0 rounded-md border border-line bg-surface px-2 py-[3px] text-[11px] text-ink-2 hover:bg-surface-2 disabled:opacity-50"
+          className="ml-auto shrink-0 rounded-md border border-line bg-surface px-2 py-[3px] text-caption text-ink-2 hover:bg-surface-2 disabled:opacity-50"
         >
           {checking ? "Đang hỏi…" : "↻ Kiểm lại"}
         </button>
       </div>
 
-      <p className="mt-1.5 text-[12px] leading-relaxed text-ink-2">{plan.detail}</p>
+      <p className="mt-1.5 text-small leading-relaxed text-ink-2">{plan.detail}</p>
 
       {plan.steps.length > 0 && (
         <ol className="mt-2 flex flex-col gap-2">
           {plan.steps.map((step, i) => (
-            <li key={i} className="flex gap-2 text-[12px] leading-relaxed">
-              <span className="mt-[1px] shrink-0 font-mono text-[11px] text-ink-3">
+            <li key={i} className="flex gap-2 text-small leading-relaxed">
+              <span className="mt-[1px] shrink-0 font-mono text-caption text-ink-3">
                 {i + 1}.
               </span>
               <div className="min-w-0 flex-1">
                 <span className="text-ink-2">{step.text}</span>
                 {step.command && (
                   <div className="mt-1 flex items-start gap-1.5">
-                    <pre className="min-w-0 flex-1 overflow-x-auto rounded bg-surface px-2 py-1 font-mono text-[11px] text-ink-2">
+                    <pre className="min-w-0 flex-1 overflow-x-auto rounded bg-surface px-2 py-1 font-mono text-caption text-ink-2">
                       {step.command}
                     </pre>
                     <CopyBtn text={step.command} />
@@ -1416,7 +1416,7 @@ function RecoveryCard({
                     target="_blank"
                     rel="noreferrer"
                     title={step.url}
-                    className="mt-1 block truncate font-mono text-[11px] text-accent-ink underline underline-offset-2"
+                    className="mt-1 block truncate font-mono text-caption text-accent-ink underline underline-offset-2"
                   >
                     {step.url}
                   </a>
@@ -1460,7 +1460,7 @@ function Terminal({
       <pre
         ref={scrollRef}
         onScroll={onScroll}
-        className="min-h-0 flex-1 overflow-auto p-3 font-mono text-[11px] leading-[1.5]"
+        className="min-h-0 flex-1 overflow-auto p-3 font-mono text-caption leading-[1.5]"
         style={{ color: TERM.text }}
       >
         {children}
@@ -1479,17 +1479,17 @@ function HistoryCard({ runs, onOpen }: { runs: RunRow[]; onOpen: (id: number) =>
             key={r.id}
             type="button"
             onClick={() => onOpen(r.id)}
-            className="flex items-center gap-2 rounded px-1 py-1 text-left text-[12px] hover:bg-surface-2"
+            className="flex items-center gap-2 rounded px-1 py-1 text-left text-small hover:bg-surface-2"
           >
-            <span className="font-mono text-[11.5px] text-ink-2">{r.version}</span>
+            <span className="font-mono text-small text-ink-2">{r.version}</span>
             <span
               className={
-                "rounded-full px-1.5 text-[10px] font-medium " + RUN_TONE[r.state as RunState]
+                "rounded-full px-1.5 text-micro font-medium " + RUN_TONE[r.state as RunState]
               }
             >
               {RUN_LABEL[r.state as RunState]}
             </span>
-            <span className="ml-auto font-mono text-[10.5px] text-ink-3">
+            <span className="ml-auto font-mono text-caption text-ink-3">
               {formatDayMonth(r.startedAt, true)}
             </span>
           </button>
@@ -1531,17 +1531,17 @@ function ConfirmDialog({
 }) {
   const matches = typed.trim() === version.trim();
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/55 backdrop-blur-[3px] p-4">
       <div className="max-h-full w-full max-w-lg overflow-auto rounded-[10px] border border-line bg-surface p-5">
         <div className={CTITLE}>Release thật</div>
         <h2 className="mt-1 text-lg font-semibold tracking-tight">{version}</h2>
 
-        <div className="mt-3 flex flex-col gap-1.5 text-[12.5px] leading-relaxed text-ink-2">
+        <div className="mt-3 flex flex-col gap-1.5 text-body leading-relaxed text-ink-2">
           <div>
             <b>Repo SDK</b> — build từ <span className="font-mono">{head}</span> @{" "}
             <span className="font-mono">{headSha.slice(0, 8)}</span>
             {headSubject && (
-              <span className="mt-0.5 block text-[12px] text-ink-3">{headSubject}</span>
+              <span className="mt-0.5 block text-small text-ink-3">{headSubject}</span>
             )}
           </div>
           <div className="rounded-[5px] border border-crit/50 bg-crit-soft px-2.5 py-2 text-crit">
@@ -1559,7 +1559,7 @@ function ConfirmDialog({
         </div>
 
         <label className="mt-3 block">
-          <span className="text-[12px] text-ink-2">
+          <span className="text-small text-ink-2">
             Gõ lại tên version để xác nhận
           </span>
           <input
@@ -1579,7 +1579,7 @@ function ConfirmDialog({
             type="button"
             onClick={onGo}
             disabled={!matches || busy}
-            className="rounded-md bg-crit px-3 py-1 text-[12.5px] font-medium text-white hover:opacity-90 disabled:opacity-50"
+            className="rounded-md bg-crit px-3 py-1 text-body font-medium text-white hover:opacity-90 disabled:opacity-50"
           >
             {busy ? "Đang chạy…" : "Release"}
           </button>
@@ -1606,13 +1606,13 @@ function NotifyPermission({ enabled }: { enabled: boolean }) {
 
   if (state === "unsupported")
     return (
-      <p className="mt-1.5 text-[11.5px] text-ink-3">
+      <p className="mt-1.5 text-small text-ink-3">
         Trình duyệt này không có thông báo desktop.
       </p>
     );
 
   return (
-    <p className="mt-1.5 text-[11.5px] text-warn">
+    <p className="mt-1.5 text-small text-warn">
       {state === "denied"
         ? "Trình duyệt đang chặn thông báo cho trang này — mở cài đặt site để cho phép."
         : "Chưa cấp quyền thông báo."}
@@ -1663,7 +1663,7 @@ function ConfigCard({ view }: { view: SdkConfigView }) {
     <div className="flex max-w-2xl flex-col gap-3">
       <section className={CARD}>
         <div className={CTITLE}>Đường dẫn hai clone</div>
-      <p className="mt-1.5 text-[12.5px] text-ink-3">
+      <p className="mt-1.5 text-body text-ink-3">
         App chạy đúng ba lệnh ghi trên hai repo này: <span className="font-mono">fetch</span>,{" "}
         <span className="font-mono">checkout</span>, và{" "}
         <span className="font-mono">merge --ff-only origin/main</span> ở repo swift, rồi{" "}
@@ -1688,21 +1688,21 @@ function ConfigCard({ view }: { view: SdkConfigView }) {
 
       <div className="mt-3 flex flex-col gap-2.5">
         <label className="block">
-          <span className="text-[11.5px] text-ink-3">Repo SDK (Rust)</span>
+          <span className="text-small text-ink-3">Repo SDK (Rust)</span>
           <input
             value={sdkPath}
             onChange={(e) => setSdkPath(e.target.value)}
             placeholder="/Users/ban/Repo/viptalk-matrix-rust-sdk-ruma"
-            className={INPUT + " mt-1 w-full font-mono text-[12px]"}
+            className={INPUT + " mt-1 w-full font-mono text-small"}
           />
         </label>
         <label className="block">
-          <span className="text-[11.5px] text-ink-3">Repo swift (nơi release đi ra)</span>
+          <span className="text-small text-ink-3">Repo swift (nơi release đi ra)</span>
           <input
             value={packagePath}
             onChange={(e) => setPackagePath(e.target.value)}
             placeholder="/Users/ban/Repo/viptalk-matrix-rust-components-swift"
-            className={INPUT + " mt-1 w-full font-mono text-[12px]"}
+            className={INPUT + " mt-1 w-full font-mono text-small"}
           />
         </label>
         </div>
@@ -1733,9 +1733,9 @@ function ConfigCard({ view }: { view: SdkConfigView }) {
             }}
             className="mt-[3px] size-3.5 shrink-0 accent-[var(--accent)]"
           />
-          <span className="text-[12.5px] text-ink-2">
+          <span className="text-body text-ink-2">
             Báo lên desktop khi lần chạy <b>kết thúc</b> — xong, lỗi, hay bị huỷ.
-            <span className="mt-0.5 block text-[11.5px] text-ink-3">
+            <span className="mt-0.5 block text-small text-ink-3">
               Log vẫn chạy trong app dù bạn ở tab khác; cái này chỉ là tiếng gọi
               lúc nó dừng.
             </span>
@@ -1757,7 +1757,7 @@ function ConfigCard({ view }: { view: SdkConfigView }) {
        */}
       <section className={CARD}>
       <div className={CTITLE}>Bảng hậu tố theo nhánh</div>
-      <p className="mt-1.5 text-[12.5px] text-ink-3">
+      <p className="mt-1.5 text-body text-ink-3">
         Khớp chính xác tên nhánh thì thắng mọi luật suy đoán. Năm dòng đầu là bảng trong
         tài liệu; thêm nhánh của team bạn vào đây. Hậu tố <b>để trống</b> nghĩa là version
         chỉ còn ngày trần — đó là cách <span className="font-mono">master</span> được viết.
@@ -1767,7 +1767,7 @@ function ConfigCard({ view }: { view: SdkConfigView }) {
       </p>
 
       <div className="mt-2.5 flex flex-col gap-1">
-        <div className="flex gap-1.5 font-mono text-[10px] uppercase tracking-[0.06em] text-ink-3">
+        <div className="flex gap-1.5 eyebrow text-ink-2">
           <span className="flex-1">Nhánh</span>
           <span className="w-[150px]">Hậu tố</span>
           <span className="w-5" />
@@ -1778,19 +1778,19 @@ function ConfigCard({ view }: { view: SdkConfigView }) {
               value={r.branch}
               onChange={(e) => setRow(i, { branch: e.target.value })}
               placeholder="ctalk/develop"
-              className={INPUT + " min-w-0 flex-1 font-mono text-[12px]"}
+              className={INPUT + " min-w-0 flex-1 font-mono text-small"}
             />
             <input
               value={r.suffix}
               onChange={(e) => setRow(i, { suffix: e.target.value })}
               placeholder="(trống)"
-              className={INPUT + " w-[150px] font-mono text-[12px]"}
+              className={INPUT + " w-[150px] font-mono text-small"}
             />
             <button
               type="button"
               onClick={() => setRows((rs) => rs.filter((_, j) => j !== i))}
               title="Bỏ dòng này"
-              className="w-5 shrink-0 text-[13px] text-ink-3 hover:text-crit"
+              className="w-5 shrink-0 text-body text-ink-3 hover:text-crit"
             >
               ×
             </button>
@@ -1833,7 +1833,7 @@ function ConfigCard({ view }: { view: SdkConfigView }) {
         <button type="button" disabled={busy} onClick={save} className={BTN_PRI}>
           {busy ? "Đang lưu…" : "Lưu"}
         </button>
-        {note && <span className="text-[12px] text-ink-3">{note}</span>}
+        {note && <span className="text-small text-ink-3">{note}</span>}
       </div>
       </section>
       </div>

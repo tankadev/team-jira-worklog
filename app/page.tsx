@@ -227,13 +227,13 @@ async function boardPage(props: PageProps<'/'>) {
     <NavProvider>
       <header className="mb-4 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <div className="font-mono text-[10.5px] uppercase tracking-[0.09em] text-ink-3">
+          <div className="eyebrow text-ink-2">
             {current
               ? `${current.name} · ${current.startDate?.slice(8, 10)}/${current.startDate?.slice(5, 7)} – ${current.endDate?.slice(8, 10)}/${current.endDate?.slice(5, 7)} · đang chạy`
               : 'Không xác định được sprint hiện tại'}
           </div>
-          <h1 className="text-xl font-semibold tracking-tight">Task board</h1>
-          <p className="mt-1 text-[12.5px] text-ink-3">
+          <h1 className="text-title font-semibold tracking-tight">Task board</h1>
+          <p className="mt-1 text-body text-ink-3">
             Subtask đang giao cho <b className="font-medium text-ink-2">{me.displayName}</b> — dùng
             bộ lọc bên dưới để thu hẹp.
           </p>
@@ -251,7 +251,7 @@ async function boardPage(props: PageProps<'/'>) {
         />
       </header>
 
-      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_296px]">
+      <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
         <div>
           <BoardFilters
             sprints={sprints.map((s) => ({
@@ -285,10 +285,32 @@ async function boardPage(props: PageProps<'/'>) {
           ) : (
             <div className="flex flex-col gap-4">
               {groupByEpic(inSprintParents, newestFirst).map((epic) => (
-                <div key={epic.key ?? '__none__'}>
+                // One tinted block per epic, its tasks hung off a rail down the
+                // left: which epic a task belongs to is read from where it sits,
+                // not from a badge that has to be found and matched.
+                <section
+                  key={epic.key ?? '__none__'}
+                  className={
+                    'rounded-2xl border p-2.5 md:p-4 ' +
+                    (epic.key ? 'border-epic/25 bg-epic-soft/35' : 'border-line bg-surface-2/40')
+                  }
+                >
                   <EpicHeader group={epic} boardSprintId={sprintId} />
-                  <div className="flex flex-col gap-3">
+                  <div
+                    className={
+                      'ml-1.5 mt-3 flex flex-col gap-3 border-l-2 pl-2.5 md:ml-4 md:pl-5 ' +
+                      (epic.key ? 'border-epic/30' : 'border-line-strong/60')
+                    }
+                  >
                     {epic.parents.map((group) => (
+                      <div key={group.key} className="relative">
+                        <span
+                          aria-hidden
+                          className={
+                            'absolute -left-2.5 top-[26px] h-0.5 w-2.5 md:-left-5 md:w-5 ' +
+                            (epic.key ? 'bg-epic/30' : 'bg-line-strong/60')
+                          }
+                        />
                       <ParentGroup
                         key={group.key}
                         group={group}
@@ -298,14 +320,16 @@ async function boardPage(props: PageProps<'/'>) {
                         sprintEnd={sprintEnd}
                         datesSupported={datesSupported}
                         dayLoggedSeconds={byDate.get(date) ?? 0}
+                        dayQuotaHours={dayQuota}
                         myAccountId={me.accountId}
                         currentSprint={
                           selectedSprint ? { id: selectedSprint.id, name: selectedSprint.name } : null
                         }
                       />
+                      </div>
                     ))}
                   </div>
-                </div>
+                </section>
               ))}
 
               {/* Below the sprint, never mixed into it: these are the user's own
@@ -314,10 +338,10 @@ async function boardPage(props: PageProps<'/'>) {
               {strayParents.length > 0 && (
                 <div>
                   <div className="mb-2 flex flex-wrap items-baseline gap-2">
-                    <span className="rounded-[3px] border border-warn bg-warn-soft px-1.5 py-0.5 font-mono text-[9.5px] font-semibold uppercase tracking-[0.06em] text-warn">
+                    <span className="rounded-[5px] border border-warn bg-warn-soft px-1.5 py-0.5 chip-text text-warn">
                       Ngoài sprint
                     </span>
-                    <span className="text-[12.5px] text-ink-3">
+                    <span className="text-body text-ink-3">
                       Task cha chưa được gán sprint nào — task con của bạn vẫn log giờ được ở đây.
                     </span>
                   </div>
@@ -332,6 +356,7 @@ async function boardPage(props: PageProps<'/'>) {
                         sprintEnd={sprintEnd}
                         datesSupported={datesSupported}
                         dayLoggedSeconds={byDate.get(date) ?? 0}
+                        dayQuotaHours={dayQuota}
                         myAccountId={me.accountId}
                         currentSprint={
                           selectedSprint ? { id: selectedSprint.id, name: selectedSprint.name } : null
@@ -413,11 +438,11 @@ function EmptyBoard({
 }) {
   if (noSprintMatch) {
     return (
-      <div className="rounded-[9px] border border-dashed border-line-strong bg-surface p-6 text-center">
-        <p className="text-[13.5px]">
+      <div className="rounded-xl border border-dashed border-line-strong bg-surface p-6 text-center">
+        <p className="text-emph">
           <b className="font-mono font-semibold">{dateLabel}</b> không nằm trong sprint nào.
         </p>
-        <p className="mx-auto mt-2 max-w-lg text-[12.5px] leading-relaxed text-ink-3">
+        <p className="mx-auto mt-2 max-w-lg text-body leading-relaxed text-ink-3">
           Ngày này rơi ngoài khoảng của mọi sprint trên board — thường là khoảng nghỉ giữa hai
           sprint. Chọn ngày khác, hoặc đổi bộ lọc sang{' '}
           <b className="font-medium text-ink-2">Mọi sprint</b> để xem hết task.
@@ -427,8 +452,8 @@ function EmptyBoard({
   }
 
   return (
-    <div className="rounded-[9px] border border-dashed border-line-strong bg-surface p-6 text-center">
-      <p className="text-[13.5px]">
+    <div className="rounded-xl border border-dashed border-line-strong bg-surface p-6 text-center">
+      <p className="text-emph">
         Không có task con nào đang giao cho bạn
         {sprintName ? ` trong ${sprintName}` : ''}
         {status === 'open' ? ' và chưa Done' : ''}
@@ -441,13 +466,13 @@ function EmptyBoard({
         .
       </p>
       {teamLabel && (
-        <p className="mx-auto mt-2 max-w-lg text-[12.5px] leading-relaxed text-ink-3">
+        <p className="mx-auto mt-2 max-w-lg text-body leading-relaxed text-ink-3">
           Board đang lọc theo team — task thiếu label{' '}
           <b className="font-mono text-ink-2">{teamLabel}</b> sẽ không hiện ở đây, kể cả khi được
           giao cho bạn. Bỏ trống ô label trong Settings để xem tất cả.
         </p>
       )}
-      <p className="mx-auto mt-2 max-w-lg text-[12.5px] leading-relaxed text-ink-3">
+      <p className="mx-auto mt-2 max-w-lg text-body leading-relaxed text-ink-3">
         {hasTasks ? (
           'Bạn có task cấp trên ở sprint này — xem danh sách bên dưới để tạo task con rồi log giờ.'
         ) : (
@@ -466,13 +491,13 @@ function EmptyBoard({
 
 function NotConfigured() {
   return (
-    <div className="rounded-[9px] border border-line bg-surface p-[17px]">
+    <div className="card p-5">
       <div className="flex flex-wrap items-center gap-3">
         <i className="inline-block size-[6px] shrink-0 rounded-full bg-warn" />
-        <span className="text-[13px]">Chưa có API token — vào Settings để điền.</span>
+        <span className="text-body">Chưa có API token — vào Settings để điền.</span>
         <Link
           href="/settings"
-          className="rounded-md border border-line-strong bg-surface px-[9px] py-1 text-[12.5px] hover:bg-surface-2"
+          className="rounded-lg border border-line-strong bg-surface px-3 py-1.5 font-medium text-body hover:bg-surface-2"
         >
           <span className="inline-flex items-center gap-1.5">
             Mở Settings

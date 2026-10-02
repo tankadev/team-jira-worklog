@@ -28,11 +28,11 @@ export function ReportDatePicker({ date, label }: { date: string; label: string 
   }
 
   const arrow =
-    'h-[30px] w-[26px] rounded-md border border-line-strong bg-surface leading-none text-ink-2 hover:bg-surface-2 hover:text-ink disabled:opacity-50'
+    'h-9 w-9 rounded-lg border border-line-strong bg-surface leading-none text-ink-2 hover:bg-surface-2 hover:text-ink disabled:opacity-50'
 
   return (
     <div className="flex flex-col items-end gap-1">
-      <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.09em] text-ink-3">
+      <span className="flex items-center gap-1.5 eyebrow text-ink-2">
         <NavSpinner />
         Ngày báo cáo
       </span>
@@ -46,7 +46,7 @@ export function ReportDatePicker({ date, label }: { date: string; label: string 
             type="button"
             onClick={openCalendar}
             disabled={pending}
-            className="flex h-[30px] items-center gap-2 rounded-md border border-line-strong bg-surface px-[11px] font-mono text-[12.5px] hover:bg-surface-2 disabled:opacity-60"
+            className="flex h-9 items-center gap-2 rounded-md border border-line-strong bg-surface px-[11px] font-mono text-body hover:bg-surface-2 disabled:opacity-60"
           >
             {label}
             <svg viewBox="0 0 16 16" className="size-3.5 text-ink-3" fill="none" stroke="currentColor" strokeWidth="1.4">
@@ -73,7 +73,7 @@ export function ReportDatePicker({ date, label }: { date: string; label: string 
           <button
             onClick={() => go(todayIn())}
             disabled={pending}
-            className="ml-1 h-[30px] rounded-md border border-line-strong bg-surface px-[9px] text-[12.5px] hover:bg-surface-2 disabled:opacity-60"
+            className="ml-1 h-9 rounded-md border border-line-strong bg-surface px-[9px] text-body hover:bg-surface-2 disabled:opacity-60"
           >
             Hôm nay
           </button>

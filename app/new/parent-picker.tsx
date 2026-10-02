@@ -118,7 +118,7 @@ export function ParentPicker({
           }}
           onBlur={() => setTimeout(() => setOpen(false), 100)}
           placeholder={epicMode ? 'Gõ tên epic để tìm…' : 'Gõ key hoặc tên để tìm…'}
-          className="w-full rounded-md border border-line bg-ground py-[7px] pl-[10px] pr-7 text-[13px]"
+          className="w-full rounded-md border border-line bg-ground py-[7px] pl-[10px] pr-7 text-body"
         />
         {value && (
           <button
@@ -137,7 +137,7 @@ export function ParentPicker({
       </div>
 
       {open && (
-        <div className="absolute inset-x-0 top-[calc(100%+4px)] z-30 max-h-[232px] overflow-y-auto rounded-md border border-line-strong bg-surface p-1 shadow-lg">
+        <div className="absolute inset-x-0 top-[calc(100%+4px)] z-30 max-h-[232px] overflow-y-auto rounded-lg border border-line-strong bg-surface p-1 shadow-pop">
           {currentSprintId && (
             <div className="mb-1 flex gap-1">
               {[
@@ -153,7 +153,7 @@ export function ParentPicker({
                   }}
                   aria-pressed={wide === v}
                   className={
-                    'flex-1 rounded border px-1.5 py-[3px] text-[11px] ' +
+                    'flex-1 rounded border px-1.5 py-[3px] text-caption ' +
                     (wide === v
                       ? 'border-accent bg-accent-soft font-semibold text-accent-ink'
                       : 'border-line text-ink-3 hover:text-ink')
@@ -166,7 +166,7 @@ export function ParentPicker({
           )}
 
           {!epicMode && (
-            <label className="mb-1 flex items-center gap-1.5 rounded px-1.5 py-1 text-[11px] text-ink-3 hover:text-ink">
+            <label className="mb-1 flex items-center gap-1.5 rounded px-1.5 py-1 text-caption text-ink-3 hover:text-ink">
               <input
                 type="checkbox"
                 checked={showDone}
@@ -180,7 +180,7 @@ export function ParentPicker({
           )}
 
           {options.length === 0 ? (
-            <div className="p-2.5 text-center text-[12.5px] text-ink-3">
+            <div className="p-2.5 text-center text-body text-ink-3">
               {seeking ? 'Đang tìm…' : 'Không tìm thấy'}
             </div>
           ) : (
@@ -196,18 +196,18 @@ export function ParentPicker({
                 }}
                 className="block w-full rounded px-[9px] py-1.5 text-left hover:bg-accent-soft"
               >
-                <span className="font-mono text-[11px] font-semibold text-accent-ink">{p.key}</span>
+                <span className="font-mono text-caption font-semibold text-accent-ink">{p.key}</span>
                 {p.isDone && (
-                  <span className="ml-1.5 rounded-[3px] bg-good-soft px-1 py-px font-mono text-[9.5px] uppercase text-good">
+                  <span className="ml-1.5 rounded-[5px] bg-good-soft px-1 py-px chip-text text-good">
                     {p.statusName || 'Done'}
                   </span>
                 )}
                 {(p.epicName || p.sprintName) && (
-                  <span className="ml-1.5 font-mono text-[10.5px] text-ink-3">
+                  <span className="ml-1.5 font-mono text-caption text-ink-3">
                     {[p.epicName, p.sprintName].filter(Boolean).join(' · ')}
                   </span>
                 )}
-                <span className="block text-[12.5px] leading-[1.4]">{p.summary}</span>
+                <span className="block text-body leading-[1.4]">{p.summary}</span>
               </button>
             ))
           )}

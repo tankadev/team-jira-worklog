@@ -5,9 +5,9 @@ export default function BoardLoading() {
     <>
       <HeaderSkeleton />
 
-      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_296px]">
+      <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
         <div>
-          <section className="mb-3.5 rounded-[9px] border border-line bg-surface px-[17px] pb-[15px] pt-3.5">
+          <section className="mb-3.5 card px-[17px] pb-[15px] pt-3.5">
             <div className="mb-3 flex items-center justify-between gap-3">
               <Shimmer className="h-7 w-28" />
               <Shimmer className="h-2.5 w-56" />

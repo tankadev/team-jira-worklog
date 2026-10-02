@@ -45,10 +45,10 @@ interface Task {
 type Draft = Omit<Task, 'id'> & { id?: number }
 type Note = { ok: boolean; message: string } | null
 
-const CARD = 'rounded-[9px] border border-line bg-surface p-[17px]'
-const CTITLE = 'font-mono text-[10.5px] uppercase tracking-[0.09em] text-ink-3'
-const BTN = 'rounded-md border border-line-strong bg-surface px-2.5 py-1 text-[12.5px] hover:bg-surface-2'
-const BTN_PRI = 'rounded-md bg-accent px-3 py-1 text-[12.5px] font-medium text-white hover:bg-accent-2 disabled:opacity-50'
+const CARD = 'card p-5'
+const CTITLE = 'eyebrow text-ink-2'
+const BTN = 'rounded-lg border border-line-strong bg-surface px-3 py-1.5 font-medium text-body hover:bg-surface-2'
+const BTN_PRI = 'rounded-lg bg-accent shadow-card px-3 py-1.5 text-body font-semibold text-on-accent hover:bg-accent-2 disabled:opacity-50'
 
 /** Included products with their tasks, for the report. Products sharing an
  *  environment are merged under it inside renderReleaseReport. */
@@ -131,9 +131,9 @@ export function ReleaseBoard({
       <header className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <div>
           <div className={CTITLE}>Module · task nhiều team theo môi trường</div>
-          <h1 className="text-xl font-semibold tracking-tight">Releases</h1>
+          <h1 className="text-title font-semibold tracking-tight">Releases</h1>
         </div>
-        <div className="flex overflow-hidden rounded-md border border-line-strong text-[12.5px]">
+        <div className="flex overflow-hidden rounded-md border border-line-strong text-body">
           <TabBtn on={tab === 'board'} onClick={() => setTab('board')}>
             Board
           </TabBtn>
@@ -147,7 +147,7 @@ export function ReleaseBoard({
         products.length ? (
           <Board initial={initial} products={products} teams={teams} reportExcludes={reportExcludes} />
         ) : (
-          <div className={CARD + ' text-[12.5px] text-ink-2'}>
+          <div className={CARD + ' text-body text-ink-2'}>
             Chưa có product nào.{' '}
             <button
               type="button"
@@ -288,7 +288,7 @@ function Board({
   return (
     <>
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <div className="flex overflow-hidden rounded-md border border-line-strong text-[12.5px]">
+        <div className="flex overflow-hidden rounded-md border border-line-strong text-body">
           {products.map((p) => {
             const on = p.name === product?.name
             const count = tasks.filter((t) => t.product === p.name).length
@@ -307,8 +307,8 @@ function Board({
                 {p.name}
                 <span
                   className={
-                    'rounded-full px-1.5 font-mono text-[10px] font-normal ' +
-                    (on ? 'bg-accent text-white' : 'bg-surface-2 text-ink-3')
+                    'rounded-full px-1.5 font-mono text-micro font-normal ' +
+                    (on ? 'bg-accent text-on-accent' : 'bg-surface-2 text-ink-3')
                   }
                 >
                   {count}
@@ -320,7 +320,7 @@ function Board({
         <select
           value={team}
           onChange={(e) => setTeam(e.target.value)}
-          className="rounded-md border border-line bg-surface px-2.5 py-[5px] text-[12.5px]"
+          className="rounded-md border border-line bg-surface px-2.5 py-[5px] text-body"
         >
           <option value="">Team: tất cả</option>
           {teams.map((t) => (
@@ -333,7 +333,7 @@ function Board({
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Tìm task / branch…"
-          className="min-w-[160px] flex-1 rounded-md border border-line bg-surface px-2.5 py-[5px] text-[12.5px]"
+          className="min-w-[160px] flex-1 rounded-md border border-line bg-surface px-2.5 py-[5px] text-body"
         />
         <button type="button" onClick={() => setReportOpen(true)} className={BTN}>
           Report
@@ -352,8 +352,8 @@ function Board({
           return (
             <div key={column.key} className="rounded-[10px] border border-line bg-surface-2 p-2.5">
               <div className="mb-2 flex items-center justify-between">
-                <span className="text-[12px] font-semibold">{column.label}</span>
-                <span className="rounded-full border border-line bg-surface px-[7px] font-mono text-[10px] text-ink-3">
+                <span className="text-small font-semibold">{column.label}</span>
+                <span className="rounded-full border border-line bg-surface px-[7px] font-mono text-micro text-ink-3">
                   {col.length}
                 </span>
               </div>
@@ -362,7 +362,7 @@ function Board({
                   <div key={team || '__none__'}>
                     <div
                       className={
-                        'mb-1 inline-flex items-center gap-1 rounded px-1.5 py-px font-mono text-[9.5px] font-semibold uppercase tracking-wide ' +
+                        'mb-1 inline-flex items-center gap-1 rounded px-1.5 py-px chip-text tracking-wide ' +
                         teamChip(team)
                       }
                     >
@@ -390,7 +390,7 @@ function Board({
                     </div>
                   </div>
                 ))}
-                {col.length === 0 && <p className="px-1 py-2 text-[11.5px] text-ink-3">—</p>}
+                {col.length === 0 && <p className="px-1 py-2 text-small text-ink-3">—</p>}
               </div>
             </div>
           )
@@ -480,7 +480,7 @@ function TaskCard({
   return (
     <div className="group flex flex-col gap-1 rounded-md border border-line bg-surface px-2 py-1.5">
       <div className="flex items-start gap-1">
-        <span className={'min-w-0 flex-1 text-[12.5px] font-semibold leading-tight ' + teamText(task.team)}>
+        <span className={'min-w-0 flex-1 text-body font-semibold leading-tight ' + teamText(task.team)}>
           {task.taskId || '(chưa có tiêu đề)'}
         </span>
         <div className="flex shrink-0 items-center gap-1.5 text-ink-3 opacity-0 transition-opacity group-hover:opacity-100">
@@ -488,7 +488,7 @@ function TaskCard({
             type="button"
             onClick={onEdit}
             title="Sửa"
-            className="grid size-6 place-items-center rounded text-[14px] hover:bg-surface-2 hover:text-accent-ink"
+            className="grid size-6 place-items-center rounded text-emph hover:bg-surface-2 hover:text-accent-ink"
           >
             ✎
           </button>
@@ -496,7 +496,7 @@ function TaskCard({
             type="button"
             onClick={onDelete}
             title="Xoá"
-            className="grid size-6 place-items-center rounded text-[14px] hover:bg-crit-soft hover:text-crit"
+            className="grid size-6 place-items-center rounded text-emph hover:bg-crit-soft hover:text-crit"
           >
             ✕
           </button>
@@ -506,7 +506,7 @@ function TaskCard({
       {task.noBranch ? (
         <div
           title={refLabel ? 'Không có nhánh — ref: ' + refLabel : 'Không có nhánh code'}
-          className="flex items-start gap-1 font-mono text-[10.5px] text-ot"
+          className="flex items-start gap-1 font-mono text-caption text-ot"
         >
           <span className="shrink-0">⊘</span>
           <span className="break-all">{refLabel || 'không có nhánh code'}</span>
@@ -517,7 +517,7 @@ function TaskCard({
             type="button"
             onClick={copyBranch}
             title={'Copy nhánh: ' + task.branchName}
-            className="flex items-start gap-1 text-left font-mono text-[10.5px] text-ink-3 hover:text-accent-ink"
+            className="flex items-start gap-1 text-left font-mono text-caption text-ink-3 hover:text-accent-ink"
           >
             <span className="shrink-0">{copied ? '✓' : '⑂'}</span>
             <span className="break-all">{task.branchName}</span>
@@ -530,17 +530,17 @@ function TaskCard({
           type="button"
           onClick={() => onToggleBuild(nextStatus)}
           title="Bấm để đổi trạng thái build"
-          className={'shrink-0 rounded px-1.5 py-px font-mono text-[10px] leading-tight hover:brightness-95 ' + statusTone}
+          className={'shrink-0 rounded px-1.5 py-px font-mono text-micro leading-tight hover:brightness-95 ' + statusTone}
         >
           {task.buildStatus || BUILD_STATUS[0]}
         </button>
         {task.subTasks.length > 0 && (
-          <span className="font-mono text-[10px] text-ink-3" title={task.subTasks.length + ' subtask'}>
+          <span className="font-mono text-micro text-ink-3" title={task.subTasks.length + ' subtask'}>
             ≡{task.subTasks.length}
           </span>
         )}
         {task.publishedBuild && task.buildStatus === REPORTED_STATUS && (
-          <span className="truncate font-mono text-[9.5px] text-ink-3" title={'Public ở ' + task.publishedBuild}>
+          <span className="truncate font-mono text-micro text-ink-3" title={'Public ở ' + task.publishedBuild}>
             @{buildShort(task.publishedBuild)}
           </span>
         )}
@@ -548,7 +548,7 @@ function TaskCard({
           value={task.environment}
           onChange={(e) => onMove(e.target.value)}
           title="Chuyển môi trường"
-          className="ml-auto max-w-[104px] rounded border border-line bg-ground px-1 py-0 text-[10.5px] text-ink-2"
+          className="ml-auto max-w-[104px] rounded border border-line bg-ground px-1 py-0 text-caption text-ink-2"
         >
           {envs.map((env) => (
             <option key={env} value={env}>
@@ -561,13 +561,13 @@ function TaskCard({
       <FixList fixes={task.fixes} onChange={onFixes} />
 
       {linked.map((o) => (
-        <div key={o.id} className="flex items-center gap-1 rounded bg-epic-soft/60 px-1.5 py-0.5 text-[10.5px]">
+        <div key={o.id} className="flex items-center gap-1 rounded bg-epic-soft/60 px-1.5 py-0.5 text-caption">
           <span className="shrink-0">🔗</span>
           <button type="button" onClick={() => onShow(o)} className="min-w-0 truncate text-left font-medium text-epic-ink hover:underline" title="Mở thẻ bên kia">
             {o.product} · {o.taskId || o.description}
           </button>
           <span className="shrink-0 text-ink-3">· {o.environment}</span>
-          <span className={'shrink-0 rounded px-1 font-mono text-[9.5px] ' + statusChip(o.buildStatus)}>{o.buildStatus}</span>
+          <span className={'shrink-0 rounded px-1 font-mono text-micro ' + statusChip(o.buildStatus)}>{o.buildStatus}</span>
           {o.fixes.length > 0 && <span className="shrink-0 text-ink-3">· {fixProgress(o.fixes)}</span>}
           <button
             type="button"
@@ -580,7 +580,7 @@ function TaskCard({
         </div>
       ))}
       {suggested.map((o) => (
-        <div key={o.id} className="flex items-center gap-1 rounded border border-dashed border-line px-1.5 py-0.5 text-[10.5px] text-ink-3">
+        <div key={o.id} className="flex items-center gap-1 rounded border border-dashed border-line px-1.5 py-0.5 text-caption text-ink-3">
           <span className="shrink-0">🔗?</span>
           <span className="min-w-0 truncate" title="Cùng mã task ở product khác — có thể là cùng một task">
             Có thể liên quan: {o.product} · {o.taskId}
@@ -618,12 +618,12 @@ function FixList({ fixes, onChange }: { fixes: FixCode[]; onChange: (f: FixCode[
   return (
     <div className="flex flex-col gap-0.5">
       {fixes.length > 0 && (
-        <button type="button" onClick={() => setOpen((v) => !v)} className="text-left text-[10.5px] text-ink-3 hover:text-ink">
+        <button type="button" onClick={() => setOpen((v) => !v)} className="text-left text-caption text-ink-3 hover:text-ink">
           Fix: {fixProgress(fixes)} {open ? '▴' : '▾'}
         </button>
       )}
       {shown.map((f) => (
-        <div key={f.code} className="group/fix flex items-center gap-1 pl-1 font-mono text-[10.5px]">
+        <div key={f.code} className="group/fix flex items-center gap-1 pl-1 font-mono text-caption">
           <button
             type="button"
             onClick={() => onChange(fixes.map((x) => (x.code === f.code ? { ...x, status: next(x.status) } : x)))}
@@ -656,7 +656,7 @@ function FixList({ fixes, onChange }: { fixes: FixCode[]; onChange: (f: FixCode[
         }}
         placeholder="+ mã fix (Enter)"
         className={
-          'w-full rounded border border-transparent bg-transparent px-1 py-0 font-mono text-[10.5px] text-ink-2 placeholder:text-ink-3 hover:border-line focus:border-line focus:bg-ground ' +
+          'w-full rounded border border-transparent bg-transparent px-1 py-0 font-mono text-caption text-ink-2 placeholder:text-ink-3 hover:border-line focus:border-line focus:bg-ground ' +
           // A card with no fixes keeps the field out of sight until hovered.
           (fixes.length || adding ? '' : 'opacity-0 focus:opacity-100 group-hover:opacity-100')
         }
@@ -746,15 +746,15 @@ function TaskModal({
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-[90] flex items-start justify-center overflow-auto bg-black/45 p-4 sm:p-8">
-      <div role="dialog" aria-modal="true" className="w-full max-w-[560px] rounded-xl border border-line-strong bg-surface shadow-2xl">
+    <div className="fixed inset-0 z-[90] flex items-start justify-center overflow-auto bg-black/55 backdrop-blur-[3px] p-4 sm:p-8">
+      <div role="dialog" aria-modal="true" className="w-full max-w-[560px] rounded-2xl border border-line-strong bg-surface shadow-pop">
         <header className="flex items-center gap-2 border-b border-line px-4 py-3">
-          <h3 className="text-[14px] font-semibold">{d.id ? 'Sửa task' : 'Task mới'}</h3>
+          <h3 className="text-emph font-semibold">{d.id ? 'Sửa task' : 'Task mới'}</h3>
           <button
             type="button"
             onClick={onClose}
             aria-label="Đóng"
-            className="ml-auto grid size-7 place-items-center rounded-md text-[18px] leading-none text-ink-3 hover:bg-surface-2 hover:text-ink"
+            className="ml-auto grid size-7 place-items-center rounded-md text-xl leading-none text-ink-3 hover:bg-surface-2 hover:text-ink"
           >
             ×
           </button>
@@ -766,7 +766,7 @@ function TaskModal({
               value={d.taskId}
               onChange={(e) => patch({ taskId: e.target.value })}
               placeholder="Mã task hoặc tiêu đề tự do…"
-              className="w-full rounded-md border border-line bg-ground px-2.5 py-1.5 text-[13px]"
+              className="w-full rounded-lg border border-line bg-ground px-3 py-2 text-body"
             />
           </Field>
           <Field label="Nội dung">
@@ -775,7 +775,7 @@ function TaskModal({
               onChange={(e) => patch({ description: e.target.value })}
               rows={2}
               placeholder="Nội dung / mô tả…"
-              className="w-full resize-y rounded-md border border-line bg-ground px-2.5 py-1.5 text-[13px] leading-relaxed"
+              className="w-full resize-y rounded-lg border border-line bg-ground px-3 py-2 text-body leading-relaxed"
             />
           </Field>
 
@@ -784,7 +784,7 @@ function TaskModal({
               <select
                 value={d.product}
                 onChange={(e) => pickProduct(e.target.value)}
-                className="w-full rounded-md border border-line bg-ground px-2.5 py-1.5 text-[13px]"
+                className="w-full rounded-lg border border-line bg-ground px-3 py-2 text-body"
               >
                 {products.map((p) => (
                   <option key={p.id} value={p.name}>
@@ -797,7 +797,7 @@ function TaskModal({
               <select
                 value={d.team}
                 onChange={(e) => patch({ team: e.target.value })}
-                className="w-full rounded-md border border-line bg-ground px-2.5 py-1.5 text-[13px]"
+                className="w-full rounded-lg border border-line bg-ground px-3 py-2 text-body"
               >
                 <option value="">—</option>
                 {teams.map((t) => (
@@ -814,7 +814,7 @@ function TaskModal({
               <select
                 value={d.environment}
                 onChange={(e) => patch({ environment: e.target.value })}
-                className="w-full rounded-md border border-line bg-ground px-2.5 py-1.5 text-[13px]"
+                className="w-full rounded-lg border border-line bg-ground px-3 py-2 text-body"
               >
                 {envs.map((env) => (
                   <option key={env} value={env}>
@@ -827,7 +827,7 @@ function TaskModal({
               <select
                 value={d.buildStatus}
                 onChange={(e) => patch({ buildStatus: e.target.value })}
-                className="w-full rounded-md border border-line bg-ground px-2.5 py-1.5 text-[13px]"
+                className="w-full rounded-lg border border-line bg-ground px-3 py-2 text-body"
               >
                 {BUILD_STATUS.map((b) => (
                   <option key={b} value={b}>
@@ -839,7 +839,7 @@ function TaskModal({
           </div>
 
           <div className="flex flex-col gap-2">
-            <label className="flex items-center gap-1.5 text-[12px] text-ink-2">
+            <label className="flex items-center gap-1.5 text-small text-ink-2">
               <input
                 type="checkbox"
                 checked={d.noBranch}
@@ -853,7 +853,7 @@ function TaskModal({
               <select
                 value={d.refId ?? ''}
                 onChange={(e) => patch({ refId: e.target.value ? Number(e.target.value) : null })}
-                className="w-full rounded-md border border-line bg-ground px-2.5 py-1.5 text-[13px]"
+                className="w-full rounded-lg border border-line bg-ground px-3 py-2 text-body"
               >
                 <option value="">— không —</option>
                 {allTasks
@@ -875,7 +875,7 @@ function TaskModal({
                   value={d.branchName}
                   onChange={(e) => patch({ branchName: e.target.value })}
                   placeholder="feature/invite-link"
-                  className="w-full rounded-md border border-line bg-ground px-2.5 py-1.5 font-mono text-[12.5px]"
+                  className="w-full rounded-lg border border-line bg-ground px-3 py-2 font-mono text-body"
                 />
               </Field>
             )}
@@ -888,12 +888,12 @@ function TaskModal({
                   <input
                     value={f.code}
                     onChange={(e) => patch({ fixes: d.fixes.map((x, j) => (j === i ? { ...x, code: e.target.value } : x)) })}
-                    className="w-32 rounded-md border border-line bg-ground px-2 py-1 font-mono text-[12.5px]"
+                    className="w-32 rounded-md border border-line bg-ground px-2 py-1 font-mono text-body"
                   />
                   <select
                     value={f.status}
                     onChange={(e) => patch({ fixes: d.fixes.map((x, j) => (j === i ? { ...x, status: e.target.value } : x)) })}
-                    className="rounded-md border border-line bg-ground px-2 py-1 text-[12.5px]"
+                    className="rounded-md border border-line bg-ground px-2 py-1 text-body"
                   >
                     {BUILD_STATUS.map((b) => (
                       <option key={b} value={b}>
@@ -901,7 +901,7 @@ function TaskModal({
                       </option>
                     ))}
                   </select>
-                  <span className="min-w-0 truncate text-[11.5px] text-ink-3">{f.build ? `public ở ${f.build}` : ''}</span>
+                  <span className="min-w-0 truncate text-small text-ink-3">{f.build ? `public ở ${f.build}` : ''}</span>
                   <button
                     type="button"
                     onClick={() => patch({ fixes: d.fixes.filter((_, j) => j !== i) })}
@@ -914,7 +914,7 @@ function TaskModal({
               <button
                 type="button"
                 onClick={() => patch({ fixes: [...d.fixes, { code: '', status: BUILD_STATUS[0] }] })}
-                className="self-start text-[12px] text-accent-ink hover:underline"
+                className="self-start text-small text-accent-ink hover:underline"
               >
                 + Thêm mã fix
               </button>
@@ -926,15 +926,15 @@ function TaskModal({
               value={d.subTasks.join('\n')}
               onChange={(e) => patch({ subTasks: e.target.value.split('\n') })}
               rows={3}
-              className="w-full resize-y rounded-md border border-line bg-ground px-2.5 py-1.5 text-[12.5px] leading-relaxed"
+              className="w-full resize-y rounded-lg border border-line bg-ground px-3 py-2 text-body leading-relaxed"
             />
           </Field>
         </div>
 
         <footer className="flex items-center gap-2 border-t border-line bg-surface-2 px-4 py-2.5">
-          {note && <span className={'text-[12px] ' + (note.ok ? 'text-good' : 'text-crit')}>{note.message}</span>}
+          {note && <span className={'text-small ' + (note.ok ? 'text-good' : 'text-crit')}>{note.message}</span>}
           {d.id && (
-            <button type="button" onClick={() => onDelete(d.id!)} className="text-[12px] text-ink-3 hover:text-crit">
+            <button type="button" onClick={() => onDelete(d.id!)} className="text-small text-ink-3 hover:text-crit">
               Xoá
             </button>
           )}
@@ -975,14 +975,14 @@ function ReportModal({ text, onClose }: { text: string; onClose: () => void }) {
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-[90] flex items-start justify-center overflow-auto bg-black/45 p-4 sm:p-8">
-      <div className="w-full max-w-[560px] rounded-xl border border-line-strong bg-surface shadow-2xl">
+    <div className="fixed inset-0 z-[90] flex items-start justify-center overflow-auto bg-black/55 backdrop-blur-[3px] p-4 sm:p-8">
+      <div className="w-full max-w-[560px] rounded-2xl border border-line-strong bg-surface shadow-pop">
         <header className="flex items-center gap-2 border-b border-line px-4 py-3">
-          <h3 className="text-[14px] font-semibold">Report</h3>
+          <h3 className="text-emph font-semibold">Report</h3>
           <button
             type="button"
             onClick={copy}
-            className="ml-auto rounded-md bg-accent px-3 py-[5px] text-[12.5px] font-medium text-white hover:bg-accent-2"
+            className="ml-auto rounded-lg bg-accent shadow-card px-3 py-1.5 text-body font-semibold text-on-accent hover:bg-accent-2"
           >
             {copied ? 'Đã copy ✓' : 'Copy'}
           </button>
@@ -990,12 +990,12 @@ function ReportModal({ text, onClose }: { text: string; onClose: () => void }) {
             type="button"
             onClick={onClose}
             aria-label="Đóng"
-            className="grid size-7 place-items-center rounded-md text-[18px] leading-none text-ink-3 hover:bg-surface-2 hover:text-ink"
+            className="grid size-7 place-items-center rounded-md text-xl leading-none text-ink-3 hover:bg-surface-2 hover:text-ink"
           >
             ×
           </button>
         </header>
-        <pre className="overflow-x-auto whitespace-pre-wrap px-4 py-4 font-mono text-[12.5px] leading-[1.7]">
+        <pre className="overflow-x-auto whitespace-pre-wrap px-4 py-4 font-mono text-body leading-[1.7]">
           {text}
         </pre>
       </div>
@@ -1041,7 +1041,7 @@ function ProductsManager({ products }: { products: ProductConfig[] }) {
   return (
     <section className={CARD}>
       <div className={'mb-1 ' + CTITLE}>Products (repo / project)</div>
-      <p className="mb-3 text-[11.5px] text-ink-3">
+      <p className="mb-3 text-small text-ink-3">
         Mỗi product có bộ môi trường riêng — thứ tự từ trên xuống là thứ tự cột trái → phải trên board. Product
         <b> cùng môi trường</b> sẽ được gộp chung dưới một section trong report.
       </p>
@@ -1054,14 +1054,14 @@ function ProductsManager({ products }: { products: ProductConfig[] }) {
                 value={p.name}
                 onChange={(e) => patchProduct(i, { name: e.target.value })}
                 placeholder="Tên product, vd Lite"
-                className="flex-1 rounded-md border border-line bg-surface px-2.5 py-1 text-[13px] font-medium"
+                className="flex-1 rounded-md border border-line bg-surface px-2.5 py-1 text-body font-medium"
               />
-              <button type="button" onClick={() => removeProduct(i)} className="text-[12px] text-ink-3 hover:text-crit">
+              <button type="button" onClick={() => removeProduct(i)} className="text-small text-ink-3 hover:text-crit">
                 Xoá
               </button>
             </div>
             <div className="mb-2">
-              <label className="flex items-center gap-1.5 text-[12px] text-ink-2">
+              <label className="flex items-center gap-1.5 text-small text-ink-2">
                 <input
                   type="checkbox"
                   checked={p.inReport}
@@ -1072,21 +1072,21 @@ function ProductsManager({ products }: { products: ProductConfig[] }) {
               </label>
             </div>
             <div className="flex flex-col gap-1.5">
-              <span className="text-[11px] text-ink-3">Môi trường</span>
+              <span className="text-caption text-ink-3">Môi trường</span>
               {p.environments.map((env, k) => (
                 <div key={k} className="flex items-center gap-2">
-                  <span className="w-4 text-center font-mono text-[10px] text-ink-3">{k + 1}</span>
+                  <span className="w-4 text-center font-mono text-micro text-ink-3">{k + 1}</span>
                   <input
                     value={env}
                     onChange={(e) => setEnv(i, k, e.target.value)}
                     placeholder="Dev / Staging / Released…"
-                    className="flex-1 rounded-md border border-line bg-surface px-2.5 py-1 text-[12.5px]"
+                    className="flex-1 rounded-md border border-line bg-surface px-2.5 py-1 text-body"
                   />
                   <button
                     type="button"
                     onClick={() => removeEnv(i, k)}
                     aria-label="Xoá môi trường"
-                    className="grid size-6 place-items-center rounded-md text-[15px] leading-none text-ink-3 hover:bg-surface-2 hover:text-crit"
+                    className="grid size-6 place-items-center rounded-md text-lead leading-none text-ink-3 hover:bg-surface-2 hover:text-crit"
                   >
                     ×
                   </button>
@@ -1107,7 +1107,7 @@ function ProductsManager({ products }: { products: ProductConfig[] }) {
         <button type="button" onClick={save} disabled={saving} className={BTN_PRI}>
           {saving ? 'Đang lưu…' : 'Lưu products'}
         </button>
-        {note && <span className={'text-[12px] ' + (note.ok ? 'text-good' : 'text-crit')}>{note.message}</span>}
+        {note && <span className={'text-small ' + (note.ok ? 'text-good' : 'text-crit')}>{note.message}</span>}
       </div>
     </section>
   )
@@ -1132,13 +1132,13 @@ function TeamsManager({ teams }: { teams: string[] }) {
               value={t}
               onChange={(e) => setList((l) => l.map((x, j) => (j === i ? e.target.value : x)))}
               placeholder="Tên team"
-              className="w-[150px] rounded-md border border-line bg-ground px-2.5 py-1 text-[12.5px]"
+              className="w-[150px] rounded-md border border-line bg-ground px-2.5 py-1 text-body"
             />
             <button
               type="button"
               onClick={() => setList((l) => (l.length > 1 ? l.filter((_, j) => j !== i) : ['']))}
               aria-label="Xoá team"
-              className="grid size-6 place-items-center rounded-md text-[15px] leading-none text-ink-3 hover:bg-surface-2 hover:text-crit"
+              className="grid size-6 place-items-center rounded-md text-lead leading-none text-ink-3 hover:bg-surface-2 hover:text-crit"
             >
               ×
             </button>
@@ -1152,7 +1152,7 @@ function TeamsManager({ teams }: { teams: string[] }) {
         <button type="button" onClick={save} disabled={saving} className={BTN_PRI}>
           {saving ? 'Đang lưu…' : 'Lưu teams'}
         </button>
-        {note && <span className={'text-[12px] ' + (note.ok ? 'text-good' : 'text-crit')}>{note.message}</span>}
+        {note && <span className={'text-small ' + (note.ok ? 'text-good' : 'text-crit')}>{note.message}</span>}
       </div>
     </section>
   )
@@ -1180,7 +1180,7 @@ function ExcludesManager({
   return (
     <section className={CARD}>
       <div className={'mb-1 ' + CTITLE}>Report — ẩn team theo môi trường</div>
-      <p className="mb-3 text-[11.5px] text-ink-3">
+      <p className="mb-3 text-small text-ink-3">
         Vd ẩn <b>CXP</b> ở <b>Develop</b>: team đó sẽ không hiện dưới môi trường đó trong report (in-or-above vẫn
         áp cho các môi trường khác).
       </p>
@@ -1191,7 +1191,7 @@ function ExcludesManager({
             <select
               value={e.environment}
               onChange={(ev) => patch(i, { environment: ev.target.value })}
-              className="rounded-md border border-line bg-ground px-2.5 py-1 text-[12.5px]"
+              className="rounded-md border border-line bg-ground px-2.5 py-1 text-body"
             >
               <option value="">— môi trường —</option>
               {allEnvs.map((env) => (
@@ -1200,11 +1200,11 @@ function ExcludesManager({
                 </option>
               ))}
             </select>
-            <span className="text-[11px] text-ink-3">ẩn</span>
+            <span className="text-caption text-ink-3">ẩn</span>
             <select
               value={e.team}
               onChange={(ev) => patch(i, { team: ev.target.value })}
-              className="rounded-md border border-line bg-ground px-2.5 py-1 text-[12.5px]"
+              className="rounded-md border border-line bg-ground px-2.5 py-1 text-body"
             >
               <option value="">— team —</option>
               {teams.map((t) => (
@@ -1217,13 +1217,13 @@ function ExcludesManager({
               type="button"
               onClick={() => setList((l) => l.filter((_, j) => j !== i))}
               aria-label="Xoá quy tắc"
-              className="grid size-6 place-items-center rounded-md text-[15px] leading-none text-ink-3 hover:bg-surface-2 hover:text-crit"
+              className="grid size-6 place-items-center rounded-md text-lead leading-none text-ink-3 hover:bg-surface-2 hover:text-crit"
             >
               ×
             </button>
           </div>
         ))}
-        {list.length === 0 && <p className="text-[11.5px] text-ink-3">Chưa có quy tắc nào.</p>}
+        {list.length === 0 && <p className="text-small text-ink-3">Chưa có quy tắc nào.</p>}
       </div>
 
       <div className="mt-3 flex items-center gap-2">
@@ -1242,7 +1242,7 @@ function ExcludesManager({
         >
           {saving ? 'Đang lưu…' : 'Lưu quy tắc'}
         </button>
-        {note && <span className={'text-[12px] ' + (note.ok ? 'text-good' : 'text-crit')}>{note.message}</span>}
+        {note && <span className={'text-small ' + (note.ok ? 'text-good' : 'text-crit')}>{note.message}</span>}
       </div>
     </section>
   )

@@ -54,11 +54,11 @@ const APP_KEY = 'mod:ios-publish:publish-app'
  */
 const DRAFT_PREFIX = 'mod:ios-publish:draft:'
 
-const CARD = 'rounded-[9px] border border-line bg-surface p-[17px]'
-const CTITLE = 'font-mono text-[10.5px] uppercase tracking-[0.09em] text-ink-3'
-const INPUT = 'w-full rounded-md border border-line bg-ground px-2.5 py-1.5 text-[13px]'
-const BTN = 'rounded-md border border-line-strong bg-surface px-2.5 py-1 text-[12.5px] hover:bg-surface-2'
-const BTN_PRI = 'rounded-md bg-accent px-3 py-1 text-[12.5px] font-medium text-white hover:bg-accent-2 disabled:opacity-50'
+const CARD = 'card p-5'
+const CTITLE = 'eyebrow text-ink-2'
+const INPUT = 'w-full rounded-lg border border-line bg-ground px-3 py-2 text-body'
+const BTN = 'rounded-lg border border-line-strong bg-surface px-3 py-1.5 font-medium text-body hover:bg-surface-2'
+const BTN_PRI = 'rounded-lg bg-accent shadow-card px-3 py-1.5 text-body font-semibold text-on-accent hover:bg-accent-2 disabled:opacity-50'
 
 type Note = { ok: boolean; message: string } | null
 
@@ -97,9 +97,9 @@ export function IosPublish({
       <header className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <div>
           <div className={CTITLE}>Module · App Store Connect API</div>
-          <h1 className="text-xl font-semibold tracking-tight">iOS publish</h1>
+          <h1 className="text-title font-semibold tracking-tight">iOS publish</h1>
         </div>
-        <div className="flex overflow-hidden rounded-md border border-line-strong text-[12.5px]">
+        <div className="flex overflow-hidden rounded-md border border-line-strong text-body">
           <TabBtn on={tab === 'publish'} onClick={() => setTab('publish')}>
             Publish
           </TabBtn>
@@ -120,7 +120,7 @@ export function IosPublish({
             published={published}
           />
         ) : (
-          <div className={CARD + ' text-[12.5px] text-ink-2'}>
+          <div className={CARD + ' text-body text-ink-2'}>
             Chưa có app nào.{' '}
             <button
               type="button"
@@ -324,7 +324,7 @@ function PublishCards({
   }
 
   return (
-    <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+    <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
       <section className={CARD}>
         <div className={'mb-3 ' + CTITLE}>Submit build lên TestFlight external</div>
 
@@ -396,7 +396,7 @@ function PublishCards({
                 type="button"
                 onClick={fillFromReleases}
                 title="Điền các task đã build của product/môi trường app này từ module releases"
-                className="text-[11.5px] text-accent-ink underline-offset-2 hover:underline"
+                className="text-small text-accent-ink underline-offset-2 hover:underline"
               >
                 ✦ Điền từ releases
               </button>
@@ -410,10 +410,10 @@ function PublishCards({
             }}
             rows={4}
             placeholder="- Mô tả bản build cho tester"
-            className={INPUT + ' resize-y text-[12.5px] leading-relaxed'}
+            className={INPUT + ' resize-y text-body leading-relaxed'}
           />
           {already.length > 0 && (
-            <p className="rounded-md bg-warn-soft px-2.5 py-1.5 text-[12px] text-warn">
+            <p className="rounded-md bg-warn-soft px-2.5 py-1.5 text-small text-warn">
               ⚠ Đã public trước đó: {already.map((a) => `${a.code} (${a.build})`).join(', ')} — xoá khỏi What to Test nếu không cần nhắc lại.
             </p>
           )}
@@ -445,19 +445,19 @@ function PublishCards({
                 </Kv>
               </div>
             )}
-            <p className={'mt-2.5 text-[12.5px] ' + (result.ok ? 'text-good' : 'text-crit')}>{result.message}</p>
+            <p className={'mt-2.5 text-body ' + (result.ok ? 'text-good' : 'text-crit')}>{result.message}</p>
           </section>
         )}
 
         <section className={CARD}>
           <div className={'mb-2.5 ' + CTITLE}>Lịch sử submit</div>
           {log.length === 0 ? (
-            <p className="text-[12px] text-ink-3">Chưa có lần submit nào.</p>
+            <p className="text-small text-ink-3">Chưa có lần submit nào.</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-[12px]">
+              <table className="w-full text-small">
                 <thead>
-                  <tr className="text-left font-mono text-[9.5px] uppercase tracking-[0.06em] text-ink-3">
+                  <tr className="text-left eyebrow text-ink-2">
                     <th className="border-b border-line py-1.5 pr-2">Build</th>
                     <th className="border-b border-line py-1.5 pr-2">App</th>
                     <th className="border-b border-line py-1.5 pr-2">Lúc</th>
@@ -474,7 +474,7 @@ function PublishCards({
                         <span
                           title={e.message}
                           className={
-                            'rounded-full px-2 py-px font-mono text-[10px] ' +
+                            'rounded-full px-2 py-px font-mono text-micro ' +
                             (e.ok ? 'bg-good-soft text-good' : 'bg-crit-soft text-crit')
                           }
                         >
@@ -495,7 +495,7 @@ function PublishCards({
 
 function Kv({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex items-center justify-between gap-2 text-[12.5px]">
+    <div className="flex items-center justify-between gap-2 text-body">
       <span className="text-ink-2">{label}</span>
       {children}
     </div>
@@ -511,7 +511,7 @@ function Pill({ value }: { value: string }) {
       : v.includes('PROCESSING') || v.includes('WAITING') || v.includes('REVIEW')
         ? 'bg-warn-soft text-warn'
         : 'bg-blue-soft text-blue'
-  return <span className={'rounded-full px-2 py-px font-mono text-[10.5px] font-semibold ' + tone}>{value}</span>
+  return <span className={'rounded-full px-2 py-px font-mono text-caption font-semibold ' + tone}>{value}</span>
 }
 
 // ── config: ASC profiles ─────────────────────────────────────────────────────
@@ -591,9 +591,9 @@ function ProfileEditor({
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="Tên cấu hình, vd TAKAI"
-          className="flex-1 rounded-md border border-line bg-surface px-2.5 py-1 text-[13px] font-medium"
+          className="flex-1 rounded-md border border-line bg-surface px-2.5 py-1 text-body font-medium"
         />
-        <button type="button" onClick={remove} disabled={removing} className="text-[12px] text-ink-3 hover:text-crit disabled:opacity-50">
+        <button type="button" onClick={remove} disabled={removing} className="text-small text-ink-3 hover:text-crit disabled:opacity-50">
           {removing ? '…' : 'Xoá'}
         </button>
       </div>
@@ -602,13 +602,13 @@ function ProfileEditor({
           value={issuerId}
           onChange={(e) => setIssuerId(e.target.value)}
           placeholder="Issuer ID"
-          className="min-w-[200px] flex-1 rounded-md border border-line bg-surface px-2.5 py-1 font-mono text-[11.5px]"
+          className="min-w-[200px] flex-1 rounded-md border border-line bg-surface px-2.5 py-1 font-mono text-small"
         />
         <input
           value={keyId}
           onChange={(e) => setKeyId(e.target.value)}
           placeholder="Key ID"
-          className="w-[150px] rounded-md border border-line bg-surface px-2.5 py-1 font-mono text-[11.5px]"
+          className="w-[150px] rounded-md border border-line bg-surface px-2.5 py-1 font-mono text-small"
         />
       </div>
       <textarea
@@ -616,13 +616,13 @@ function ProfileEditor({
         onChange={(e) => setP8Key(e.target.value)}
         rows={3}
         placeholder={view.hasP8 ? '••••••••••  (.p8 đã lưu, để trống nếu giữ nguyên)' : '-----BEGIN PRIVATE KEY-----\n…'}
-        className="mt-2 w-full resize-y rounded-md border border-line bg-surface px-2.5 py-1.5 font-mono text-[11px] leading-relaxed"
+        className="mt-2 w-full resize-y rounded-md border border-line bg-surface px-2.5 py-1.5 font-mono text-caption leading-relaxed"
       />
       <div className="mt-2 flex items-center gap-2">
         <button type="button" onClick={save} disabled={saving} className={BTN_PRI}>
           {saving ? 'Đang lưu…' : 'Lưu'}
         </button>
-        {note && <span className={'text-[12px] ' + (note.ok ? 'text-good' : 'text-crit')}>{note.message}</span>}
+        {note && <span className={'text-small ' + (note.ok ? 'text-good' : 'text-crit')}>{note.message}</span>}
       </div>
     </div>
   )
@@ -656,12 +656,12 @@ function AppsManager({
   return (
     <section className={CARD}>
       <div className={'mb-1 ' + CTITLE}>App</div>
-      <p className="mb-3 text-[11.5px] text-ink-3">
+      <p className="mb-3 text-small text-ink-3">
         Lưu sẵn app + version + external group + room, gắn với 1 cấu hình ASC. Publish chỉ đổi build number và What
         to Test.
       </p>
       {profiles.length === 0 ? (
-        <p className="text-[12px] text-warn">Tạo ít nhất 1 cấu hình ASC ở trên trước đã.</p>
+        <p className="text-small text-warn">Tạo ít nhất 1 cấu hình ASC ở trên trước đã.</p>
       ) : (
         <>
           <div className="flex flex-col gap-3">
@@ -754,17 +754,17 @@ function AppEditor({
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="Tên app đúng như trên ASC, vd CTalk"
-          className="flex-1 rounded-md border border-line bg-surface px-2.5 py-1 text-[13px] font-medium"
+          className="flex-1 rounded-md border border-line bg-surface px-2.5 py-1 text-body font-medium"
         />
-        <button type="button" onClick={remove} disabled={removing} className="text-[12px] text-ink-3 hover:text-crit disabled:opacity-50">
+        <button type="button" onClick={remove} disabled={removing} className="text-small text-ink-3 hover:text-crit disabled:opacity-50">
           {removing ? '…' : 'Xoá'}
         </button>
       </div>
 
       <div className="flex flex-wrap gap-2">
         <label className="flex flex-1 flex-col gap-1">
-          <span className="text-[11px] text-ink-3">Cấu hình ASC</span>
-          <select value={profileId} onChange={(e) => setProfileId(e.target.value)} className="rounded-md border border-line bg-surface px-2.5 py-1 text-[12.5px]">
+          <span className="text-caption text-ink-3">Cấu hình ASC</span>
+          <select value={profileId} onChange={(e) => setProfileId(e.target.value)} className="rounded-md border border-line bg-surface px-2.5 py-1 text-body">
             {profiles.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
@@ -773,8 +773,8 @@ function AppEditor({
           </select>
         </label>
         <label className="flex w-[130px] flex-col gap-1">
-          <span className="text-[11px] text-ink-3">Version mặc định</span>
-          <input value={version} onChange={(e) => setVersion(e.target.value)} placeholder="4.12.0" className="rounded-md border border-line bg-surface px-2.5 py-1 text-[12.5px]" />
+          <span className="text-caption text-ink-3">Version mặc định</span>
+          <input value={version} onChange={(e) => setVersion(e.target.value)} placeholder="4.12.0" className="rounded-md border border-line bg-surface px-2.5 py-1 text-body" />
         </label>
       </div>
 
@@ -782,11 +782,11 @@ function AppEditor({
         <>
           <div className="mt-2 flex flex-wrap gap-2">
             <label className="flex flex-1 flex-col gap-1">
-              <span className="text-[11px] text-ink-3">Product (releases)</span>
+              <span className="text-caption text-ink-3">Product (releases)</span>
               <select
                 value={product}
                 onChange={(e) => pickProduct(e.target.value)}
-                className="rounded-md border border-line bg-surface px-2.5 py-1 text-[12.5px]"
+                className="rounded-md border border-line bg-surface px-2.5 py-1 text-body"
               >
                 <option value="">— Không map —</option>
                 {releaseProducts.map((p) => (
@@ -797,12 +797,12 @@ function AppEditor({
               </select>
             </label>
             <label className="flex flex-1 flex-col gap-1">
-              <span className="text-[11px] text-ink-3">Môi trường</span>
+              <span className="text-caption text-ink-3">Môi trường</span>
               <select
                 value={environment}
                 onChange={(e) => setEnvironment(e.target.value)}
                 disabled={!product}
-                className="rounded-md border border-line bg-surface px-2.5 py-1 text-[12.5px] disabled:opacity-50"
+                className="rounded-md border border-line bg-surface px-2.5 py-1 text-body disabled:opacity-50"
               >
                 {!product && <option value="">—</option>}
                 {envs.map((en) => (
@@ -813,27 +813,27 @@ function AppEditor({
               </select>
             </label>
           </div>
-          <p className="mt-1 text-[11px] text-ink-3">
+          <p className="mt-1 text-caption text-ink-3">
             Map để &quot;What to Test&quot; tự điền task <b>đã build</b> của product này ở môi trường đó trở lên.
           </p>
         </>
       )}
 
       <div className="mt-2 flex flex-col gap-1">
-        <span className="text-[11px] text-ink-3">External group (nhiều dòng được)</span>
+        <span className="text-caption text-ink-3">External group (nhiều dòng được)</span>
         {groups.map((g, i) => (
           <div key={i} className="flex items-center gap-2">
             <input
               value={g}
               onChange={(e) => setGroups((list) => list.map((x, j) => (j === i ? e.target.value : x)))}
               placeholder="Public Testers"
-              className="flex-1 rounded-md border border-line bg-surface px-2.5 py-1 text-[12.5px]"
+              className="flex-1 rounded-md border border-line bg-surface px-2.5 py-1 text-body"
             />
             <button
               type="button"
               onClick={() => setGroups((list) => (list.length > 1 ? list.filter((_, j) => j !== i) : ['']))}
               aria-label="Xoá group"
-              className="grid size-6 place-items-center rounded-md text-[15px] leading-none text-ink-3 hover:bg-surface-2 hover:text-crit"
+              className="grid size-6 place-items-center rounded-md text-lead leading-none text-ink-3 hover:bg-surface-2 hover:text-crit"
             >
               ×
             </button>
@@ -845,12 +845,12 @@ function AppEditor({
       </div>
 
       <label className="mt-2 flex flex-col gap-1">
-        <span className="text-[11px] text-ink-3">Room notify (bỏ trống nếu không gửi bot)</span>
+        <span className="text-caption text-ink-3">Room notify (bỏ trống nếu không gửi bot)</span>
         <input
           value={roomIds}
           onChange={(e) => setRoomIds(e.target.value)}
           placeholder="!room1:chatchit.org, !room2:chatchit.org"
-          className="rounded-md border border-line bg-surface px-2.5 py-1 font-mono text-[11.5px]"
+          className="rounded-md border border-line bg-surface px-2.5 py-1 font-mono text-small"
         />
       </label>
 
@@ -858,7 +858,7 @@ function AppEditor({
         <button type="button" onClick={save} disabled={saving} className={BTN_PRI}>
           {saving ? 'Đang lưu…' : 'Lưu'}
         </button>
-        {note && <span className={'text-[12px] ' + (note.ok ? 'text-good' : 'text-crit')}>{note.message}</span>}
+        {note && <span className={'text-small ' + (note.ok ? 'text-good' : 'text-crit')}>{note.message}</span>}
       </div>
     </div>
   )
@@ -892,7 +892,7 @@ function NotifyManager({ hasWebhook, chatTemplate }: { hasWebhook: boolean; chat
           value={webhook}
           onChange={(e) => setWebhook(e.target.value)}
           placeholder={hasWebhook ? '••••••••••  (đã lưu)' : 'https://api.chatchit.org/v1/bot/…/sendMessage?encryption=try'}
-          className={INPUT + ' font-mono text-[11.5px]'}
+          className={INPUT + ' font-mono text-small'}
         />
       </label>
 
@@ -906,16 +906,16 @@ function NotifyManager({ hasWebhook, chatTemplate }: { hasWebhook: boolean; chat
           onChange={(e) => setTemplate(e.target.value)}
           rows={5}
           placeholder={DEFAULT_MESSAGE_TEMPLATE}
-          className={INPUT + ' resize-y font-mono text-[11.5px] leading-relaxed'}
+          className={INPUT + ' resize-y font-mono text-small leading-relaxed'}
         />
-        <span className="text-[11px] text-ink-3">Để trống = dùng mẫu mặc định. Room notify khai theo từng app ở trên.</span>
+        <span className="text-caption text-ink-3">Để trống = dùng mẫu mặc định. Room notify khai theo từng app ở trên.</span>
       </label>
 
       <div className="mt-3 flex items-center gap-2">
         <button type="button" onClick={save} disabled={saving} className={BTN_PRI}>
           {saving ? 'Đang lưu…' : 'Lưu notify'}
         </button>
-        {note && <span className={'text-[12px] ' + (note.ok ? 'text-good' : 'text-crit')}>{note.message}</span>}
+        {note && <span className={'text-small ' + (note.ok ? 'text-good' : 'text-crit')}>{note.message}</span>}
       </div>
     </section>
   )
@@ -952,17 +952,17 @@ function CodesPanel({
     <div className="mb-3 rounded-md border border-line px-3 py-2.5">
       <div className="mb-1.5 flex flex-wrap items-center gap-2">
         <span className="text-xs font-medium text-ink-2">Mã sẽ public trong build này</span>
-        <span className="text-[11.5px] text-ink-3">
+        <span className="text-small text-ink-3">
           {picked.size}/{pending.length} đã chọn{publishedCount ? ` · ${publishedCount} mã đã public ở build trước (ẩn)` : ''}
         </span>
         {pending.length > 0 && (
-          <button type="button" onClick={onFill} className="ml-auto text-[11.5px] text-accent-ink underline-offset-2 hover:underline">
+          <button type="button" onClick={onFill} className="ml-auto text-small text-accent-ink underline-offset-2 hover:underline">
             ✦ Điền What to Test từ mã đã chọn
           </button>
         )}
       </div>
       {pending.length === 0 ? (
-        <p className="text-[12px] text-ink-3">Không có mã nào &quot;đã build&quot; mà chưa public cho app này.</p>
+        <p className="text-small text-ink-3">Không có mã nào &quot;đã build&quot; mà chưa public cho app này.</p>
       ) : (
         <div className="flex flex-col gap-2">
           {features.map((feature) => {
@@ -971,20 +971,20 @@ function CodesPanel({
             return (
               <div key={feature}>
                 {rows.map((c) => (
-                  <label key={keyOf(c)} className="flex cursor-pointer items-center gap-2 text-[12.5px]">
+                  <label key={keyOf(c)} className="flex cursor-pointer items-center gap-2 text-body">
                     <input type="checkbox" checked={picked.has(keyOf(c))} onChange={() => toggle(keyOf(c))} />
                     <span className={'font-mono ' + (c.kind === 'fix' ? 'pl-3' : 'font-semibold')}>{c.code}</span>
-                    <span className="text-[11px] text-ink-3">
+                    <span className="text-caption text-ink-3">
                       {c.kind === 'fix' ? `fix của ${c.feature}` : 'feature'}
                       {c.team ? ` · ${c.team}` : ''}
                     </span>
                   </label>
                 ))}
                 {rows.every((c) => c.kind === 'fix') && (
-                  <div className="pl-5 text-[11px] text-ink-3">feature {feature} đã public trước đó — chỉ còn fix</div>
+                  <div className="pl-5 text-caption text-ink-3">feature {feature} đã public trước đó — chỉ còn fix</div>
                 )}
                 {links.map((l) => (
-                  <div key={l.label} className={'pl-5 text-[11px] ' + (l.ready ? 'text-ink-3' : 'text-warn')}>
+                  <div key={l.label} className={'pl-5 text-caption ' + (l.ready ? 'text-ink-3' : 'text-warn')}>
                     🔗 {l.label} · {l.environment} · {l.status}
                     {l.ready ? '' : ' — bên này chưa public, kiểm tra đã có trong build chưa'}
                   </div>

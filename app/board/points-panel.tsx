@@ -65,20 +65,20 @@ export function PointsPanel({
   const perPoint = points > 0 ? pointedSeconds / points : 0
 
   return (
-    <section className="rounded-[9px] border border-line bg-surface p-[17px]">
-      <div className="mb-2.5 font-mono text-[10.5px] uppercase tracking-[0.09em] text-ink-3">
+    <section className="card p-5">
+      <div className="mb-2.5 eyebrow text-ink-2">
         Point · {sprintName}
       </div>
 
       <div className="mb-3 flex items-baseline gap-2">
-        <span className="font-mono text-[22px] font-medium tracking-[-0.03em] tabular">
+        <span className="font-mono text-2xl font-medium tracking-[-0.03em] tabular">
           {fmt(donePoints)}
         </span>
-        <span className="font-mono text-[13px] text-ink-3">/ {fmt(points)} point xong</span>
+        <span className="font-mono text-body text-ink-3">/ {fmt(points)} point xong</span>
         {points > 0 && (
           <span
             className={
-              'ml-auto rounded-full px-2 py-[2.5px] text-[11.5px] font-medium ' +
+              'ml-auto rounded-full px-2 py-[2.5px] text-small font-medium ' +
               (pct >= 100 ? 'bg-good-soft text-good' : 'bg-surface-2 text-ink-2')
             }
           >
@@ -118,12 +118,12 @@ export function PointsPanel({
         {buckets.map((b) => (
           <div
             key={b.tone}
-            className="flex items-center gap-2 rounded px-1 py-[3px] text-[12.5px]"
+            className="flex items-center gap-2 rounded px-1 py-[3px] text-body"
           >
             <i className={'size-[6px] shrink-0 rounded-full ' + FILL[b.tone]} />
             <span className="min-w-0 flex-1 truncate text-ink-2">{LABEL[b.tone]}</span>
-            <span className="font-mono text-[11px] text-ink-3">{b.tasks} task</span>
-            <b className="w-[52px] shrink-0 text-right font-mono text-[12px] tabular">
+            <span className="font-mono text-caption text-ink-3">{b.tasks} task</span>
+            <b className="w-[52px] shrink-0 text-right font-mono text-small tabular">
               {fmt(b.points)} pt
             </b>
           </div>
@@ -152,7 +152,7 @@ export function PointsPanel({
 
       {unpointed > 0 && (
         <div
-          className="mt-2 rounded-[5px] border border-warn/40 bg-warn-soft px-2 py-1.5 text-[11.5px] leading-relaxed text-warn"
+          className="mt-2 rounded-[5px] border border-warn/40 bg-warn-soft px-2 py-1.5 text-small leading-relaxed text-warn"
           title="Task không có point vẫn tính giờ nhưng không tính point — nên tỉ lệ giờ/point ở trên chỉ dựa trên các task đã ước lượng."
         >
           <b className="font-mono font-semibold">{unpointed}</b> task chưa có point

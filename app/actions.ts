@@ -10,7 +10,7 @@ import {
   updateDescription,
   updateSummary,
 } from '@/lib/jira/issues'
-import { createWorklog, loggedMinutesOnDate } from '@/lib/jira/worklog'
+import { createWorklog, deleteWorklog, loggedMinutesOnDate } from '@/lib/jira/worklog'
 import { listDaysOff } from '@/lib/days-off'
 import { scheduleForDate } from '@/lib/quota'
 import { SETTING_KEYS, getSetting, getWorkSchedule } from '@/lib/settings'
@@ -27,6 +27,11 @@ export interface ActionResult {
   partial?: boolean
 }
 
+export interface LogResult extends ActionResult {
+  /** Ids of the worklogs written, so the board can offer an undo. */
+  worklogIds?: string[]
+}
+
 /**
  * Logs work on one issue. The minimum step is enforced here rather than only in
  * the UI, because the value arrives from a client component and could be
@@ -38,7 +43,7 @@ export async function logWorkAction(input: {
   hours: number
   date: string
   comment?: string
-}): Promise<ActionResult> {
+}): Promise<LogResult> {
   const step = Number(getSetting(SETTING_KEYS.logStepHours) ?? '0.5') || 0.5
 
   if (!Number.isFinite(input.hours) || input.hours <= 0) {
@@ -76,9 +81,10 @@ export async function logWorkAction(input: {
     // failure on the second leaves the first already recorded in Jira. Calling
     // that a plain failure would invite a retry that logs the first piece twice.
     const done: WorklogSlice[] = []
+    const ids: string[] = []
     try {
       for (const slice of slices) {
-        await createWorklog({
+        const created = await createWorklog({
           issueKey: input.issueKey,
           hours: slice.minutes / 60,
           date: input.date,
@@ -87,6 +93,7 @@ export async function logWorkAction(input: {
           tz,
         })
         done.push(slice)
+        if (created?.id) ids.push(String(created.id))
       }
     } catch (error) {
       const reason = error instanceof Error ? error.message : 'Không log được'
@@ -103,6 +110,7 @@ export async function logWorkAction(input: {
       return {
         ok: false,
         partial: true,
+        worklogIds: ids,
         message:
           `${formatDuration(landed)} (${formatSlices(done)}) đã được log, ` +
           `nhưng xảy ra lỗi khi log ${formatDuration(lost)} (${formatSlices(failed)}): ${reason} ` +
@@ -115,11 +123,41 @@ export async function logWorkAction(input: {
     return {
       ok: true,
       message: `Đã log ${input.hours}h cho ${input.issueKey} · ${formatSlices(slices)}`,
+      worklogIds: ids,
     }
   } catch (error) {
     return {
       ok: false,
       message: error instanceof Error ? error.message : 'Không log được',
+    }
+  }
+}
+
+/**
+ * Takes back worklogs the board just wrote — the undo offered for a few seconds
+ * after a one-click log. Only ids handed out by `logWorkAction` reach here, so
+ * it never deletes a worklog the user did not just create from this screen.
+ */
+export async function undoWorklogAction(input: {
+  issueKey: string
+  worklogIds: string[]
+}): Promise<ActionResult> {
+  const ids = input.worklogIds.filter((id) => /^\d+$/.test(id))
+  if (!ids.length) return { ok: false, message: 'Không có worklog để hoàn tác' }
+
+  let removed = 0
+  try {
+    for (const id of ids) {
+      await deleteWorklog(input.issueKey, id)
+      removed++
+    }
+    return { ok: true, message: `Đã hoàn tác lần log ${input.issueKey}` }
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : 'Không hoàn tác được'
+    return {
+      ok: false,
+      partial: removed > 0,
+      message: removed > 0 ? `Mới xoá được ${removed}/${ids.length} worklog: ${reason}` : reason,
     }
   }
 }
@@ -300,3 +338,4 @@ export async function transitionAction(
     }
   }
 }
+

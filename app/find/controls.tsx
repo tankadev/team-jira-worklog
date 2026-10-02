@@ -75,23 +75,24 @@ export function FindControls({
   }
 
   const control =
-    'rounded-md border border-line bg-surface px-[9px] py-[5px] text-[12.5px] text-ink disabled:opacity-60'
+    'h-9 rounded-lg border border-line bg-surface px-3 shadow-card hover:border-line-strong text-body text-ink disabled:opacity-60'
 
   return (
     <>
-      <div className="mb-3.5 flex gap-0.5 border-b border-line">
+      <div role="tablist" className="mb-4 inline-flex gap-1 rounded-xl border border-line bg-surface-2/70 p-1">
         {TABS.map((t) => (
           <button
             key={t.key}
             type="button"
             disabled={pending}
             onClick={() => set({ tab: t.key })}
+            role="tab"
             aria-selected={tab === t.key}
             className={
-              '-mb-px border-b-2 px-3 py-[7px] text-[13px] disabled:opacity-60 ' +
+              'rounded-lg px-3.5 py-1.5 text-body transition-colors disabled:opacity-60 ' +
               (tab === t.key
-                ? 'border-accent font-semibold text-accent-ink'
-                : 'border-transparent text-ink-3 hover:text-ink')
+                ? 'bg-surface font-semibold text-ink shadow-card'
+                : 'text-ink-3 hover:text-ink')
             }
           >
             {t.label}
@@ -134,7 +135,7 @@ export function FindControls({
             className={control}
           />
 
-          <span className="ml-auto text-[11.5px] text-ink-3">
+          <span className="ml-auto text-small text-ink-3">
             Subtask không lọc được theo sprint nên không hiện ở đây
           </span>
           <NavSpinner />
@@ -174,15 +175,15 @@ export function FindControls({
       )}
 
       {tab === 'jql' && (
-        <div className="mb-3.5 rounded-[9px] border border-line bg-surface p-[17px]">
-          <label className="mb-1.5 block text-xs font-medium text-ink-2">JQL</label>
+        <div className="mb-4 card p-4">
+          <label className="mb-1.5 block eyebrow text-ink-2">JQL</label>
           <textarea
             rows={4}
             value={jqlText}
             disabled={pending}
             onChange={(e) => setJqlText(e.target.value)}
             placeholder='project = VT AND assignee IS EMPTY ORDER BY created DESC'
-            className="w-full resize-y rounded-md border border-line bg-ground px-[11px] py-[9px] font-mono text-[12.5px] leading-[1.6]"
+            className="w-full resize-y rounded-lg border border-line bg-ground px-3 py-2.5 font-mono text-body leading-[1.6]"
           />
 
           <div className="mt-2.5 flex flex-wrap gap-1.5">
@@ -191,7 +192,7 @@ export function FindControls({
                 <button
                   type="button"
                   onClick={() => setJqlText(p.jql)}
-                  className="rounded-l-full rounded-r-full border border-line px-[11px] py-[3px] font-mono text-[11.5px] text-ink-2 hover:border-accent hover:text-accent-ink"
+                  className="rounded-l-full rounded-r-full border border-line px-[11px] py-[3px] font-mono text-small text-ink-2 hover:border-accent hover:text-accent-ink"
                   title={p.jql}
                 >
                   {p.name}
@@ -203,7 +204,7 @@ export function FindControls({
                     onClick={() =>
                       startSaving(async () => setNote(await deletePresetAction(p.id)))
                     }
-                    className="-ml-1 rounded-full px-1.5 text-[11px] text-ink-3 hover:text-crit disabled:opacity-40"
+                    className="-ml-1 rounded-full px-1.5 text-caption text-ink-3 hover:text-crit disabled:opacity-40"
                     title="Xoá preset"
                   >
                     ×
@@ -215,7 +216,7 @@ export function FindControls({
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <NavSpinner />
-            <span className="mr-auto text-[11.5px] text-ink-3">
+            <span className="mr-auto text-small text-ink-3">
               {note ? (
                 <b className={note.ok ? 'text-good' : 'text-crit'}>{note.message}</b>
               ) : (
@@ -232,7 +233,7 @@ export function FindControls({
                 const name = prompt('Tên preset')
                 if (name) startSaving(async () => setNote(await savePresetAction(name, jqlText)))
               }}
-              className="rounded-md border border-line-strong bg-surface px-[9px] py-1 text-[12.5px] hover:bg-surface-2 disabled:opacity-60"
+              className="rounded-lg border border-line-strong bg-surface px-3 py-1.5 font-medium text-body hover:bg-surface-2 disabled:opacity-60"
             >
               {saving ? <Working>Đang lưu…</Working> : 'Lưu preset'}
             </button>
@@ -240,7 +241,7 @@ export function FindControls({
               type="button"
               disabled={pending}
               onClick={() => set({ jql: jqlText })}
-              className="rounded-md bg-accent px-3 py-1 text-[12.5px] font-medium text-white hover:bg-accent-2 disabled:opacity-60"
+              className="rounded-lg bg-accent shadow-card px-3 py-1.5 text-body font-semibold text-on-accent hover:bg-accent-2 disabled:opacity-60"
             >
               {pending ? 'Đang chạy…' : 'Chạy JQL'}
             </button>
