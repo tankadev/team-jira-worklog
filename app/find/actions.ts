@@ -14,8 +14,8 @@ export async function assignToMeAction(issueKey: string): Promise<FindResult> {
   try {
     const me = await getMyself()
     await assignToMe(issueKey, me.accountId)
-    revalidatePath('/find')
-    revalidatePath('/')
+    // Every screen that lists "my" work — board, daily report — now has one more.
+    revalidatePath('/', 'layout')
     return { ok: true, message: `${issueKey} đã giao cho bạn` }
   } catch (error) {
     return {

@@ -2,12 +2,10 @@ import Link from 'next/link'
 import { connection } from 'next/server'
 
 import { getMyself, jiraBlockedBy } from '@/lib/jira/client'
-import { getOpenSubtasks } from '@/lib/jira/issues'
 import { getSprints } from '@/lib/jira/sprints'
 import { getWorklogs, sumByDate } from '@/lib/jira/worklog'
 import type { ReportIssue } from '@/lib/report'
 import { listDaysOff } from '@/lib/days-off'
-import { statusTone } from '@/lib/jira/types'
 import { type QuotaRules, quotaForDate } from '@/lib/quota'
 import { SETTING_KEYS, getSetting, getWorkSchedule } from '@/lib/settings'
 import { getTemplate, listTemplates } from '@/lib/templates'
@@ -15,6 +13,7 @@ import { DEFAULT_TZ, formatDateVi, formatDuration, previousWorkday, todayIn, wee
 
 import { JiraDown } from '../jira-down'
 import { NavProvider } from '../board/navigation'
+import { loadTodayCandidates } from './candidates'
 import { ReportDatePicker } from './date-picker'
 import { ReportOutput } from './output'
 import { WeekTable } from './week-table'
@@ -74,12 +73,12 @@ async function reportPage(props: PageProps<'/report'>) {
 
   // prevDate falls in the previous week when `date` is a Monday, so the fetch
   // reaches back to it; the extra days are harmless to the week table and stats.
-  const [weekEntries, sprintEntries, openTasks] = await Promise.all([
+  const [weekEntries, sprintEntries, todayCandidates] = await Promise.all([
     getWorklogs(prevDate < days[0] ? prevDate : days[0], days[6], me.accountId, tz),
     sprintFrom && sprintTo
       ? getWorklogs(sprintFrom, min(sprintTo, todayIn(tz)), me.accountId, tz)
       : Promise.resolve([]),
-    getOpenSubtasks(current?.id ?? null),
+    loadTodayCandidates(current?.id ?? null),
   ])
 
   const dayEntries = weekEntries.filter((e) => e.date === date)
@@ -105,14 +104,6 @@ async function reportPage(props: PageProps<'/report'>) {
   // been logged so far.
   const dayIssueCount = new Set(dayEntries.map((e) => e.issueKey)).size
   const daySeconds = dayEntries.reduce((n, e) => n + e.timeSpentSeconds, 0)
-
-  // Candidates for "Today", work in progress first — the likeliest picks sit
-  // at the top. None are ticked; the user chooses.
-  const TONE_ORDER = { prog: 0, todo: 1, test: 2, ver: 3, done: 4 } as const
-  const todayCandidates = openTasks
-    .map((t) => ({ ...t, tone: statusTone(t.statusName) }))
-    .sort((a, b) => TONE_ORDER[a.tone] - TONE_ORDER[b.tone])
-    .map((t) => ({ key: t.key, summary: t.summary, statusName: t.statusName }))
 
   const byDate = sumByDate(weekEntries)
   const rules: QuotaRules = {
@@ -157,6 +148,7 @@ async function reportPage(props: PageProps<'/report'>) {
             prevDayOff={!!rules.daysOff[prevDate]}
             displayName={me.displayName}
             sprintName={current?.name}
+            sprintId={current?.id ?? null}
             previousIssues={issues}
             todayCandidates={todayCandidates}
             templates={templates.map((t) => ({ id: t.id, name: t.name, isDefault: t.isDefault }))}

@@ -96,11 +96,12 @@ export interface BoardQuery {
 async function sprintParentKeys(
   sprintId: number,
   projectKey: string,
+  fresh = false,
 ): Promise<string[]> {
   const issues = await searchJql<JiraIssue>(
     `project = "${escapeJql(projectKey)}" AND sprint = ${sprintId} AND issuetype not in subTaskIssueTypes()`,
     ["summary"],
-    { limit: 300 },
+    { limit: 300, fresh },
   );
   return issues.map((i) => i.key);
 }
@@ -124,7 +125,7 @@ async function sprintlessChildren(
   base: string[],
   fields: string[],
   alreadyShown: JiraIssue[],
-  query: BoardQuery,
+  query: Pick<BoardQuery, "reconcileIds"> & { fresh?: boolean },
 ): Promise<{ issues: JiraIssue[]; parents: Set<string> }> {
   const meta = await getProjectMeta();
   const empty = { issues: [], parents: new Set<string>() };
@@ -133,7 +134,7 @@ async function sprintlessChildren(
   const mine = await searchJql<JiraIssue>(
     `${base.join(" AND ")} ORDER BY created DESC`,
     fields,
-    { limit: 200, reconcileIssues: query.reconcileIds },
+    { limit: 200, reconcileIssues: query.reconcileIds, fresh: query.fresh },
   );
 
   const shown = new Set(alreadyShown.map((i) => i.key));
@@ -149,7 +150,7 @@ async function sprintlessChildren(
   const parents = await searchJql<JiraIssue>(
     `key in (${parentKeys.map((k) => `"${escapeJql(k)}"`).join(",")})`,
     ["summary", meta.sprintFieldId],
-    { limit: parentKeys.length },
+    { limit: parentKeys.length, fresh: query.fresh },
   );
 
   const sprintless = new Set(
@@ -601,15 +602,19 @@ export async function getSprintTasks(
  *
  * Sprint membership is resolved on the parents first (JQL cannot filter subtasks
  * by sprint — see {@link sprintParentKeys}), then subtasks are matched by
- * `parent in (…)`, same as {@link getBoard}.
+ * `parent in (…)`, same as {@link getBoard} — including its pull-back of
+ * children whose parent sits in no sprint, so "Today" offers what the board shows.
+ *
+ * `fresh` skips the read cache: a task assigned a minute ago (from Jira, or by a
+ * teammate) has to be pickable without the user hunting for "Làm mới".
  */
 export async function getOpenSubtasks(
   sprintId: number | null,
+  { fresh = false }: { fresh?: boolean } = {},
 ): Promise<Array<{ key: string; summary: string; statusName: string }>> {
   if (!sprintId) return [];
   const projectKey = requireProjectKey();
-  const parentKeys = await sprintParentKeys(sprintId, projectKey);
-  if (!parentKeys.length) return [];
+  const parentKeys = await sprintParentKeys(sprintId, projectKey, fresh);
 
   const base = [
     `project = "${escapeJql(projectKey)}"`,
@@ -618,6 +623,8 @@ export async function getOpenSubtasks(
     "statusCategory != Done",
     ...teamClauses(),
   ];
+  // `parent` is what the sprintless pull-back groups by.
+  const fields = ["summary", "status", "parent"];
 
   const CHUNK = 50;
   const batches: Promise<JiraIssue[]>[] = [];
@@ -629,13 +636,14 @@ export async function getOpenSubtasks(
     batches.push(
       searchJql<JiraIssue>(
         `${[...base, `parent in (${chunk})`].join(" AND ")} ORDER BY updated DESC`,
-        ["summary", "status"],
-        { limit: 100 },
+        fields,
+        { limit: 100, fresh },
       ),
     );
   }
-  const issues = (await Promise.all(batches)).flat();
-  return issues.map((i) => ({
+  const inSprint = (await Promise.all(batches)).flat();
+  const stray = await sprintlessChildren(base, fields, inSprint, { fresh });
+  return inSprint.concat(stray.issues).map((i) => ({
     key: i.key,
     summary: i.fields.summary ?? "",
     statusName: i.fields.status?.name ?? "",

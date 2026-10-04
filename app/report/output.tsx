@@ -8,6 +8,7 @@ import { statusStyle } from '@/lib/status-style'
 import { formatDateVi, formatDuration } from '@/lib/time'
 
 import { NavSpinner, useNav } from '../board/navigation'
+import { refreshTodayCandidatesAction } from './actions'
 
 export interface TodayCandidate {
   key: string
@@ -37,8 +38,9 @@ export function ReportOutput({
   prevDayOff,
   displayName,
   sprintName,
+  sprintId,
   previousIssues,
-  todayCandidates,
+  todayCandidates: initialCandidates,
   templates,
   templateId,
   showKey,
@@ -52,6 +54,7 @@ export function ReportOutput({
   prevDayOff: boolean
   displayName?: string
   sprintName?: string
+  sprintId: number | null
   previousIssues: ReportIssue[]
   todayCandidates: TodayCandidate[]
   templates: Array<{ id: number; name: string; isDefault: boolean }>
@@ -70,6 +73,24 @@ export function ReportOutput({
     // Nothing logged on a working day reads as a day off — the usual reason.
     off: true,
   }))
+
+  // Shown at once from the render, then re-read live: the render may be an
+  // hour old out of the client cache, missing a task assigned since.
+  const [todayCandidates, setTodayCandidates] = useState(initialCandidates)
+  const [syncing, setSyncing] = useState(true)
+  useEffect(() => {
+    let live = true
+    setTodayCandidates(initialCandidates)
+    setSyncing(true)
+    refreshTodayCandidatesAction(sprintId).then((fresh) => {
+      if (!live) return
+      if (fresh) setTodayCandidates(fresh)
+      setSyncing(false)
+    })
+    return () => {
+      live = false
+    }
+  }, [sprintId, initialCandidates])
 
   // Restored after mount: the server cannot read this browser's storage.
   useEffect(() => {
@@ -230,7 +251,7 @@ export function ReportOutput({
 
           <PickGroup
             title="Today"
-            sub="giao cho bạn · chưa Done"
+            sub={syncing ? 'giao cho bạn · chưa Done · đang cập nhật…' : 'giao cho bạn · chưa Done'}
             count={todayCandidates.length ? `${selectedToday.length}/${todayCandidates.length}` : undefined}
             onAll={
               todayCandidates.length
