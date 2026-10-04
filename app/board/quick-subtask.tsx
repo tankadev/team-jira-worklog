@@ -104,7 +104,7 @@ export function QuickSubtask({
         if (res.id) {
           const params = new URLSearchParams(window.location.search)
           params.set('reconcile', res.id)
-          navigate(`${window.location.pathname}?${params}`)
+          navigate(`${window.location.pathname}?${params}`, { quiet: true })
         } else {
           refresh()
         }

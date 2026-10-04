@@ -18,16 +18,25 @@ import {
  * visible moment against Jira. Without a shared pending flag each control only
  * knows about its own transition, so the rest of the page looks frozen with no
  * explanation. This puts one flag where every part of the board can read it.
+ *
+ * Two flags, not one. `pending` is a navigation — the page is turning into a
+ * different one, so dimming it and locking the filters is honest. `refreshing`
+ * is the re-fetch after a write: the page stays the same page, so it must stay
+ * usable — the control that was edited shows its own spinner, and the rest of
+ * the board only gets the thin bar at the top.
  */
 const NavContext = createContext<{
-  navigate: (href: string) => void;
-  /** Re-fetches the route through the same shared pending flag. */
+  /** `quiet` re-renders without dimming — for a URL change that is really a refresh. */
+  navigate: (href: string, opts?: { quiet?: boolean }) => void;
+  /** Re-fetches the route in the background, leaving the page interactive. */
   refresh: () => void;
   pending: boolean;
+  refreshing: boolean;
 }>({
   navigate: () => {},
   refresh: () => {},
   pending: false,
+  refreshing: false,
 });
 
 export function useNav() {
@@ -37,25 +46,26 @@ export function useNav() {
 export function NavProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [refreshing, startRefresh] = useTransition();
 
   // Memoised because consumers keep these: an interval keyed on `refresh`
   // identity was being torn down and restarted on every transition, so a
   // periodic refresh could never reach its own deadline.
   const navigate = useCallback(
-    (href: string) => {
-      startTransition(() => router.push(href));
+    (href: string, opts?: { quiet?: boolean }) => {
+      (opts?.quiet ? startRefresh : startTransition)(() => router.push(href));
     },
     [router],
   );
 
   /**
-   * Used after a write. Routing it through the shared transition means the
-   * progress bar, the dimmer and the inline spinners all react — otherwise the
-   * side panels sit on stale numbers for the two or three seconds the refetch
-   * takes, which reads as "the save did not work".
+   * Used after a write. Kept apart from navigation so nothing dims: dimming the
+   * whole board for the two or three seconds the refetch takes locked every
+   * other row out over one edit. The progress bar still runs, so the side panels'
+   * stale numbers read as "updating" rather than "the save did not work".
    */
   const refresh = useCallback(() => {
-    startTransition(async () => {
+    startRefresh(async () => {
       // Every screen kept in the client cache, not just this one — otherwise
       // the report would still show the hours from before this log.
       await invalidateViewsAction();
@@ -64,13 +74,13 @@ export function NavProvider({ children }: { children: React.ReactNode }) {
   }, [router]);
 
   const value = useMemo(
-    () => ({ navigate, refresh, pending }),
-    [navigate, refresh, pending],
+    () => ({ navigate, refresh, pending, refreshing }),
+    [navigate, refresh, pending, refreshing],
   );
 
   return (
     <NavContext.Provider value={value}>
-      {pending && <TopProgress />}
+      {(pending || refreshing) && <TopProgress />}
       {children}
     </NavContext.Provider>
   );
@@ -138,10 +148,10 @@ export function NavDimmer({
   );
 }
 
-/** Inline "đang tải" chip for the filter bar. */
+/** Inline "đang tải" chip for the filter bar — informational, never blocking. */
 export function NavSpinner() {
-  const { pending } = useNav();
-  if (!pending) return null;
+  const { pending, refreshing } = useNav();
+  if (!pending && !refreshing) return null;
   return (
     <span className="flex items-center gap-1.5 font-mono text-small text-ink-3">
       <span className="inline-block size-3 animate-spin rounded-full border-[1.5px] border-line-strong border-t-accent" />

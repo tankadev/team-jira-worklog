@@ -307,7 +307,7 @@ function CreateIssueModal({
         if (ids.length) {
           const params = new URLSearchParams(window.location.search)
           params.set('reconcile', ids.join(','))
-          navigate(`${window.location.pathname}?${params}`)
+          navigate(`${window.location.pathname}?${params}`, { quiet: true })
         } else {
           refresh()
         }
@@ -415,9 +415,9 @@ function CreateIssueModal({
   const canCreate = Boolean(title.trim() && ctx?.issueTypeId && datesOk && !creating)
 
   // Rendered through the body, not inline: the button lives inside the board's
-  // NavDimmer, so a plain child would fade to opacity-40 the moment a successful
-  // create kicks off the board refresh. The portal keeps the dialog crisp and
-  // clickable while the board behind it reloads.
+  // NavDimmer, so a plain child would fade to opacity-40 whenever the board
+  // navigates. The portal keeps the dialog crisp and clickable while the board
+  // behind it reloads.
   return createPortal(
     <div
       // Deliberately no backdrop-click-to-close: a create form holds several
