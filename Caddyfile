@@ -1,0 +1,12 @@
+# Local domain in front of the app: http://logwork.localhost
+#
+# Plain HTTP on purpose. Caddy would happily issue a certificate for this name,
+# but from inside a container it cannot add its CA to the Mac's keychain, so the
+# browser would only show a warning. `*.localhost` already resolves to this
+# machine in Chrome and Firefox; Safari may need a line in /etc/hosts.
+#
+# reverse_proxy keeps the Host header as-is, which Next.js needs: Server Actions
+# compare it with the request's Origin and reject the write when they differ.
+http://logwork.localhost {
+	reverse_proxy app:3847
+}

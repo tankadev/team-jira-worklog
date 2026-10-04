@@ -1,0 +1,14 @@
+node_modules
+.next
+.git
+.claude
+data
+tasks-type
+*.db
+*.db-*
+*.tsbuildinfo
+*.zip
+*.log
+.DS_Store
+# secrets come in at runtime via env_file, never baked into the image
+.env*

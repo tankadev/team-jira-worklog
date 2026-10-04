@@ -1,6 +1,12 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  /**
+   * Only the Docker build asks for this: it emits `.next/standalone`, a
+   * self-contained server with just the node_modules it traces, which keeps the
+   * image small. Local `npm run build && npm start` stays as it was.
+   */
+  output: process.env.NEXT_OUTPUT === 'standalone' ? 'standalone' : undefined,
   /** Bottom-left is where Settings sits, pinned at the foot of the sidebar. */
   devIndicators: {
     position: 'bottom-right',
