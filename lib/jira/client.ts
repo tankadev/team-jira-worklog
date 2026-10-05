@@ -128,6 +128,17 @@ export interface JiraFetchOptions extends Omit<RequestInit, 'body'> {
 const JIRA_TTL_MS = 30 * 60_000
 /** Oldest entries go first past this — a long session touches many URLs. */
 const JIRA_CACHE_MAX = 800
+/**
+ * How long after a write a search answer is not trusted enough to keep.
+ *
+ * Clearing the cache on a write is not enough on its own: the refresh that
+ * follows asks `search/jql`, whose index trails the write by a few seconds, and
+ * the stale answer it gets back was then held for the full half hour. A task put
+ * into the sprint dropped off the board that way until the cache expired. Inside
+ * this window search results are still returned, just not stored, so the next
+ * render asks again and sees the settled index.
+ */
+const SEARCH_SETTLE_MS = 20_000
 interface JiraCacheEntry {
   at: number
   data: unknown
@@ -135,6 +146,7 @@ interface JiraCacheEntry {
 const globalForJira = globalThis as unknown as { __jiraReadCache?: Map<string, JiraCacheEntry> }
 const readCache: Map<string, JiraCacheEntry> = globalForJira.__jiraReadCache ?? new Map()
 globalForJira.__jiraReadCache = readCache
+let lastWriteAt = 0
 
 /** Drops every cached read — used on writes and by the manual "Làm mới". */
 export function clearJiraCache() {
@@ -227,7 +239,10 @@ export async function jiraFetch<T = unknown>(path: string, options: JiraFetchOpt
   })
 
   // A successful write can change what any read returns — invalidate everything.
-  if (!isRead && (res.ok || res.status === 204)) readCache.clear()
+  if (!isRead && (res.ok || res.status === 204)) {
+    readCache.clear()
+    lastWriteAt = Date.now()
+  }
 
   // 204 is the documented success response for a transition.
   if (res.status === 204) return undefined as T
@@ -239,7 +254,8 @@ export async function jiraFetch<T = unknown>(path: string, options: JiraFetchOpt
 
   if (!res.ok) throw new JiraError(describeError(res.status, payload), res.status, url, payload)
 
-  if (isRead) {
+  const unsettled = url.includes('/search') && Date.now() - lastWriteAt < SEARCH_SETTLE_MS
+  if (isRead && !unsettled) {
     // Re-inserted so Map order stays oldest-first, which is what eviction reads.
     readCache.delete(url)
     readCache.set(url, { at: Date.now(), data: payload })

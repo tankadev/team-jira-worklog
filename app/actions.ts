@@ -251,15 +251,16 @@ export async function setDatesAction(
 export async function setSprintAction(
   issueKey: string,
   sprintId: number,
-): Promise<ActionResult> {
+): Promise<ActionResult & { id?: string }> {
   if (!Number.isInteger(sprintId) || sprintId <= 0) {
     return { ok: false, message: 'Sprint không hợp lệ' }
   }
 
   try {
-    const { labelAdded } = await attachToSprint(issueKey, sprintId)
+    const { labelAdded, issueId } = await attachToSprint(issueKey, sprintId)
     return {
       ok: true,
+      id: issueId,
       message: labelAdded
         ? `Đã đưa ${issueKey} vào sprint và gắn label ${labelAdded}`
         : `Đã đưa ${issueKey} vào sprint`,

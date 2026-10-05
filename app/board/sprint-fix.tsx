@@ -37,14 +37,24 @@ export function SprintFixButton({
 }) {
   const [note, setNote] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
-  const { refresh } = useNav()
+  const { navigate, refresh } = useNav()
 
   function apply() {
     setNote(null)
     startTransition(async () => {
       const res = await setSprintAction(issueKey, sprintId)
-      if (res.ok) refresh()
-      else setNote(res.message)
+      if (!res.ok) {
+        setNote(res.message)
+      } else if (res.id) {
+        // A plain refresh asked Jira's search before it had indexed the move,
+        // and the task dropped off the board entirely. Carrying the id makes
+        // the sprint query reconcile it — the same fix a new subtask uses.
+        const params = new URLSearchParams(window.location.search)
+        params.set('reconcile', res.id)
+        navigate(`${window.location.pathname}?${params}`, { quiet: true })
+      } else {
+        refresh()
+      }
     })
   }
 

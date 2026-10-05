@@ -92,16 +92,23 @@ export interface BoardQuery {
  *
  * Parents are not filtered by assignee: someone else may own the parent Task
  * while the subtask is yours.
+ *
+ * `reconcile` carries the id of a parent put into the sprint moments ago. The
+ * search index lags the write, so without it the board re-read right after
+ * "đưa vào sprint" still found the parent outside the sprint — while the
+ * sprintless check, reading the parent itself, already saw it inside — and the
+ * task vanished from both blocks until the read cache expired.
  */
 async function sprintParentKeys(
   sprintId: number,
   projectKey: string,
   fresh = false,
+  reconcile: string[] = [],
 ): Promise<string[]> {
   const issues = await searchJql<JiraIssue>(
     `project = "${escapeJql(projectKey)}" AND sprint = ${sprintId} AND issuetype not in subTaskIssueTypes()`,
     ["summary"],
-    { limit: 300, fresh },
+    { limit: 300, fresh, reconcileIssues: reconcile },
   );
   return issues.map((i) => i.key);
 }
@@ -208,7 +215,12 @@ export async function getBoard(query: BoardQuery = {}): Promise<BoardParent[]> {
   let sprintlessParents = new Set<string>();
 
   if (query.sprintId) {
-    const parentKeys = await sprintParentKeys(query.sprintId, projectKey);
+    const parentKeys = await sprintParentKeys(
+      query.sprintId,
+      projectKey,
+      false,
+      query.reconcileIds,
+    );
 
     // `parent in (…)` with hundreds of keys makes an unwieldy query, so chunk it.
     const CHUNK = 50;
@@ -911,7 +923,7 @@ export async function updateDates(
 export async function attachToSprint(
   issueKey: string,
   sprintId: number,
-): Promise<{ labelAdded: string | null }> {
+): Promise<{ labelAdded: string | null; issueId: string }> {
   const meta = await getProjectMeta();
   if (!meta.sprintFieldId)
     throw new Error("Không tìm thấy field Sprint trên project này");
@@ -920,13 +932,15 @@ export async function attachToSprint(
   const { label } = getTeamScope();
   let labelAdded: string | null = null;
 
+  // Read fresh: a cached copy from seconds ago could drop a label someone else
+  // just added, and this write replaces the whole array. Read even with no
+  // label to add, for the id the board needs to reconcile the sprint search.
+  const issue = await jiraFetch<JiraIssue>(
+    `/rest/api/3/issue/${encodeURIComponent(issueKey)}?fields=labels`,
+    { fresh: true },
+  );
+
   if (label && meta.labelsOnScreen) {
-    // Read fresh: a cached copy from seconds ago could drop a label someone
-    // else just added, and this write replaces the whole array.
-    const issue = await jiraFetch<JiraIssue>(
-      `/rest/api/3/issue/${encodeURIComponent(issueKey)}?fields=labels`,
-      { fresh: true },
-    );
     const current = strings(issue.fields.labels);
     if (!current.some((l) => l.toLowerCase() === label.toLowerCase())) {
       fields.labels = [...current, label];
@@ -939,7 +953,7 @@ export async function attachToSprint(
     body: { fields },
   });
 
-  return { labelAdded };
+  return { labelAdded, issueId: issue.id };
 }
 
 /**
