@@ -390,8 +390,10 @@ async function boardPage(props: PageProps<'/'>) {
         <div className="flex flex-col gap-3.5">
         <CapacityBar
           date={date}
+          label={dateLabel}
           quotaHours={dayQuota}
           isWeekend={dayIsWeekend}
+          dayOff={rules.daysOff[date] ?? null}
           entries={todaysEntries.map((e) => ({ key: e.issueKey, seconds: e.timeSpentSeconds }))}
         />
 

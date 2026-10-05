@@ -15,15 +15,21 @@ import { Popover } from './popover'
  * Sits on each row rather than on the selected day's card so a whole sprint can
  * be corrected in one pass — leave is usually remembered afterwards, in a batch,
  * not on the day itself.
+ *
+ * The `chip` variant is the same control on the selected day's card, always
+ * visible and labelled: the row icon only shows on hover, so a day off was
+ * easy to never find and kept being reported as short.
  */
 export function DayOffButton({
   date,
   current,
   label,
+  variant = 'icon',
 }: {
   date: string
   current: DayOffKind | null
   label: string
+  variant?: 'icon' | 'chip'
 }) {
   const [kind, setKind] = useState<DayOffKind | null>(current)
   const [pending, startTransition] = useTransition()
@@ -44,7 +50,25 @@ export function DayOffButton({
     <Popover
       align="right"
       panelClassName="w-[150px] p-1"
-      trigger={(open) => (
+      trigger={(open) =>
+        variant === 'chip' ? (
+          <span
+            role="button"
+            tabIndex={0}
+            title={kind ? 'Đổi hoặc bỏ đánh dấu ngày nghỉ' : `Đánh dấu ngày nghỉ · ${label}`}
+            className={
+              'inline-flex cursor-pointer items-center gap-1 rounded-full px-2 py-[2px] text-caption font-medium transition-colors ' +
+              (kind
+                ? 'bg-ot-soft text-ot'
+                : open
+                  ? 'bg-accent-soft text-accent-ink'
+                  : 'text-ink-3 hover:bg-surface-2 hover:text-ink-2')
+            }
+          >
+            {pending ? <Spinner className="size-2.5" /> : kind ? '⊘' : '⊕'}
+            {kind ? DAY_OFF_LABEL[kind] : 'Nghỉ?'}
+          </span>
+        ) : (
         <span
           role="button"
           tabIndex={0}
@@ -60,7 +84,8 @@ export function DayOffButton({
         >
           {pending ? <Spinner className="size-2.5" /> : kind ? '⊘' : '⊕'}
         </span>
-      )}
+        )
+      }
     >
       {(close) => (
         <>

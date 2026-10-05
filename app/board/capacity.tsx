@@ -1,4 +1,7 @@
+import { DAY_OFF_LABEL, type DayOffKind } from '@/lib/quota'
 import { formatDuration } from '@/lib/time'
+
+import { DayOffButton } from './day-off-button'
 
 interface Entry {
   key: string
@@ -17,13 +20,18 @@ interface Entry {
  * their order carries no meaning.
  */
 export function CapacityBar({
+  date,
+  label,
   quotaHours,
   isWeekend,
+  dayOff,
   entries,
 }: {
   date: string
+  label: string
   quotaHours: number
   isWeekend: boolean
+  dayOff: DayOffKind | null
   entries: Entry[]
 }) {
   const merged = new Map<string, number>()
@@ -43,8 +51,13 @@ export function CapacityBar({
     <section className="card p-4">
       <div className="mb-1 flex items-center gap-2">
         <span className="eyebrow text-ink-2">Giờ đã log trong ngày</span>
-        <span className="ml-auto">
-          {isWeekend && quota === 0 && (
+        <span className="ml-auto flex items-center gap-1">
+          {/* Keyed by date: the button holds the mark locally while it saves,
+              and must not carry one day's mark over to the next day picked. */}
+          {!(isWeekend && quota === 0 && !dayOff) && (
+            <DayOffButton key={date} variant="chip" date={date} current={dayOff} label={label} />
+          )}
+          {isWeekend && quota === 0 && !dayOff && (
             <span className="rounded-full bg-ot-soft px-2 py-[2px] text-caption font-medium text-ot">
               OT cuối tuần
             </span>
@@ -76,7 +89,11 @@ export function CapacityBar({
       </div>
 
       {segments.length === 0 && remaining === 0 ? (
-        <p className="text-small text-ink-3">Chưa log giờ nào cho ngày này.</p>
+        <p className="text-small text-ink-3">
+          {dayOff === 'full'
+            ? `${DAY_OFF_LABEL.full} — không cần log giờ.`
+            : 'Chưa log giờ nào cho ngày này.'}
+        </p>
       ) : (
         <>
           {/* A track the segments fill, rather than a dashed box for what is
