@@ -48,21 +48,58 @@ npm start
 
 ## Chạy bằng Docker
 
+Không cần cài Node — chỉ cần **Docker Desktop** đang chạy và **Jira API token** của
+chính bạn.
+
+### Lần đầu
+
+```bash
+git clone https://github.com/tankadev/team-jira-worklog.git
+cd team-jira-worklog
+cp .env.local.example .env.local
+```
+
+Mở `.env.local`, điền tối thiểu `JIRA_BASE_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN`
+(của **bạn**, không dùng chung), `JIRA_PROJECT_KEY`, `JIRA_BOARD_ID` — giống phần
+[Chạy lần đầu](#chạy-lần-đầu). Gemini, GitHub và team label để trống được, điền
+sau trong **Settings**.
+
 ```bash
 docker compose up -d --build
 ```
 
-Mở http://logwork.localhost (Caddy trong `docker-compose.yml` chuyển vào app, cấu
-hình ở `Caddyfile`). Safari nếu không mở được thì thêm `127.0.0.1 logwork.localhost`
-vào `/etc/hosts`. Port 80 bị chiếm thì đổi bằng `PROXY_PORT=8080`.
+Mở http://logwork.localhost → **Settings** → **Test connection**. Vẫn vào thẳng
+được http://localhost:3847.
 
-Vẫn vào thẳng được http://localhost:3847. Port 3847 chọn để tránh 3000/5000/8080 hay dùng; đổi
-bằng `APP_PORT=4000 docker compose up -d`. Token đọc từ `.env.local` lúc chạy
-(không đóng vào image), dữ liệu dùng chung thư mục `data/` với `npm run dev` —
-đừng chạy cả hai cùng lúc.
+### Dùng hằng ngày
 
-Module Code review và SDK release không chạy trong container: chúng cần
-`claude` CLI, repo git và toolchain Swift trên máy.
+| Việc | Lệnh |
+|---|---|
+| Cập nhật bản mới | `git pull` rồi `docker compose up -d --build` |
+| Xem log khi lỗi | `docker logs -f jira-logwork` |
+| Tắt | `docker compose down` — dữ liệu vẫn nằm trong `data/` |
+
+### Khi gặp vấn đề
+
+- **Port 80 bị chiếm**: `PROXY_PORT=8080 docker compose up -d`, rồi mở
+  http://logwork.localhost:8080
+- **Port 3847 bị chiếm**: `APP_PORT=4000 docker compose up -d` (chọn 3847 để
+  tránh 3000/5000/8080 hay dùng)
+- **Safari không mở được logwork.localhost**: thêm `127.0.0.1 logwork.localhost`
+  vào `/etc/hosts`
+- **Sửa `.env.local` mà app không đổi**: file chỉ nạp lần đầu, sau đó sửa trong
+  **Settings** (xem ghi chú ở [Chạy lần đầu](#chạy-lần-đầu))
+
+### Lưu ý
+
+- Token đọc từ `.env.local` lúc chạy, không đóng vào image. Đừng commit hay gửi
+  file này cho người khác.
+- Dữ liệu dùng chung thư mục `data/` với `npm run dev` — đừng chạy cả hai cùng
+  lúc.
+- `http://logwork.localhost` do Caddy trong `docker-compose.yml` chuyển vào app,
+  cấu hình ở `Caddyfile`.
+- Module Code review và SDK release không chạy trong container: chúng cần
+  `claude` CLI, repo git và toolchain Swift trên máy.
 
 ## Kiểm tra
 
