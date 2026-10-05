@@ -19,12 +19,18 @@ export function DatePicker({
   sprints,
   sprintId,
   isToday,
+  variant = 'header',
 }: {
   date: string
   label: string
   sprints: SprintRange[]
   sprintId: number | null
   isToday: boolean
+  /**
+   * 'panel' fills the board's sticky side column: full width, and "Hôm nay"
+   * moves up beside the label, since four buttons do not fit in one 300px row.
+   */
+  variant?: 'header' | 'panel'
 }) {
   const params = useSearchParams()
   const { navigate, pending } = useNav()
@@ -76,19 +82,33 @@ export function DatePicker({
   const arrow =
     'h-9 w-9 rounded-lg border border-line-strong bg-surface leading-none text-ink-2 hover:bg-surface-2 hover:text-ink disabled:opacity-50'
 
+  const panel = variant === 'panel'
+  const showToday = date !== todayIn()
+
   return (
-    <div className="flex flex-col items-end gap-1">
-      {/* The warning used to be a banner across the middle of the board. It
-          belongs on the control it describes, where it costs no vertical room. */}
-      <span
-        className={
-          'flex items-center gap-1.5 eyebrow ' +
-          (isToday ? 'text-ink-3' : 'text-ot')
-        }
-      >
-        <NavSpinner />
-        {isToday ? 'Ngày đang log' : 'Đang log vào ngày cũ'}
-      </span>
+    <div className={'flex flex-col gap-1 ' + (panel ? 'w-full' : 'items-end')}>
+      <div className="flex items-center gap-2">
+        {/* The warning used to be a banner across the middle of the board. It
+            belongs on the control it describes, where it costs no vertical room. */}
+        <span
+          className={
+            'flex items-center gap-1.5 eyebrow ' +
+            (isToday ? 'text-ink-3' : 'text-ot')
+          }
+        >
+          <NavSpinner />
+          {isToday ? 'Ngày đang log' : 'Đang log vào ngày cũ'}
+        </span>
+        {panel && showToday && (
+          <button
+            onClick={() => go(todayIn())}
+            disabled={pending}
+            className="ml-auto text-small font-medium text-accent-ink hover:underline disabled:opacity-60"
+          >
+            Về hôm nay
+          </button>
+        )}
+      </div>
 
       <div className="flex items-center gap-1">
         <button
@@ -100,12 +120,13 @@ export function DatePicker({
           ‹
         </button>
 
-        <div className="relative">
+        <div className={'relative ' + (panel ? 'flex-1' : '')}>
           <button
             type="button"
             onClick={openCalendar}
             disabled={pending}
             className={
+              (panel ? 'w-full justify-center ' : '') +
               'flex h-9 items-center gap-2 rounded-md border px-[11px] font-mono text-body hover:bg-surface-2 disabled:opacity-60 ' +
               (isToday
                 ? 'border-line-strong bg-surface'
@@ -140,7 +161,7 @@ export function DatePicker({
           ›
         </button>
 
-        {date !== todayIn() && (
+        {!panel && showToday && (
           <button
             onClick={() => go(todayIn())}
             disabled={pending}

@@ -222,14 +222,14 @@ function DayRow({
   return (
     <div
       className={
-        'group grid grid-cols-[64px_minmax(0,1fr)_38px_18px] items-center gap-1.5 rounded-md px-1.5 py-1 ' +
+        'group grid grid-cols-[70px_minmax(0,1fr)_38px_18px] items-center gap-1.5 rounded-md px-1.5 py-1 ' +
         (selected ? '-mx-1.5 bg-accent-soft' : 'hover:bg-surface-2')
       }
     >
       <Link href={href} className="contents">
       <span
         className={
-          'font-mono text-caption ' +
+          'whitespace-nowrap font-mono text-caption ' +
           (selected
             ? 'font-semibold text-accent-ink'
             : future || quota === 0

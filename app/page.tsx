@@ -226,6 +226,21 @@ async function boardPage(props: PageProps<'/'>) {
   const dateLabel = formatDateVi(date)
   const todaysEntries = week.entries.filter((e) => e.date === date)
 
+  const datePicker = (variant: 'header' | 'panel') => (
+    <DatePicker
+      variant={variant}
+      date={date}
+      label={dateLabel}
+      isToday={isToday}
+      sprintId={sprintId}
+      sprints={sprints.map((s) => ({
+        id: s.id,
+        start: s.startDate?.slice(0, 10) ?? null,
+        end: s.endDate?.slice(0, 10) ?? null,
+      }))}
+    />
+  )
+
   return (
     <NavProvider>
       <header className="mb-4 flex flex-wrap items-end justify-between gap-4">
@@ -241,17 +256,8 @@ async function boardPage(props: PageProps<'/'>) {
             bộ lọc bên dưới để thu hẹp.
           </p>
         </div>
-        <DatePicker
-          date={date}
-          label={dateLabel}
-          isToday={isToday}
-          sprintId={sprintId}
-          sprints={sprints.map((s) => ({
-            id: s.id,
-            start: s.startDate?.slice(0, 10) ?? null,
-            end: s.endDate?.slice(0, 10) ?? null,
-          }))}
-        />
+        {/* Wide screens get it in the sticky side column instead — see below. */}
+        <div className="lg:hidden">{datePicker('header')}</div>
       </header>
 
       <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
@@ -375,6 +381,11 @@ async function boardPage(props: PageProps<'/'>) {
           </NavDimmer>
         </div>
 
+        {/* Follows the scroll on wide screens, so the day being logged into and
+            its hours stay in sight while working far down the board. No
+            overflow scroller here: the day-off popovers would be clipped by it. */}
+        <div className="flex flex-col gap-3.5 lg:sticky lg:top-4">
+        <div className="hidden lg:block">{datePicker('panel')}</div>
         <NavDimmer label="Đang cập nhật…">
         <div className="flex flex-col gap-3.5">
         <CapacityBar
@@ -412,6 +423,7 @@ async function boardPage(props: PageProps<'/'>) {
         )}
         </div>
         </NavDimmer>
+        </div>
       </div>
     </NavProvider>
   )
