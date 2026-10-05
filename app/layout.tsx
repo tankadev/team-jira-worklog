@@ -50,7 +50,7 @@ export default async function RootLayout({
               it one long unbreakable line — a code snippet in a review, a long
               branch name — widens `main` past the viewport and the whole page
               scrolls sideways. With it, that content scrolls in its own box. */}
-          <main className="min-w-0 max-w-[1380px] px-4 pb-16 pt-5 md:px-8 md:pt-7">{children}</main>
+          <main className="mx-auto w-full min-w-0 max-w-[1600px] px-4 pb-16 pt-5 md:px-8 md:pt-7">{children}</main>
         </div>
       </body>
     </html>

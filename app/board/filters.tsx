@@ -246,7 +246,9 @@ export function BoardFilters({
         </select>
       )}
 
+      {/* Grows into whatever the row leaves, so the bar ends flush with the board below. */}
       <form
+        className="min-w-[150px] flex-1"
         onSubmit={(e) => {
           e.preventDefault()
           set('q', term)
@@ -258,7 +260,7 @@ export function BoardFilters({
           disabled={pending}
           onChange={(e) => setTerm(e.target.value)}
           placeholder="Lọc task…"
-          className={control + ' w-[150px]'}
+          className={control + ' w-full'}
         />
       </form>
 
