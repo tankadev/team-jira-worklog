@@ -25,6 +25,7 @@ export type IconName =
   | 'check'
   | 'chevrons-down'
   | 'chevrons-up'
+  | 'chart-bars'
 
 const PATHS: Record<IconName, React.ReactNode> = {
   kanban: (
@@ -62,6 +63,12 @@ const PATHS: Record<IconName, React.ReactNode> = {
     <>
       <path d="M3 3v15a3 3 0 0 0 3 3h15" />
       <path d="m19 9-5 5-4-4-3 3" />
+    </>
+  ),
+  'chart-bars': (
+    <>
+      <path d="M3 3v15a3 3 0 0 0 3 3h15" />
+      <path d="M8 17v-4M12 17V8M16 17v-6M20 17V5" />
     </>
   ),
   'phone-upload': (

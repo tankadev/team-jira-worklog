@@ -21,6 +21,7 @@ const CORE: Array<{ href: string; label: string; icon: IconName }> = [
 
 const MODULE_ICONS: Record<string, IconName> = {
   '/m/progress': 'chart-line',
+  '/m/team-progress': 'chart-bars',
   '/m/ios-publish': 'phone-upload',
   '/m/sdk-release': 'package',
   '/m/releases': 'rocket',

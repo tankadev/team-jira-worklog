@@ -173,8 +173,10 @@ export interface GenerateOutcome extends GeneratedTask {
  * the window, so the only way through is a different model. Transient failures
  * are still handled by the retry inside each attempt — including an answer
  * that `parse` rejects, which throws RetryableError for a re-roll.
+ *
+ * Exported so a module's own prompts share the same key, models and fallback.
  */
-async function runPrompt<T>(
+export async function runPrompt<T>(
   prompt: string,
   parse: (raw: Record<string, unknown>) => T,
   temperature?: number,
