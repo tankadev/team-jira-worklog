@@ -17,6 +17,7 @@ import { LinkPending } from './link-pending'
 import { BoardFilters } from './board/filters'
 import { NavDimmer, NavProvider } from './board/navigation'
 import { CapacityBar } from './board/capacity'
+import { CollapseBody, Collapsible } from './board/collapsible'
 import { DatePicker } from './board/date-picker'
 import { EpicHeader, groupByEpic } from './board/epic-section'
 import { ParentGroup } from './board/parent-group'
@@ -297,7 +298,8 @@ async function boardPage(props: PageProps<'/'>) {
                 // One tinted block per epic, its tasks hung off a rail down the
                 // left: which epic a task belongs to is read from where it sits,
                 // not from a badge that has to be found and matched.
-                <section
+                <Collapsible
+                  as="section"
                   key={epic.key ?? '__none__'}
                   className={
                     'rounded-2xl border p-2.5 md:p-4 ' +
@@ -305,7 +307,7 @@ async function boardPage(props: PageProps<'/'>) {
                   }
                 >
                   <EpicHeader group={epic} boardSprintId={sprintId} />
-                  <div
+                  <CollapseBody
                     className={
                       'ml-1.5 mt-3 flex flex-col gap-3 border-l-2 pl-2.5 md:ml-4 md:pl-5 ' +
                       (epic.key ? 'border-epic/30' : 'border-line-strong/60')
@@ -337,8 +339,8 @@ async function boardPage(props: PageProps<'/'>) {
                       />
                       </div>
                     ))}
-                  </div>
-                </section>
+                  </CollapseBody>
+                </Collapsible>
               ))}
 
               {/* Below the sprint, never mixed into it: these are the user's own

@@ -1,6 +1,7 @@
 import type { BoardParent } from '@/lib/jira/types'
 import { formatDuration } from '@/lib/time'
 
+import { CollapseTrigger } from './collapsible'
 import { CreateIssueButton } from './create-issue'
 import { TypeIcon } from './type-icon'
 
@@ -85,9 +86,9 @@ export function EpicHeader({
             {logged > 0 && <> · {formatDuration(logged)}</>}
           </span>
         </div>
-        <div className="truncate text-emph font-semibold leading-snug text-ink" title={group.name}>
-          {group.name}
-        </div>
+        <CollapseTrigger title={group.name}>
+          <div className="truncate text-emph font-semibold leading-snug text-ink">{group.name}</div>
+        </CollapseTrigger>
       </div>
 
       {group.key && (

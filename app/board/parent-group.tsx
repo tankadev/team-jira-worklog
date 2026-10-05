@@ -16,6 +16,7 @@ import {
 } from "@/lib/settings";
 import { formatDuration } from "@/lib/time";
 
+import { CollapseBody, CollapseTrigger, Collapsible } from "./collapsible";
 import { DatesEditor } from "./dates-editor";
 import { HygieneBadge } from "./hygiene-badge";
 import { NoPointsChip, PointsEditor, PointsRollup } from "./points-editor";
@@ -108,8 +109,10 @@ export function ParentGroup({
   const loggedTotal = group.childTimeSpentTotal;
 
   return (
-    <article className="card">
-      <header className="rounded-t-[13px] border-b border-line bg-surface-2/70 px-4 py-3">
+    <Collapsible as="article" className="card">
+      {/* Folded, the header is the whole card: round its foot and drop the
+          rule that separated it from rows no longer shown. */}
+      <header className="rounded-t-[13px] border-b border-line bg-surface-2/70 px-4 py-3 group-data-collapsed/fold:rounded-b-[13px] group-data-collapsed/fold:border-b-0">
         <div className="flex flex-wrap items-center gap-2">
           {!isOrphan && (
             <>
@@ -222,7 +225,9 @@ export function ParentGroup({
           </span>
         </div>
 
-        <div className="mt-2 text-emph font-semibold leading-snug tracking-[-0.005em]">{group.summary}</div>
+        <CollapseTrigger className="mt-2">
+          <span className="text-emph font-semibold leading-snug tracking-[-0.005em]">{group.summary}</span>
+        </CollapseTrigger>
 
         {!isOrphan && (
           <div className="mt-1">
@@ -235,7 +240,7 @@ export function ParentGroup({
         )}
       </header>
 
-      <div className="flex flex-col">
+      <CollapseBody className="flex flex-col">
         {group.subtasks.map((subtask, i) => (
           <SubtaskRow
             key={subtask.key}
@@ -270,7 +275,7 @@ export function ParentGroup({
             sprintEnd={sprintEnd}
           />
         )}
-      </div>
-    </article>
+      </CollapseBody>
+    </Collapsible>
   );
 }
