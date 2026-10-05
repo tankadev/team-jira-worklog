@@ -390,6 +390,35 @@ main:has(.wide-page) {
   font-weight: 600;
 }
 
+/*
+ * A read-only fact about an issue — "thiếu ngày", "chưa gán sprint".
+ *
+ * Borderless and fully rounded on purpose: everything that can be clicked on
+ * the board has a border, square-ish corners and a shadow (see `control`), so
+ * shape alone says which is which. They used to share one outlined amber chip
+ * and a warning read exactly like the button that fixes it.
+ */
+@utility badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 18px;
+  padding: 0 8px;
+  border-radius: 9999px;
+  cursor: default;
+  white-space: nowrap;
+  font-size: 11px;
+  line-height: 14px;
+  font-weight: 600;
+}
+
+/* Clickable chip on the board: bordered, raised, and it answers the pointer. */
+@utility control {
+  cursor: pointer;
+  border-width: 1px;
+  box-shadow: var(--elev-card);
+}
+
 /* Jira status names are English and conventionally shown upper case. */
 @utility status-text {
   font-size: 10.5px;

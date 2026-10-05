@@ -368,7 +368,7 @@ export function SubtaskRow({
                   `nhưng ngày ${badLogDate} vẫn có giờ được log.\n\n` +
                   `Một trong hai đang sai: due date chưa được dời, hoặc trạng thái đóng sớm.`
                 }
-                className="rounded-[5px] border border-warn bg-warn-soft px-1.5 py-px chip-text text-warn"
+                className="badge bg-warn-soft text-warn"
               >
                 ⚠ log {badLogDate.slice(8)}/{badLogDate.slice(5, 7)} · sau due
               </span>
@@ -376,7 +376,7 @@ export function SubtaskRow({
             {loggedButTodo(total, subtask.statusName) && (
               <span
                 title={`${subtask.key} đã log ${formatDuration(total)} nhưng vẫn đang To Do — nhớ chuyển trạng thái`}
-                className="rounded-[5px] border border-warn bg-warn-soft px-1.5 py-px chip-text text-warn"
+                className="badge bg-warn-soft text-warn"
               >
                 ⚠ vẫn To Do
               </span>

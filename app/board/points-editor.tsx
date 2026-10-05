@@ -72,7 +72,7 @@ export function PointsEditor({
     return (
       <span
         title={readOnlyReason ?? `Story point của ${issueKey}`}
-        className="inline-flex h-6 min-w-[26px] items-center justify-center gap-1 rounded-[5px] border border-line bg-surface-2 px-1.5 font-mono text-small text-ink-3"
+        className="inline-flex h-6 min-w-[26px] cursor-default items-center justify-center gap-1 rounded-[5px] bg-surface-2 px-1.5 font-mono text-small text-ink-3"
       >
         {label}
       </span>
@@ -91,14 +91,14 @@ export function PointsEditor({
             over ? 'Đã log quá ước lượng — chỉ cảnh báo, không chặn' : `Story point của ${issueKey}`
           }
           className={
-            'inline-flex h-6 min-w-[26px] items-center justify-center gap-1 rounded-[5px] border px-1.5 font-mono text-small disabled:opacity-60 ' +
+            'control inline-flex h-6 min-w-[26px] items-center justify-center gap-1 rounded-[5px] bg-surface px-1.5 font-mono text-small hover:bg-surface-2 disabled:opacity-60 ' +
             (over
-              ? 'border-crit bg-crit-soft text-crit'
+              ? 'border-crit text-crit'
               : mismatch
-                ? 'border-warn bg-warn-soft text-warn'
+                ? 'border-dashed border-warn text-warn hover:border-solid'
                 : open
                   ? 'border-accent text-accent-ink'
-                  : 'border-line-strong bg-surface text-ink-2 hover:border-accent hover:text-accent-ink')
+                  : 'border-line-strong text-ink-2 hover:border-accent hover:text-accent-ink')
           }
         >
           {pending ? <Spinner className="size-2.5" /> : label}
@@ -260,7 +260,7 @@ export function NoPointsChip({
     return (
       <span
         title={`${issueTypeName} không đánh story point`}
-        className="inline-flex h-6 items-center rounded-[5px] border border-dashed border-line-strong px-1.5 text-caption text-ink-3"
+        className="badge bg-surface-2 font-normal text-ink-3"
       >
         {issueTypeName} · không point
       </span>
@@ -282,7 +282,7 @@ export function NoPointsChip({
           })
         }
         title={`${issueTypeName} không đánh story point — ${value} SP đang có là sai. Bấm để xoá.`}
-        className="inline-flex h-6 items-center gap-1 rounded-[5px] border border-crit bg-crit-soft px-1.5 font-mono text-small text-crit hover:brightness-105 disabled:opacity-60"
+        className="control inline-flex h-6 items-center gap-1 rounded-[5px] border-crit bg-surface px-1.5 font-mono text-small text-crit hover:bg-crit-soft disabled:opacity-60"
       >
         {pending ? <Spinner className="size-2.5" /> : <>⚠ {value} SP · xoá</>}
       </button>

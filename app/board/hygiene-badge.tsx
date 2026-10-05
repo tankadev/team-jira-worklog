@@ -23,10 +23,7 @@ export function HygieneBadge({ hygiene }: { hygiene: IssueHygiene }) {
   return (
     <span
       title={hygiene.problems.join(' · ')}
-      className={
-        'inline-flex h-[18px] items-center gap-1 rounded-[5px] border px-1.5 chip-text ' +
-        (structural ? 'border-crit bg-crit-soft text-crit' : 'border-warn bg-warn-soft text-warn')
-      }
+      className={'badge ' + (structural ? 'bg-crit-soft text-crit' : 'bg-warn-soft text-warn')}
     >
       ⚠ {structural ? 'sai quy ước' : 'thiếu ngày'}
     </span>

@@ -123,7 +123,7 @@ export function ParentGroup({
               </span>
               {/* The Jira issue type is separate — a parent may be a Task, a Bug
                   or an Improve, and which one matters when reading the board. */}
-              <span className="inline-flex items-center gap-1 rounded-[5px] border border-line-strong px-1.5 py-0.5 chip-text text-ink-3">
+              <span className="inline-flex items-center gap-1 rounded-[5px] bg-surface-2 px-1.5 py-0.5 chip-text text-ink-3">
                 <TypeIcon name={group.issueTypeName} className="size-3" />
                 {group.issueTypeName}
               </span>
@@ -149,7 +149,7 @@ export function ParentGroup({
           {!isOrphan && loggedButTodo(loggedTotal, group.statusName) && (
             <span
               title={`${group.key} đã log ${formatDuration(loggedTotal)} nhưng vẫn đang To Do — nhớ chuyển trạng thái`}
-              className="inline-flex h-[18px] items-center rounded-[5px] border border-warn bg-warn-soft px-1.5 chip-text text-warn"
+              className="badge bg-warn-soft text-warn"
             >
               ⚠ vẫn To Do
             </span>
@@ -160,7 +160,7 @@ export function ParentGroup({
           {group.outOfSprint && (
             <span
               title={`${group.key} không thuộc sprint nào — task con của bạn vẫn hiện ở đây để log giờ`}
-              className="inline-flex h-[18px] items-center rounded-[5px] border border-warn bg-warn-soft px-1.5 chip-text text-warn"
+              className="badge bg-warn-soft text-warn"
             >
               ⚠ chưa gán sprint
             </span>
@@ -177,7 +177,7 @@ export function ParentGroup({
           {ownedByOther && group.assigneeName && (
             <span
               title={lockReason}
-              className="inline-flex h-[18px] items-center gap-1 rounded-[5px] border border-line-strong px-1.5 chip-text text-ink-3"
+              className="badge bg-surface-2 text-ink-3"
             >
               🔒 {group.assigneeName}
             </span>

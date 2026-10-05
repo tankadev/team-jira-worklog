@@ -135,8 +135,9 @@ export function DatesEditor({
       <span
         title={readOnlyReason ?? (start || due ? `${start ?? '—'} → ${due ?? '—'}` : 'Chưa có ngày')}
         className={
-          'inline-flex h-6 items-center gap-1 rounded-[5px] border px-1.5 font-mono text-caption ' +
-          (tone ?? 'border-line bg-surface-2 text-ink-3')
+          // No border: only something that can be clicked gets one.
+          'inline-flex h-6 cursor-default items-center gap-1 rounded-[5px] px-1.5 font-mono text-caption ' +
+          (tone ?? 'bg-surface-2 text-ink-3')
         }
       >
         <CalendarIcon />
@@ -165,24 +166,25 @@ export function DatesEditor({
                   : `${issueKey}: ${start} → ${due}`
           }
           className={
-            'inline-flex h-6 items-center gap-1 rounded-[5px] border px-1.5 font-mono text-caption disabled:opacity-60 ' +
+            'control inline-flex h-6 items-center gap-1 rounded-[5px] bg-surface px-1.5 font-mono text-caption hover:bg-surface-2 disabled:opacity-60 ' +
             (loggingPastDue
               // Amber, not red: nothing is broken and nothing is late — two
               // facts simply disagree, and which one is wrong is the user's to
               // say. Red is reserved for a deadline actually missed.
-              ? 'border-warn bg-warn-soft font-semibold text-warn'
+              ? 'border-warn font-semibold text-warn'
               : overdue
-              ? 'border-crit bg-crit-soft text-crit'
+              ? 'border-crit text-crit'
               : dueToday
                 // Same amber as a missing date — both mean "this needs you
                 // today" — but bold, because one is a gap in the data and the
                 // other is a deadline landing. The dates in the chip say which.
-                ? 'border-warn bg-warn-soft font-semibold text-warn'
+                ? 'border-warn font-semibold text-warn'
                 : missing
-                  ? 'border-warn bg-warn-soft text-warn'
+                  // Dashed: a blank to fill in, not an alarm.
+                  ? 'border-dashed border-warn text-warn hover:border-solid'
                   : open
                     ? 'border-accent text-accent-ink'
-                    : 'border-line-strong bg-surface text-ink-2 hover:border-accent hover:text-accent-ink')
+                    : 'border-line-strong text-ink-2 hover:border-accent hover:text-accent-ink')
           }
         >
           {pending ? (

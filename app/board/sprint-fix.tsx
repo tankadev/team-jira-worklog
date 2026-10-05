@@ -69,13 +69,16 @@ export function SprintFixButton({
           (addsLabel ? ` và thêm label ${addsLabel}` : '') +
           ' — sửa cả trên Jira, không chỉ ở đây'
         }
-        className="inline-flex h-[18px] items-center gap-1 rounded-[5px] border border-warn bg-warn-soft px-1.5 chip-text text-warn hover:brightness-110 disabled:opacity-60"
+        // A button, and dressed as one: it sits right after the amber
+        // "chưa gán sprint" badge, and in the same amber it read as a second
+        // warning rather than the fix for the first.
+        className="control inline-flex h-6 items-center gap-1 rounded-[5px] border-accent/60 bg-surface px-2 text-caption font-semibold text-accent-ink hover:border-accent hover:bg-accent-soft disabled:opacity-60"
       >
         {/* Its own element, not a bare string: two adjacent text expressions
             merge into one anonymous flex item and `gap` never applies, which
             left the arrow glued to the word. */}
-        <span aria-hidden>{pending ? <Spinner className="size-2.5" /> : '↳'}</span>
-        <span>{addsLabel ? 'đưa vào sprint + label' : 'đưa vào sprint'}</span>
+        <span aria-hidden>{pending ? <Spinner className="size-2.5" /> : '→'}</span>
+        <span>{addsLabel ? 'Đưa vào sprint + label' : 'Đưa vào sprint'}</span>
       </button>
       {note && <span className="text-caption text-crit">{note}</span>}
     </span>

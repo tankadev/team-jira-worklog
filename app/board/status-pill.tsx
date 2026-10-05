@@ -214,7 +214,7 @@ export function StatusPill({
         disabled={pending}
         title={`${current} — bấm để đổi trạng thái`}
         className={
-          "inline-flex items-center gap-1 rounded-[5px] px-[7px] py-[3px] status-text disabled:opacity-60 " +
+          "control inline-flex items-center gap-1 rounded-[5px] border-current/30 px-[7px] py-[2px] status-text hover:border-current/70 disabled:opacity-60 " +
           (compact ? "max-w-[220px]" : "") +
           " " +
           statusStyle(current)
