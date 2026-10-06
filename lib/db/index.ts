@@ -350,6 +350,8 @@ function open() {
   // Claude drafted for its thread, and whether the reviewer sent it.
   ensureColumn(sqlite, "review_findings", "follow_reply", "follow_reply TEXT NOT NULL DEFAULT ''");
   ensureColumn(sqlite, "review_findings", "follow_sent_url", "follow_sent_url TEXT NOT NULL DEFAULT ''");
+  // Tests Claude suggests the reviewer run by hand for a code round (never run by the app).
+  ensureColumn(sqlite, "review_rounds", "test_plan", "test_plan TEXT NOT NULL DEFAULT '[]'");
   return drizzle(sqlite, { schema });
 }
 

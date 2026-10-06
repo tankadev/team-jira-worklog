@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { type ChatMessage, applyChanges, cancelChat, listChat, sendChat } from '@/lib/modules/code-review/chat'
 import { type ClaudeCheck, checkClaude } from '@/lib/modules/code-review/claude'
 import { getRepo, getTemplate, rememberPerson, setRepos, setRunnerConfig, setTemplates } from '@/lib/modules/code-review/config'
-import { isRepo, listRemoteBranches, fetchAll, gitSays, withRepoLock } from '@/lib/modules/code-review/git'
+import { diffRanges, isRepo, listRemoteBranches, fetchAll, gitSays, withRepoLock } from '@/lib/modules/code-review/git'
 import {
   type Discussion,
   type GithubAccess,
@@ -24,7 +24,7 @@ import {
   viewerLogin,
 } from '@/lib/modules/code-review/github'
 import { ForbiddenAction } from '@/lib/modules/code-review/guard'
-import { type Addressee, type DocFile, type DocTemplate, type FindingStatus, HONORIFICS, type PrLink, addressOf, cleanHandle, validHandle, type FindingView, type ItemSummary, type RepoPreset, type RoundView, where } from '@/lib/modules/code-review/model'
+import { type Addressee, type DocFile, type DocTemplate, type FindingStatus, HONORIFICS, type PrLink, addressOf, anchorInDiff, cleanHandle, validHandle, type FindingView, type ItemSummary, type RepoPreset, type RoundView, where } from '@/lib/modules/code-review/model'
 import { type LogLine, cancelRound, ensureTicker, tick, updateRoundSummary, viewLog } from '@/lib/modules/code-review/runner'
 import {
   createItem,
@@ -347,6 +347,22 @@ const locationLine = (f: FindingView) => `**\`${where(f)}\`**`
  * Posts one finding on its own. Inside the diff it becomes an inline comment
  * on its line; outside it, a conversation comment that names the place.
  */
+/**
+ * Diff hunks of the round's PR, read from the local clone — the ground truth
+ * for which lines GitHub will accept a comment on. Best-effort: without them
+ * nothing is posted inline.
+ */
+async function roundRanges(itemId: number, baseSha: string, headSha: string) {
+  const item = getItem(itemId)
+  const repo = item?.repoId ? getRepo(item.repoId) : undefined
+  if (!repo || !baseSha || !headSha) return null
+  return diffRanges(repo.localPath, baseSha, headSha).catch(() => null)
+}
+
+/** GitHub refusing to place a comment on a line — the case worth retrying as a conversation comment. */
+const unplaceable = (err: unknown) =>
+  err instanceof GithubError && /could not be resolved|part of the diff|pull_request_review_thread/i.test(err.message)
+
 export async function postFindingAction(findingId: number): Promise<Result & { url?: string }> {
   if (!enabled()) return OFF
   const f = getFinding(findingId)
@@ -357,18 +373,39 @@ export async function postFindingAction(findingId: number): Promise<Result & { u
   if (typeof ctx === 'string') return { ok: false, message: ctx }
   const denied = await denyWrite(ctx)
   if (denied) return denied
+  const asConversation = () => postIssueComment(ctx.repo, ctx.number, `${f.file ? `${locationLine(f)}\n\n` : ''}${f.body}`)
   try {
-    const posted =
-      f.inDiff && f.line && f.file && round!.headSha
-        ? await postInlineComment(ctx.repo, ctx.number, round!.headSha, {
-            path: f.file,
-            line: f.endLine && f.endLine > f.line ? f.endLine : f.line,
-            startLine: f.endLine && f.endLine > f.line ? f.line : undefined,
-            body: f.body,
-          })
-        : await postIssueComment(ctx.repo, ctx.number, `${f.file ? `${locationLine(f)}\n\n` : ''}${f.body}`)
-    patchFinding(findingId, { ghCommentId: f.inDiff ? posted.id : null, ghUrl: posted.url })
-    return { ok: true, message: 'Đã gửi lên PR.', url: posted.url }
+    // Re-anchored on the real diff now, not trusted from when it was stored: a
+    // range running past its hunk is trimmed to fit, so GitHub can resolve it.
+    const ranges = f.file && f.line ? await roundRanges(round!.itemId, round!.baseSha, round!.headSha) : null
+    const anchor = f.file ? anchorInDiff(ranges?.get(f.file), f.line, f.endLine) : null
+    if (anchor && round!.headSha) {
+      try {
+        const posted = await postInlineComment(ctx.repo, ctx.number, round!.headSha, { path: f.file, ...anchor, body: f.body })
+        patchFinding(findingId, { ghCommentId: posted.id, ghUrl: posted.url })
+        const trimmed = (anchor.startLine ?? anchor.line) !== f.line || anchor.line !== (f.endLine && f.endLine > f.line! ? f.endLine : f.line)
+        return {
+          ok: true,
+          message: trimmed
+            ? `Đã gửi lên PR (gắn vào dòng ${anchor.startLine ? `${anchor.startLine}–` : ''}${anchor.line} — phần nằm trong diff).`
+            : 'Đã gửi lên PR.',
+          url: posted.url,
+        }
+      } catch (err) {
+        if (!unplaceable(err)) throw err
+        // e.g. the PR was force-pushed past this round's commit.
+        const posted = await asConversation()
+        patchFinding(findingId, { ghCommentId: null, ghUrl: posted.url })
+        return { ok: true, message: 'GitHub không gắn được vào dòng code — đã gửi thành comment chung (có ghi file:dòng).', url: posted.url }
+      }
+    }
+    const posted = await asConversation()
+    patchFinding(findingId, { ghCommentId: null, ghUrl: posted.url })
+    return {
+      ok: true,
+      message: f.file && f.line ? 'Dòng này không nằm trong diff — đã gửi thành comment chung (có ghi file:dòng).' : 'Đã gửi lên PR.',
+      url: posted.url,
+    }
   } catch (err) {
     return failure(err)
   }
@@ -392,7 +429,9 @@ export async function submitReviewAction(input: {
   const denied = await denyWrite(ctx)
   if (denied) return denied
   const chosen = listFindings(round.id).filter((f) => input.findingIds.includes(f.id) && !f.ghUrl)
-  const inline = chosen.filter((f) => f.inDiff && f.line && f.file)
+  const ranges = await roundRanges(round.itemId, round.baseSha, round.headSha)
+  const anchors = new Map(chosen.map((f) => [f.id, f.file ? anchorInDiff(ranges?.get(f.file), f.line, f.endLine) : null]))
+  const inline = chosen.filter((f) => anchors.get(f.id))
   const rest = chosen.filter((f) => !inline.includes(f))
   const body = [
     input.body.trim(),
@@ -408,12 +447,7 @@ export async function submitReviewAction(input: {
       commitId: round.headSha,
       body,
       event: input.event,
-      comments: inline.map((f) => ({
-        path: f.file,
-        line: f.endLine && f.endLine > f.line! ? f.endLine : f.line!,
-        startLine: f.endLine && f.endLine > f.line! ? f.line! : undefined,
-        body: f.body,
-      })),
+      comments: inline.map((f) => ({ path: f.file, ...anchors.get(f.id)!, body: f.body })),
     })
     inline.forEach((f, i) => patchFinding(f.id, { ghCommentId: res.comments[i]?.id || null, ghUrl: res.comments[i]?.url || res.url }))
     for (const f of rest) patchFinding(f.id, { ghUrl: res.url })

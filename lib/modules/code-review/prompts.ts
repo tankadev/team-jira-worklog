@@ -48,11 +48,27 @@ const REVIEWER_NOTE = {
   description: 'Nhận xét gửi riêng cho người review (không phải comment cho member).',
 } as const
 
+const TEST_PLAN = {
+  type: 'array',
+  description: 'Test người review nên tự chạy trên máy để kiểm chứng finding / thay đổi. Bạn KHÔNG chạy — chỉ gợi ý.',
+  items: {
+    type: 'object',
+    properties: {
+      purpose: { type: 'string', description: 'Chạy để kiểm chứng điều gì.' },
+      command: { type: 'string', description: 'Lệnh shell đầy đủ, chạy từ thư mục gốc repo.' },
+      expect: { type: 'string', description: 'Kết quả mong đợi; pass / fail nghĩa là gì cho finding.' },
+      findings: { type: 'array', items: { type: 'string' }, description: 'Title của các finding liên quan (đúng như trong findings).' },
+    },
+    required: ['purpose', 'command', 'expect'],
+  },
+} as const
+
 export const CODE_SCHEMA = {
   type: 'object',
   properties: {
     verdict: { type: 'string', enum: ['approve', 'request_changes', 'comment'] },
     reviewer_note: REVIEWER_NOTE,
+    test_plan: TEST_PLAN,
     findings: {
       type: 'array',
       items: {
@@ -295,6 +311,7 @@ Cách làm:
 - \`reviewer_note\` là nhận xét RIÊNG cho người review (tech lead) — không gửi member, không xưng hô với tác giả: 3–6 câu, PR làm gì, đánh giá tổng thể, rủi ro lớn nhất, chỗ nào người review nên tự xem kỹ, kết luận merge được chưa.${input.round > 1 ? ' Vòng này: member đã sửa được bao nhiêu, còn gì đáng lo.' : ''}
 - Điều không gắn với dòng code cụ thể — câu hỏi cho member, chỗ nghi ngờ cần member kiểm tra lại (config, backend, môi trường, ý định thiết kế, phạm vi PR, commit/nhánh…) — là **comment rời**: \`file\` để trống, không có \`line\`, \`category\` = "Cần xác nhận" (hỏi / nghi ngờ) hoặc "Chung". Chỉ tạo khi thật sự cần member trả lời hoặc làm gì đó.
 - Nếu PR ổn, \`findings\` có thể rỗng và verdict = approve.
+- \`test_plan\`: 0–5 test người review nên TỰ chạy trên máy để kiểm chứng những finding chưa chắc chắn hoặc phần thay đổi rủi ro. Bạn không chạy gì cả — chỉ gợi ý. Tìm cách repo chạy test (workflow CI, Makefile, fastlane, Package.swift, Cargo.toml / workspace) và đưa lệnh cụ thể, hẹp nhất có thể (một crate / một test / \`-only-testing:\`), không chạy cả bộ. Ưu tiên test đã có; nếu chưa có test phù hợp thì nói rõ trong \`purpose\` là cần viết thêm. Không có gì đáng chạy thì để mảng rỗng.
 
 ${UNTRUSTED}
 
@@ -458,6 +475,7 @@ ${list}
 ${input.message.trim()}
 """
 
+Nếu tin nhắn có kết quả chạy test / log do người review tự chạy: đọc kỹ, nói rõ test nào pass / fail và vì sao, finding nào được xác nhận hay bị bác bỏ, rồi đề xuất cập nhật trong \`changes\` (dismiss finding sai, đổi severity, sửa nội dung, thêm finding nếu lộ lỗi mới).
 Trả lời trong \`reply\`: tiếng Việt, đi thẳng vào câu hỏi; mở lại code / tài liệu để kiểm chứng khi cần, đừng trả lời theo trí nhớ nếu không chắc. Nếu người review yêu cầu (hoặc bạn thấy rõ là cần) sửa bản review, đề xuất trong \`changes\`:
 - \`update\`: sửa title / comment / severity của finding theo id, hoặc \`dismiss: true\` nếu nó sai; kèm \`reason\`.
 - \`add\`: finding mới (cùng dạng như lúc review${input.kind === 'pr' ? '; điều không gắn với dòng code nào là comment rời — bỏ trống file / line' : ''}).

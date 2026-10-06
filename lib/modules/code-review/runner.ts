@@ -25,7 +25,7 @@ import {
 import { type RawFinding, buildFreshRows } from './findings'
 import { getDiscussion, getPull, listPullComments } from './github'
 import { cleanupLinks, linkDirs, prepareLinks } from './links'
-import type { DocFile, FindingStatus, FindingView, RoundLink } from './model'
+import { type DocFile, type FindingStatus, type FindingView, type RoundLink, type TestSuggestion, anchorInDiff } from './model'
 import { ALLOWED_TOOLS, DISALLOWED_TOOLS, ISOLATION_FLAGS, reviewEnv } from './guard'
 import { CODE_SCHEMA, DOC_SCHEMA, type ThreadTalk, codePrompt, docPrompt } from './prompts'
 import { type LogLine, bootTime, lastResult, parseLog, pidAlive, readLog, strayLines } from './proc'
@@ -392,6 +392,19 @@ async function threadTalk(repo: string, number: number, previous: FindingView[])
   }
 }
 
+/** Suggested tests, kept as text for the reviewer to copy — nothing here is ever executed. */
+function cleanTestPlan(plan: Output['test_plan']): TestSuggestion[] {
+  return (plan ?? [])
+    .filter((t) => t?.command?.trim())
+    .slice(0, 8)
+    .map((t) => ({
+      purpose: String(t.purpose ?? '').trim(),
+      command: String(t.command ?? '').trim(),
+      expect: String(t.expect ?? '').trim(),
+      findings: (t.findings ?? []).map(String).filter(Boolean),
+    }))
+}
+
 function parseDocs(raw: string): DocFile[] {
   try {
     const v = JSON.parse(raw)
@@ -406,6 +419,7 @@ function parseDocs(raw: string): DocFile[] {
 interface Output {
   verdict?: string
   reviewer_note?: string
+  test_plan?: Array<{ purpose?: string; command?: string; expect?: string; findings?: string[] }>
   /** Older rounds / older prompts. */
   summary_comment?: string
   findings?: RawFinding[]
@@ -459,6 +473,7 @@ async function finalize(r: RoundRow) {
     summary: (out.reviewer_note ?? out.summary_comment ?? '').trim(),
     costUsd: result.total_cost_usd ?? 0,
     sessionId: result.session_id ?? '',
+    testPlan: JSON.stringify(cleanTestPlan(out.test_plan)),
     message: '',
   })
   await cleanup(r)
@@ -498,7 +513,7 @@ async function storeOutput(r: RoundRow, out: Output) {
         endLine = Number.isInteger(v?.end_line) && v!.end_line! >= moved ? v!.end_line! : null
         const snip = await snippetAt(repo.localPath, r.headSha, old.file, line, endLine)
         if (snip.text) ({ text: snippet, start: snippetStart } = snip)
-        inDiff = Boolean(ranges && (ranges.get(old.file) ?? []).some(([a, b]) => line! >= a && line! <= b))
+        inDiff = Boolean(anchorInDiff(ranges?.get(old.file), line, endLine))
       }
       rows.push({
         roundId: r.id,

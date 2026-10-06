@@ -367,6 +367,8 @@ export const reviewRounds = sqliteTable(
     sessionId: text("session_id").notNull().default(""),
     /** JSON: the linked PRs as this round saw them — shas, worktree, diff file. */
     links: text("links").notNull().default("[]"),
+    /** JSON TestSuggestion[]: tests for the reviewer to run by hand. The app runs nothing. */
+    testPlan: text("test_plan").notNull().default("[]"),
     bootAt: integer("boot_at").notNull().default(0),
     createdAt: integer("created_at").notNull().default(now),
     startedAt: integer("started_at"),
