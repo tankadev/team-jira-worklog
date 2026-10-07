@@ -1,14 +1,227 @@
 # Jira Logwork
 
-Công cụ chạy local để log giờ lên Jira và dựng daily report. Thay cho Chrome extension `jira-daily-tool` cũ.
+Ứng dụng chạy ngay trên máy bạn để **log giờ lên Jira** và **dựng daily report**,
+không cần mở Jira từng task. Thay cho Chrome extension `jira-daily-tool` cũ.
 
-## Cần gì trước khi chạy
+Không cần biết lập trình — làm theo các bước dưới đây một lần là xong, những ngày sau
+chỉ cần 2 lệnh để mở lại.
 
-- **Node.js 20.9 trở lên** (`node -v`). Bản này phát triển trên Node 23.
-- **Jira API token** — tạo tại https://id.atlassian.com/manage-profile/security/api-tokens
-- **Google API key** — tạo tại https://aistudio.google.com/apikey (chỉ cần nếu muốn dùng AI sinh nội dung task)
+> Hướng dẫn viết cho **macOS**. Dùng Windows thì xem ghi chú [Nếu bạn dùng Windows](#nếu-bạn-dùng-windows).
 
-## Chạy lần đầu
+---
+
+## Hướng dẫn cài đặt từng bước (cho designer, QC, người không rành kỹ thuật)
+
+Tổng thời gian lần đầu: khoảng **15–20 phút**.
+
+### Bước 1 — Chuẩn bị 3 thứ
+
+1. **Email đăng nhập Jira** của bạn (email công ty bạn dùng để vào Jira).
+2. **Địa chỉ Jira của công ty** — mở Jira trên trình duyệt, copy phần đầu địa chỉ,
+   ví dụ `https://tencongty.atlassian.net`.
+3. **Jira API token** — một "mật khẩu riêng cho ứng dụng":
+   1. Mở https://id.atlassian.com/manage-profile/security/api-tokens (đăng nhập nếu được hỏi).
+   2. Bấm **Create API token**, đặt tên bất kỳ (vd `jira-logwork`), chọn thời hạn, bấm **Create**.
+   3. Bấm **Copy** và dán tạm vào Notes. **Token chỉ hiện một lần** — đóng cửa sổ là không xem lại được
+      (mất thì tạo cái mới).
+
+> ⚠️ Token này là của riêng bạn. Không gửi cho ai, không dùng chung token của người khác.
+
+### Bước 2 — Cài Node.js (chỉ làm một lần)
+
+Node.js là "động cơ" để chạy ứng dụng.
+
+> **Terminal là gì?** Là cửa sổ để gõ lệnh. Trong hướng dẫn này, mỗi khi thấy khung
+> lệnh màu xám, bạn **copy nguyên dòng đó, dán vào Terminal rồi bấm Enter**.
+
+1. Mở https://nodejs.org và tải bản **LTS** (nút bên trái, ghi "LTS").
+2. Mở file vừa tải (`.pkg`) → bấm **Continue / Tiếp tục** đến hết → **Install**, nhập mật khẩu máy nếu được hỏi.
+3. Kiểm tra: mở ứng dụng **Terminal**
+   (bấm `⌘ Command` + `Space`, gõ `Terminal`, Enter), gõ lệnh sau rồi Enter:
+
+   ```bash
+   node -v
+   ```
+
+   Thấy hiện một dòng như `v22.x.x` hoặc `v24.x.x` (số đầu **từ 20 trở lên**) là được.
+   Nếu báo `command not found`, tắt hẳn Terminal (`⌘ Q`) rồi mở lại và thử lần nữa.
+
+### Bước 3 — Lấy ứng dụng về máy
+
+Bạn sẽ nhận được một file **`jira-logwork-xxxxxxxx.zip`** từ người trong team
+(hoặc link repo GitHub nếu được cấp quyền).
+
+1. Bấm đúp file zip để giải nén.
+2. Kéo thư mục vừa giải nén vào **Documents** (Tài liệu) và đổi tên thành **`jira-logwork`**
+   cho dễ nhớ.
+
+<details>
+<summary>Nếu bạn được cấp quyền repo GitHub (không bắt buộc)</summary>
+
+```bash
+cd ~/Documents
+git clone https://github.com/tankadev/team-jira-worklog.git jira-logwork
+```
+
+</details>
+
+### Bước 4 — Mở Terminal tại thư mục ứng dụng
+
+Trong Terminal, gõ `cd ` (chữ cd **và một dấu cách**), sau đó **kéo thư mục `jira-logwork`
+từ Finder thả vào cửa sổ Terminal** — đường dẫn sẽ tự điền. Bấm Enter.
+
+Hoặc nếu bạn để đúng chỗ như Bước 3, chỉ cần dán:
+
+```bash
+cd ~/Documents/jira-logwork
+```
+
+### Bước 5 — Cài các thành phần của ứng dụng (chỉ làm lần đầu)
+
+```bash
+npm install
+```
+
+Chờ khoảng **1–3 phút**. Màn hình chạy nhiều chữ, có thể có chữ `warn` màu vàng — **bình thường**,
+không cần làm gì. Xong khi dấu nhắc lệnh hiện lại.
+
+### Bước 6 — Mở ứng dụng
+
+```bash
+npm run dev
+```
+
+Chờ đến khi thấy dòng:
+
+```
+- Local:        http://localhost:3000
+```
+
+Mở trình duyệt (Chrome/Safari) và vào **http://localhost:3000**
+(hoặc giữ `⌘ Command` rồi bấm vào link đó trong Terminal).
+
+> ⚠️ **Để nguyên cửa sổ Terminal trong lúc dùng app.** Đóng Terminal = tắt ứng dụng.
+> Có thể thu nhỏ (`⌘ M`) cho gọn.
+
+### Bước 7 — Kết nối với Jira của bạn
+
+1. Trong ứng dụng, bấm **Settings** (menu bên trái).
+2. Ở khung **Kết nối Jira**, điền:
+
+   | Ô | Điền gì | Ví dụ |
+   |---|---|---|
+   | **Jira base URL** | Địa chỉ Jira công ty (Bước 1) | `https://tencongty.atlassian.net` |
+   | **Email** | Email đăng nhập Jira của bạn | `ten.ban@congty.com` |
+   | **API token** | Token vừa tạo ở Bước 1 | `ATATT3x…` |
+   | **Project key** | Chữ viết tắt của dự án | `VT` |
+   | **Board id** | Số của board | `4493` |
+
+   **Tìm Project key và Board id:** mở board của team trên Jira, nhìn thanh địa chỉ trình duyệt, ví dụ
+   `https://tencongty.atlassian.net/jira/software/c/projects/`**`VT`**`/boards/`**`4493`**
+   → Project key là **`VT`**, Board id là **`4493`**. Không chắc thì hỏi leader.
+
+3. Kéo xuống cuối trang, bấm **Lưu settings**.
+4. Kéo lên lại, bấm **Test connection**. Thấy **"Kết nối OK · Tên của bạn"** là xong 🎉
+
+> Phải bấm **Lưu settings trước** rồi mới **Test connection** — nút test kiểm tra cấu hình đã lưu.
+
+### Bước 8 — Nếu board của bạn dùng chung với team khác (hỏi leader nếu không chắc)
+
+Ở khung **Team trên board** trong Settings, bấm **Dò từ board** → app tự điền
+label, tiền tố và bộ lọc sprint của team → bấm **Lưu settings**.
+Board chỉ có một team thì bỏ qua bước này.
+
+**Xong!** Vào **Task board** để xem task được giao và bắt đầu log giờ.
+
+---
+
+## Dùng hằng ngày
+
+Mỗi lần bật máy muốn dùng app, mở **Terminal** rồi dán lần lượt:
+
+```bash
+cd ~/Documents/jira-logwork
+npm run dev
+```
+
+rồi vào **http://localhost:3000**. Cấu hình đã lưu từ lần trước, không phải điền lại.
+
+**Tắt ứng dụng:** bấm vào cửa sổ Terminal, nhấn `Control` + `C` (hoặc đóng cửa sổ).
+
+### Cập nhật lên bản mới
+
+Khi nhận được file zip bản mới:
+
+1. Tắt ứng dụng (`Control` + `C` trong Terminal).
+2. Giải nén bản mới, **copy thư mục `data` từ bản cũ sang bản mới** — trong đó là cấu hình
+   và token của bạn. Không copy thì phải điền lại Settings.
+3. Mở Terminal tại thư mục bản mới, chạy lại `npm install` một lần rồi `npm run dev`.
+
+### Màn hình chính
+
+| Màn | Dùng để |
+|---|---|
+| **Task board** | Xem subtask đang giao cho bạn, log giờ, đổi trạng thái. |
+| **Tìm & nhận task** | Tìm task theo sprint / cả project, nhận task về mình. |
+| **Task mới** | Mô tả bằng lời, AI viết sẵn title + mô tả + DoD, tạo task trên Jira. |
+| **Report** | Daily report từ giờ đã log, bấm copy để gửi; xem thống kê tuần / sprint, xuất CSV. |
+| **Settings** | Kết nối Jira, AI, quy tắc giờ, bật/tắt module. |
+
+> **Task mới** dùng AI của Google (Gemini) — muốn dùng thì tạo key miễn phí tại
+> https://aistudio.google.com/apikey, dán vào ô **API key** ở khung **Google Gemini** trong Settings,
+> **Lưu settings** rồi bấm **Test Gemini**. Không dùng thì bỏ qua.
+
+---
+
+## Gặp lỗi?
+
+| Hiện tượng | Cách xử lý |
+|---|---|
+| `command not found: node` hoặc `npm` | Chưa cài Node.js (Bước 2), hoặc cần tắt hẳn Terminal (`⌘ Q`) rồi mở lại. |
+| `npm install` báo lỗi đỏ có chữ `gyp` / `better-sqlite3` / `xcrun` | Máy thiếu công cụ của Apple. Chạy `xcode-select --install`, bấm **Install** trong cửa sổ hiện ra, chờ xong rồi chạy lại `npm install`. |
+| `ENOENT … package.json` | Terminal chưa đứng đúng thư mục — làm lại Bước 4. |
+| Báo cổng 3000 đã được dùng (`Port 3000 is in use`) | App tự chạy ở cổng khác — mở đúng link `Local: http://localhost:300x` hiện trong Terminal. |
+| Trình duyệt báo **không kết nối được** `localhost` | Ứng dụng chưa chạy hoặc Terminal đã bị đóng — chạy lại `npm run dev`. |
+| **Test connection** báo **401** | Email hoặc token sai, hoặc token hết hạn. Tạo token mới (Bước 1), dán lại, **Lưu settings**, test lại. Email phải đúng email đăng nhập Jira. |
+| **Test connection** báo **404** / không tìm thấy | Jira base URL sai — chỉ để phần đầu, vd `https://tencongty.atlassian.net`, không có `/jira/...` phía sau. |
+| Task board trống | Bạn chưa có subtask trong sprint đang chạy — đổi bộ lọc sang **Mọi sprint**; hoặc ô **Label của team** đang lọc mất task (xem [Board dùng chung cho nhiều team](#board-dùng-chung-cho-nhiều-team)). |
+| Trang cứ hiện **"Đang tải…"** rất lâu, bấm không ăn | Tắt app (`Control` + `C`), chạy lại `npm run dev`, tải lại trang. |
+| Vẫn không được | Mở http://localhost:3000/api/health, chụp màn hình gửi cho người hỗ trợ. **Đừng gửi** API token. |
+
+### Nếu bạn dùng Windows
+
+Các bước giống hệt, chỉ khác:
+
+- Mở **PowerShell** thay cho Terminal (bấm phím Windows, gõ `PowerShell`, Enter).
+- Bước 4: `cd $HOME\Documents\jira-logwork`
+- Lỗi khi `npm install` liên quan `gyp` / `better-sqlite3`: cài lại Node.js bản LTS và **tick ô
+  "Automatically install the necessary tools"** trong trình cài đặt.
+- Tắt app: `Ctrl` + `C`.
+
+### Bảo mật
+
+- Thư mục **`data/`** chứa token Jira của bạn. **Không gửi thư mục này** cho ai, không đưa lên Drive/chat.
+- Muốn chia sẻ app cho đồng nghiệp: nhờ người có quyền chạy `./share.sh` (xem [Chia sẻ cho người khác](#chia-sẻ-cho-người-khác)) —
+  file zip tạo ra đã tự loại token. Người nhận tự tạo token riêng.
+
+---
+
+## Vài quy ước đã cài sẵn
+
+- **Chỉ log giờ vào Subtask.** Task cha chỉ để gom nhóm.
+- **Định mức 8h/ngày thường**, T7 và CN không tính định mức nhưng giờ log vào vẫn cộng tổng.
+- **Point 1 = 1–2h, 2 = 4h, 3 = 1–2 ngày.** Tối đa 3 point. App chỉ cảnh báo khi vượt, không bao giờ chặn.
+- **Task cha không tự cộng point** — app tính sẵn tổng point các task con để bạn tự điền vào cha.
+- **Tiền tố title** `[Mobile]` `[BE]` … chọn được nhiều cái, thứ tự bấm là thứ tự ghép. `[SPT-69]` tự suy từ sprint.
+- **Start date và due date là bắt buộc** khi tạo task — nút *Tạo trên Jira* không bật cho tới khi chọn đủ.
+
+Tất cả sửa được trong Settings.
+
+---
+
+# Dành cho developer
+
+## Cấu hình bằng file (thay cho điền Settings)
 
 ```bash
 npm install
@@ -28,16 +241,11 @@ JIRA_BOARD_ID=1
 GITHUB_TOKEN=                          ← chỉ cần nếu bật module "Nhánh & ghi chú"
 ```
 
-Rồi chạy:
-
-```bash
-npm run dev
-```
-
-Mở http://localhost:3000 → vào **Settings** → bấm **Test connection**. Ra tên bạn là xong.
+Rồi `npm run dev`, mở http://localhost:3000 → **Settings** → **Test connection**.
 
 > `.env.local` chỉ dùng để nạp lần đầu. Sau đó mọi cấu hình nằm trong SQLite và sửa thẳng
 > trong màn Settings, không cần restart. Muốn nạp lại từ file thì xoá `data/app.db`.
+> Yêu cầu **Node.js 20.9 trở lên**; bản này phát triển trên Node 23.
 
 ## Chạy bản production
 
@@ -168,27 +376,6 @@ thật: đứng ở 11/09 sau due date của mười task Done → **0 dòng và
 Nút Log không tô viền, chỉ nhắc trong tooltip trước khi bấm; bấm xong thì hiện
 thêm một dòng nhắc, đúng một lần.
 
-## Các màn hình
-
-| Màn | Việc |
-|---|---|
-| **Task board** | Subtask đang giao cho bạn, nhóm theo task cha. Log giờ, đổi trạng thái. |
-| **Tìm & nhận task** | Tìm theo sprint / toàn project / JQL tự do, rồi tự assign về mình. |
-| **Task mới** | Mô tả bằng lời, Gemini dựng title + description + DoD, tạo issue thật trên Jira. |
-| **Report** | Daily report từ worklog thật, copy được, thống kê tuần và sprint, xuất CSV. |
-| **Settings** | Kết nối Jira / Gemini, quy tắc giờ, quy đổi point, tiền tố title, template report. |
-
-## Vài quy ước đã cài sẵn
-
-- **Chỉ log giờ vào Subtask.** Task cha chỉ để gom nhóm.
-- **Định mức 8h/ngày thường**, T7 và CN không tính định mức nhưng giờ log vào vẫn cộng tổng.
-- **Point 1 = 1–2h, 2 = 4h, 3 = 1–2 ngày.** Tối đa 3 point. App chỉ cảnh báo khi vượt, không bao giờ chặn.
-- **Task cha không tự cộng point** — app tính sẵn tổng point các task con để bạn tự điền vào cha.
-- **Tiền tố title** `[Mobile]` `[BE]` … chọn được nhiều cái, thứ tự bấm là thứ tự ghép. `[SPT-69]` tự suy từ sprint.
-- **Start date và due date là bắt buộc** khi tạo task — nút *Tạo trên Jira* không bật cho tới khi chọn đủ.
-
-Tất cả sửa được trong Settings.
-
 ## Board dùng chung cho nhiều team
 
 Một project Jira có thể chứa nhiều board, mỗi board là một filter theo label — ví dụ project
@@ -238,7 +425,7 @@ Tạo file zip đã loại sẵn `node_modules`, `.next`, `.env.local` và `data
 **Đừng bao giờ gửi kèm `data/app.db`** — file đó lưu Jira API token và Google API key
 ở dạng chữ thường. Người nhận tự tạo token riêng của họ.
 
-## Xử lý sự cố
+## Xử lý sự cố (chi tiết)
 
 **`Test connection` báo 401** — token sai hoặc đã hết hạn. Token Atlassian giờ có hạn tối đa 1 năm.
 Kiểm tra ở https://id.atlassian.com/manage-profile/security/api-tokens, và email phải đúng email
