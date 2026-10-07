@@ -126,7 +126,7 @@ async function boardPage(props: PageProps<'/'>) {
       tz,
       visibleIds,
     ),
-    noSprintMatch ? Promise.resolve([]) : getSprintTasks(sprintId, status),
+    noSprintMatch ? Promise.resolve([]) : getSprintTasks(sprintId, status, reconcileIds),
     // Only with a sprint picked, and only when the panel is on. "Point in this
     // sprint" has no answer across every sprint at once, and a panel nobody
     // shows must not be paying for its own query — switching it off in
@@ -379,7 +379,13 @@ async function boardPage(props: PageProps<'/'>) {
               )}
             </div>
           )}
-            <PendingTasks tasks={uncovered} />
+            <PendingTasks
+              tasks={uncovered}
+              currentSprint={
+                selectedSprint ? { id: selectedSprint.id, name: selectedSprint.name } : null
+              }
+              teamLabel={getTeamScope().label}
+            />
           </NavDimmer>
         </div>
 
@@ -486,9 +492,9 @@ function EmptyBoard({
       </p>
       {teamLabel && (
         <p className="mx-auto mt-2 max-w-lg text-body leading-relaxed text-ink-3">
-          Board đang lọc theo team — task thiếu label{' '}
-          <b className="font-mono text-ink-2">{teamLabel}</b> sẽ không hiện ở đây, kể cả khi được
-          giao cho bạn. Bỏ trống ô label trong Settings để xem tất cả.
+          Board đang lọc theo team — task con chỉ hiện khi nó hoặc task cha mang label{' '}
+          <b className="font-mono text-ink-2">{teamLabel}</b>, kể cả khi được giao cho bạn. Bỏ
+          trống ô label trong Settings để xem tất cả.
         </p>
       )}
       <p className="mx-auto mt-2 max-w-lg text-body leading-relaxed text-ink-3">

@@ -95,6 +95,8 @@ export interface SprintTask {
   startDate: string | null;
   dueDate: string | null;
   labels: string[];
+  /** Still in the backlog — assigned to the user but in no sprint. */
+  outOfSprint?: boolean;
 }
 
 export interface Transition {

@@ -66,6 +66,64 @@ function teamClauses(): string[] {
   return label ? [`labels = "${escapeJql(label)}"`] : [];
 }
 
+/**
+ * Narrows the user's subtasks to the team's, reading the label off the subtask
+ * OR its parent.
+ *
+ * {@link teamClauses} cannot be put on a subtask query: the team label is
+ * what the team's board matches, and that board lists parents. A subtask made
+ * in Jira's own UI does not inherit its parent's labels, so VT-2398/VT-2399 —
+ * picked up straight from Jira under a `ctalk` parent — were filtered off this
+ * board while sitting in plain view on the team's. JQL has no "parent's
+ * labels" clause, hence the second read here: one search over the parents of
+ * whatever is not labelled itself. Subtasks therefore need `labels` and
+ * `parent` among their fields.
+ */
+async function keepTeamSubtasks(
+  issues: JiraIssue[],
+  fresh = false,
+): Promise<JiraIssue[]> {
+  const { label } = getTeamScope();
+  if (!label) return issues;
+  const want = label.toLowerCase();
+  const tagged = (v: unknown) =>
+    strings(v).some((l) => l.toLowerCase() === want);
+
+  const parentKeys = [
+    ...new Set(
+      issues
+        .filter((i) => !tagged(i.fields.labels))
+        .map((i) => i.fields.parent?.key)
+        .filter((k): k is string => Boolean(k)),
+    ),
+  ];
+
+  const CHUNK = 50;
+  const batches: Promise<JiraIssue[]>[] = [];
+  for (let i = 0; i < parentKeys.length; i += CHUNK) {
+    const chunk = parentKeys.slice(i, i + CHUNK);
+    batches.push(
+      searchJql<JiraIssue>(
+        `key in (${chunk.map((k) => `"${escapeJql(k)}"`).join(",")})`,
+        ["labels"],
+        { limit: chunk.length, fresh },
+      ),
+    );
+  }
+  const teamParents = new Set(
+    (await Promise.all(batches))
+      .flat()
+      .filter((p) => tagged(p.fields.labels))
+      .map((p) => p.key),
+  );
+
+  return issues.filter(
+    (i) =>
+      tagged(i.fields.labels) ||
+      teamParents.has(i.fields.parent?.key ?? ""),
+  );
+}
+
 export interface BoardQuery {
   sprintId?: number | null;
   /** Substring match on summary or key. */
@@ -188,7 +246,7 @@ export async function getBoard(query: BoardQuery = {}): Promise<BoardParent[]> {
     `project = "${escapeJql(projectKey)}"`,
     "assignee = currentUser()",
     "issuetype in subTaskIssueTypes()",
-    ...teamClauses(),
+    // No `teamClauses()`: the team is decided by `keepTeamSubtasks` below.
   ];
 
   if (query.status !== "all") base.push("statusCategory != Done");
@@ -250,6 +308,7 @@ export async function getBoard(query: BoardQuery = {}): Promise<BoardParent[]> {
       { limit: 200, reconcileIssues: query.reconcileIds },
     );
   }
+  issues = await keepTeamSubtasks(issues);
 
   const subtasks: BoardSubtask[] = issues.map((issue) => ({
     id: issue.id,
@@ -501,14 +560,14 @@ export async function getSprintPoints(sprintId: number): Promise<PointRow[]> {
   const parentKeys = await sprintParentKeys(sprintId, projectKey);
   if (!parentKeys.length) return [];
 
-  const fields = ["status", "timespent"];
+  // `parent` and `labels` are what `keepTeamSubtasks` reads.
+  const fields = ["status", "timespent", "parent", "labels"];
   if (meta.storyPointsFieldId) fields.push(meta.storyPointsFieldId);
 
   const base = [
     `project = "${escapeJql(projectKey)}"`,
     "assignee = currentUser()",
     "issuetype in subTaskIssueTypes()",
-    ...teamClauses(),
   ];
 
   // Same chunking as the board: `parent in (…)` over hundreds of keys is a
@@ -529,7 +588,9 @@ export async function getSprintPoints(sprintId: number): Promise<PointRow[]> {
     );
   }
 
-  return (await Promise.all(batches)).flat().map((issue) => ({
+  return (
+    await keepTeamSubtasks((await Promise.all(batches)).flat())
+  ).map((issue) => ({
     key: issue.key,
     statusName: issue.fields.status?.name ?? "",
     storyPoints: meta.storyPointsFieldId
@@ -546,10 +607,20 @@ export async function getSprintPoints(sprintId: number): Promise<PointRow[]> {
  * Work is only ever logged against subtasks, so a sprint holding nothing but
  * bare Tasks leaves the board empty with no way forward. Surfacing those Tasks
  * turns the dead end into an obvious next step: create a subtask under one.
+ *
+ * With a sprint picked, the user's open Tasks still sitting in the backlog are
+ * added too, flagged `outOfSprint`. Picking a task up in Jira assigns it but
+ * leaves it in the backlog — VT-3513 was that, and with no sprint and no team
+ * label it showed up nowhere here, so there was no way to log against it. They
+ * are not held to the team label: a backlog task assigned to this user is
+ * theirs either way, and the board offers to add sprint and label together.
+ * Open only — a finished backlog task would sit here forever.
  */
 export async function getSprintTasks(
   sprintId: number | null,
   status: "open" | "all" = "all",
+  /** A task moved out of the backlog moments ago — see {@link BoardQuery}. */
+  reconcileIds: string[] = [],
 ): Promise<SprintTask[]> {
   const meta = await getProjectMeta();
   const projectKey = requireProjectKey();
@@ -577,13 +648,29 @@ export async function getSprintTasks(
   if (meta.storyPointsFieldId) fields.push(meta.storyPointsFieldId);
   if (meta.startDateFieldId) fields.push(meta.startDateFieldId);
 
-  const issues = await searchJql<JiraIssue>(
-    `${clauses.join(" AND ")} ORDER BY created DESC`,
-    fields,
-    { limit: 50 },
-  );
+  const [inSprint, backlog] = await Promise.all([
+    searchJql<JiraIssue>(
+      `${clauses.join(" AND ")} ORDER BY created DESC`,
+      fields,
+      { limit: 50, reconcileIssues: reconcileIds },
+    ),
+    sprintId
+      ? searchJql<JiraIssue>(
+          [
+            `project = "${escapeJql(projectKey)}"`,
+            "assignee = currentUser()",
+            "issuetype not in subTaskIssueTypes()",
+            "sprint is EMPTY",
+            "statusCategory != Done",
+          ].join(" AND ") + " ORDER BY created DESC",
+          fields,
+          { limit: 50, reconcileIssues: reconcileIds },
+        )
+      : Promise.resolve([]),
+  ]);
+  const inBacklog = new Set(backlog.map((i) => i.key));
 
-  return issues
+  return [...inSprint, ...backlog.filter((i) => !inSprint.some((s) => s.key === i.key))]
     .filter((i) => (i.fields.issuetype?.hierarchyLevel ?? 0) === 0)
     .map((issue) => ({
       key: issue.key,
@@ -604,6 +691,7 @@ export async function getSprintTasks(
         : null,
       dueDate: str(issue.fields.duedate),
       labels: strings(issue.fields.labels),
+      outOfSprint: inBacklog.has(issue.key),
     }));
 }
 
@@ -633,10 +721,10 @@ export async function getOpenSubtasks(
     "assignee = currentUser()",
     "issuetype in subTaskIssueTypes()",
     "statusCategory != Done",
-    ...teamClauses(),
   ];
-  // `parent` is what the sprintless pull-back groups by.
-  const fields = ["summary", "status", "parent"];
+  // `parent` is what the sprintless pull-back groups by; it and `labels` are
+  // also what `keepTeamSubtasks` reads.
+  const fields = ["summary", "status", "parent", "labels"];
 
   const CHUNK = 50;
   const batches: Promise<JiraIssue[]>[] = [];
@@ -655,7 +743,8 @@ export async function getOpenSubtasks(
   }
   const inSprint = (await Promise.all(batches)).flat();
   const stray = await sprintlessChildren(base, fields, inSprint, { fresh });
-  return inSprint.concat(stray.issues).map((i) => ({
+  const mine = await keepTeamSubtasks(inSprint.concat(stray.issues), fresh);
+  return mine.map((i) => ({
     key: i.key,
     summary: i.fields.summary ?? "",
     statusName: i.fields.status?.name ?? "",

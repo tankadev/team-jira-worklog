@@ -1,6 +1,7 @@
 import type { SprintTask } from '@/lib/jira/types'
 
 import { CreateIssueButton } from './create-issue'
+import { SprintFixButton } from './sprint-fix'
 import { StatusPill } from './status-pill'
 import { TypeIcon } from './type-icon'
 
@@ -13,7 +14,18 @@ import { TypeIcon } from './type-icon'
  * hours have not been logged. Listing them here is the only route from "this is
  * my work" to "I can log against it".
  */
-export function PendingTasks({ tasks, title }: { tasks: SprintTask[]; title?: string }) {
+export function PendingTasks({
+  tasks,
+  title,
+  currentSprint = null,
+  teamLabel = null,
+}: {
+  tasks: SprintTask[]
+  title?: string
+  /** The sprint being viewed — where a backlog task is offered to move. */
+  currentSprint?: { id: number; name: string } | null
+  teamLabel?: string | null
+}) {
   if (!tasks.length) return null
 
   return (
@@ -53,6 +65,30 @@ export function PendingTasks({ tasks, title }: { tasks: SprintTask[]; title?: st
                 </span>
               )}
             </span>
+
+            {/* Picked up in Jira but left in the backlog: the subtask route
+                works regardless, the fix keeps Jira's own board honest. */}
+            {t.outOfSprint && (
+              <span
+                title={`${t.key} còn ở backlog, chưa thuộc sprint nào`}
+                className="badge bg-warn-soft text-warn"
+              >
+                ⚠ chưa gán sprint
+              </span>
+            )}
+            {t.outOfSprint && currentSprint && (
+              <SprintFixButton
+                issueKey={t.key}
+                sprintId={currentSprint.id}
+                sprintName={currentSprint.name}
+                addsLabel={
+                  teamLabel &&
+                  !t.labels.some((l) => l.toLowerCase() === teamLabel.toLowerCase())
+                    ? teamLabel
+                    : null
+                }
+              />
+            )}
 
             {t.storyPoints !== null && (
               <span className="rounded bg-surface-2 px-[7px] py-0.5 font-mono text-caption text-ink-3">
