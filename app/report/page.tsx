@@ -9,7 +9,7 @@ import { listDaysOff } from '@/lib/days-off'
 import { type QuotaRules, quotaForDate } from '@/lib/quota'
 import { SETTING_KEYS, getSetting, getWorkSchedule } from '@/lib/settings'
 import { getTemplate, listTemplates } from '@/lib/templates'
-import { DEFAULT_TZ, formatDateVi, formatDuration, previousWorkday, todayIn, weekOf } from '@/lib/time'
+import { DEFAULT_TZ, formatDateVi, formatDuration, previousReportDay, previousWorkday, todayIn, weekOf } from '@/lib/time'
 
 import { JiraDown } from '../jira-down'
 import { NavProvider } from '../board/navigation'
@@ -62,8 +62,11 @@ async function reportPage(props: PageProps<'/report'>) {
 
   const days = weekOf(date)
   // The report is written for `date` ("today"); its "Previous day" block lists
-  // what was actually logged on the last working day — Friday, for a Monday.
-  const prevDate = previousWorkday(date)
+  // what was actually logged on the last working day — Friday, for a Monday —
+  // or on a weekend day in between, if one was worked. The fetch reaches back
+  // to that Friday, so any weekend between it and `date` is covered too.
+  const lastWorkday = previousWorkday(date)
+  const fetchFrom = lastWorkday < days[0] ? lastWorkday : days[0]
   const { current } = await getSprints()
 
   // The sprint window can start before this week, so it is fetched separately
@@ -71,15 +74,18 @@ async function reportPage(props: PageProps<'/report'>) {
   const sprintFrom = current?.startDate?.slice(0, 10)
   const sprintTo = current?.endDate?.slice(0, 10)
 
-  // prevDate falls in the previous week when `date` is a Monday, so the fetch
-  // reaches back to it; the extra days are harmless to the week table and stats.
+  // The previous day falls in the previous week when `date` is a Monday, so the
+  // fetch reaches back to it; the extra days are harmless to the week table and stats.
   const [weekEntries, sprintEntries, todayCandidates] = await Promise.all([
-    getWorklogs(prevDate < days[0] ? prevDate : days[0], days[6], me.accountId, tz),
+    getWorklogs(fetchFrom, days[6], me.accountId, tz),
     sprintFrom && sprintTo
       ? getWorklogs(sprintFrom, min(sprintTo, todayIn(tz)), me.accountId, tz)
       : Promise.resolve([]),
     loadTodayCandidates(current?.id ?? null),
   ])
+
+  const loggedDays = new Set(weekEntries.map((e) => e.date))
+  const prevDate = previousReportDay(date, (d) => loggedDays.has(d))
 
   const dayEntries = weekEntries.filter((e) => e.date === date)
   const prevEntries = weekEntries.filter((e) => e.date === prevDate)
@@ -112,7 +118,7 @@ async function reportPage(props: PageProps<'/report'>) {
     // runs 09:00–18:00 around lunch, so its halves are three hours and five.
     schedule: getWorkSchedule(),
     weekendCounts: getSetting(SETTING_KEYS.weekendCountsToQuota) === 'true',
-    daysOff: listDaysOff(prevDate < days[0] ? prevDate : days[0], days[6]),
+    daysOff: listDaysOff(fetchFrom, days[6]),
   }
   const quota = rules.dailyHours
 

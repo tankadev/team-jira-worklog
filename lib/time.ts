@@ -294,6 +294,17 @@ export function previousWorkday(date: string): string {
   return d
 }
 
+/**
+ * The day a report's "Previous day" block covers: the last weekday before
+ * `date`, unless a weekend day in between was actually worked — Saturday
+ * overtime is exactly what Sunday's (or Monday's) report has to list.
+ */
+export function previousReportDay(date: string, worked: (day: string) => boolean): string {
+  const workday = previousWorkday(date)
+  for (let d = addDays(date, -1); d > workday; d = addDays(d, -1)) if (worked(d)) return d
+  return workday
+}
+
 /** Monday-first week containing `date`. */
 export function weekOf(date: string): string[] {
   const [y, m, d] = date.split('-').map(Number)
