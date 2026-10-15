@@ -8,6 +8,7 @@ import {
   type DailyMatch,
   type DeployPr,
   type EpicKind,
+  type IgnoreReason,
   NO_EPIC,
   type Phase,
   type ProgressIssue,
@@ -46,7 +47,7 @@ import {
   setPlatformAction,
 } from './actions'
 import { ConfigPanel } from './config-panel'
-import { EpicCard, type EpicGroup, type RowInfo } from './epic-card'
+import { EpicCard, type EpicGroup, type IgnoreControls, type RowInfo } from './epic-card'
 import { TemplatePanel } from './template-panel'
 
 type Scope = 'sprint' | 'all'
@@ -64,6 +65,22 @@ const SCOPE_KEY = 'team-progress:scope'
 const UNKNOWN = '?'
 const filterKey = (platform: string) => `team-progress:filter:${platform}`
 const prId = (p: DeployPr) => `${p.repo}#${p.number}@${p.base}`
+/** The foldable steps — the report itself always stays open. */
+type StepId = 'prs' | 'dailies'
+type StepTone = 'idle' | 'good' | 'warn'
+const STEPS_KEY = 'team-progress:closed-steps'
+
+/** Classic is the list as it always was; focus adds "set aside" and quick filters. */
+type View = 'classic' | 'focus'
+const VIEW_KEY = 'team-progress:view'
+type Focus = 'active' | 'picked' | 'daily' | 'new' | 'ignored'
+const FOCUS_FILTERS: Array<{ id: Focus; label: string; hint: string }> = [
+  { id: 'active', label: 'Đang theo dõi', hint: 'Mọi task chưa bỏ qua' },
+  { id: 'picked', label: 'Đã chọn', hint: 'Task đang tick — đúng những gì vào báo cáo' },
+  { id: 'daily', label: 'Daily nhắc tới', hint: 'Task mà daily của team đã được AI map tới (bước 2)' },
+  { id: 'new', label: 'Mới', hint: 'Task chưa thấy ở lần mở trước' },
+  { id: 'ignored', label: 'Đã bỏ qua', hint: 'Task/epic đã cất đi — khôi phục ở đây' },
+]
 
 const BTN = 'rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-body font-medium hover:bg-surface-2 disabled:opacity-60'
 const BTN_PRI = 'rounded-lg bg-accent px-3 py-1.5 text-body font-semibold text-on-accent shadow-card hover:bg-accent-2 disabled:opacity-60'
@@ -109,6 +126,8 @@ export function Workspace(props: {
         if (chosen.has(i.key)) out.add(i.key)
         continue
       }
+      // A new task under an epic set aside stays out, like the epic.
+      if (props.selection.ignored[i.epicKey ?? '']) continue
       if (issuePlatforms(i, epicMap.get(i.epicKey ?? ''), config.platforms).includes(platform)) out.add(i.key)
     }
     return out
@@ -116,6 +135,9 @@ export function Workspace(props: {
   const [phases, setPhases] = useState(props.selection.phases)
   const [notes, setNotes] = useState(props.selection.notes)
   const [names, setNames] = useState(props.selection.names)
+  const [ignored, setIgnored] = useState(props.selection.ignored)
+  /** Set aside on its own or with its whole epic. */
+  const ignoreOf = (i: ProgressIssue): IgnoreReason | undefined => ignored[i.key] ?? ignored[i.epicKey ?? '']
 
   // Persist only after the user does something: merely opening the page must
   // not mark every new task as seen and wipe its "mới" badge.
@@ -136,10 +158,11 @@ export function Workspace(props: {
         phases,
         notes,
         names,
+        ignored,
       })
     }, 600)
     return () => clearTimeout(t)
-  }, [picked, phases, notes, names, data, platform, props.selection])
+  }, [picked, phases, notes, names, ignored, data, platform, props.selection])
 
   function pick(keys: string[], on: boolean) {
     touch()
@@ -151,6 +174,30 @@ export function Workspace(props: {
       }
       return next
     })
+  }
+
+  /**
+   * Sets keys (issues or epics) aside, or brings them back with a null reason.
+   * Setting aside also unticks: a task someone else owns has no place in the
+   * report, whichever view it was ticked in.
+   */
+  function ignore(keys: string[], reason: IgnoreReason | null) {
+    touch()
+    setIgnored((prev) => {
+      const next = { ...prev }
+      for (const k of keys) {
+        if (reason) next[k] = reason
+        else delete next[k]
+      }
+      return next
+    })
+    if (reason) {
+      const set = new Set(keys)
+      pick(
+        data.issues.filter((i) => set.has(i.key) || set.has(i.epicKey ?? '')).map((i) => i.key),
+        false,
+      )
+    }
   }
 
   const phaseOf = (i: ProgressIssue): Phase => phases[i.key] ?? guessPhase(i)
@@ -235,9 +282,10 @@ export function Workspace(props: {
     return counts
   }, [visible, epicMap, config.platforms])
 
-  const groups: EpicGroup[] = useMemo(() => {
+  /** Issues under their epic cards, in the order the cards are listed. */
+  function groupIssues(list: ProgressIssue[]): EpicGroup[] {
     const by = new Map<string, ProgressIssue[]>()
-    for (const i of shownIssues) {
+    for (const i of list) {
       const k = i.epicKey && epicMap.has(i.epicKey) ? i.epicKey : NO_EPIC
       by.set(k, [...(by.get(k) ?? []), i])
     }
@@ -259,7 +307,9 @@ export function Workspace(props: {
           Number(b.relevant) - Number(a.relevant) ||
           (Number(b.key.split('-').pop()) || 0) - (Number(a.key.split('-').pop()) || 0),
       )
-  }, [shownIssues, epicMap, config.platforms, platform])
+  }
+  // groupIssues reads epicMap, config and platform.
+  const groups: EpicGroup[] = useMemo(() => groupIssues(shownIssues), [shownIssues, epicMap, config.platforms, platform])
 
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
@@ -317,10 +367,15 @@ export function Workspace(props: {
   const [prOff, setPrOff] = useState<Set<string>>(new Set())
   const [prNote, setPrNote] = useState<Note>(null)
   const [prPending, startPr] = useTransition()
+  const canFetchPrs = props.githubReady && config.repos.length > 0
+  // Bumped per request, so a slow answer for an old range cannot land last.
+  const prReq = useRef(0)
 
   function loadPrs() {
+    const req = ++prReq.current
     startPr(async () => {
       const res = await fetchPrsAction(range.from, range.to)
+      if (req !== prReq.current) return
       setPrNote(res)
       if (res.ok) {
         setPrs(res.data ?? [])
@@ -328,6 +383,15 @@ export function Workspace(props: {
       }
     })
   }
+  // Read-only and one request per branch, so the list loads by itself — on
+  // open and once the range settles — rather than waiting for a click on
+  // every visit. Not AI: nothing here is billed.
+  useEffect(() => {
+    if (!canFetchPrs) return
+    const t = setTimeout(loadPrs, 400)
+    return () => clearTimeout(t)
+    // loadPrs reads `range`.
+  }, [range, canFetchPrs])
   const pickedPrs = prs.filter((p) => !prOff.has(prId(p)))
 
   /* ── the report ─────────────────────────────────────────────────────── */
@@ -344,13 +408,13 @@ export function Workspace(props: {
         sprintName: props.sprintName,
         epics: groups.map((g) => g.epic).filter((e): e is NonNullable<typeof e> => Boolean(e)),
         issues: shownIssues.filter((i) => picked.has(i.key)),
-        selection: { selected: [], seen: [], phases, notes, names },
+        selection: { selected: [], seen: [], phases, notes, names, ignored },
         platforms: config.platforms,
         envs: config.envs,
         prs: prs.filter((p) => !prOff.has(prId(p))),
         subtaskParent: data.subtaskParent,
       }),
-    [platform, today, props.sprintName, groups, shownIssues, picked, phases, notes, names, config, prs, prOff, data.subtaskParent],
+    [platform, today, props.sprintName, groups, shownIssues, picked, phases, notes, names, ignored, config, prs, prOff, data.subtaskParent],
   )
   const rendered = useMemo(() => {
     try {
@@ -445,7 +509,7 @@ export function Workspace(props: {
     // The sprint's work, plus anything ticked from outside it — what a daily
     // talks about. Subtasks go in too: dailies name the subtask a worklog went to.
     const candidates = data.issues
-      .filter((i) => !superseded.has(i.key) && (showQc || !isQc(i)) && (i.inSprint || picked.has(i.key)))
+      .filter((i) => !superseded.has(i.key) && (showQc || !isQc(i)) && (i.inSprint || picked.has(i.key)) && !ignoreOf(i))
       .flatMap((i) => {
         const epic = epicMap.get(i.epicKey ?? '')?.summary ?? ''
         return [
@@ -465,7 +529,11 @@ export function Workspace(props: {
   }
 
   /** Issues the dailies name that are not ticked yet. */
-  const mentionedUnpicked = [...matchesByKey.keys()].filter((k) => !picked.has(k) && issueByKey.has(k))
+  // Set-aside issues are not nudged back in just because a daily names them.
+  const mentionedUnpicked = [...matchesByKey.keys()].filter((k) => {
+    const i = issueByKey.get(k)
+    return i && !picked.has(k) && !ignoreOf(i)
+  })
   const mentionedHidden = mentionedUnpicked.filter((k) => !shownIssues.some((i) => i.key === k)).length
 
   /** The matches as one line each, for the report prompt. */
@@ -485,9 +553,123 @@ export function Workspace(props: {
   const [aiNote, setAiNote] = useState<Note>(null)
   const [aiPending, startAi] = useTransition()
 
-  // Below the two-column width the report sits under the whole epic list;
-  // "Xem báo cáo ↓" above the list jumps down to it.
-  const reportRef = useRef<HTMLElement>(null)
+  /* ── the focus view ─────────────────────────────────────────────────── */
+
+  // The classic list stays the default; the new one is opted into and remembered.
+  const [view, setView] = useState<View>('classic')
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(VIEW_KEY) === 'focus') setView('focus')
+    } catch {}
+  }, [])
+  function changeView(v: View) {
+    setView(v)
+    try {
+      localStorage.setItem(VIEW_KEY, v)
+    } catch {}
+  }
+
+  const [focus, setFocus] = useState<Focus>('active')
+  const focusMatch = (f: Focus, i: ProgressIssue): boolean => {
+    if (f === 'ignored') return Boolean(ignoreOf(i))
+    if (ignoreOf(i)) return false
+    if (f === 'picked') return picked.has(i.key)
+    if (f === 'daily') return matchesByKey.has(i.key)
+    if (f === 'new') return !firstRun && !seen0.has(i.key)
+    return true
+  }
+  const focusCounts = Object.fromEntries(
+    FOCUS_FILTERS.map((f) => [f.id, shownIssues.filter((i) => focusMatch(f.id, i)).length]),
+  ) as Record<Focus, number>
+  const focusIssues = shownIssues.filter((i) => focusMatch(focus, i))
+  const focusGroups = groupIssues(focusIssues)
+
+  // Cards start folded on the full list and open on the narrow ones, where
+  // the few tasks left are the point; a click flips one card either way.
+  const [flipped, setFlipped] = useState<Set<string>>(new Set())
+  const focusOpen = (key: string) => (focus !== 'active') !== flipped.has(key)
+  function changeFocus(f: Focus) {
+    setFocus(f)
+    setFlipped(new Set())
+  }
+  const anyFocusOpen = focusGroups.some((g) => focusOpen(g.key))
+  function toggleAllFocus() {
+    // Fold all when anything is open, else open all.
+    const wantOpen = !anyFocusOpen
+    setFlipped(wantOpen === (focus === 'active') ? new Set(focusGroups.map((g) => g.key)) : new Set())
+  }
+
+  // Setting aside makes a row vanish from the list, so the last one can be undone.
+  const [undo, setUndo] = useState<{ keys: string[]; repick: string[] } | null>(null)
+  useEffect(() => {
+    if (!undo) return
+    const t = setTimeout(() => setUndo(null), 8000)
+    return () => clearTimeout(t)
+  }, [undo])
+  function ignoreFromList(keys: string[], reason: IgnoreReason | null) {
+    if (reason) {
+      const set = new Set(keys)
+      const repick = data.issues.filter((i) => (set.has(i.key) || set.has(i.epicKey ?? '')) && picked.has(i.key)).map((i) => i.key)
+      setUndo({ keys, repick })
+    } else setUndo(null)
+    ignore(keys, reason)
+  }
+  const ignoreControls: IgnoreControls = {
+    reasonOf: (key) => ignored[key],
+    listing: focus === 'ignored',
+    onIgnore: ignoreFromList,
+  }
+
+  /* ── the steps' headers ─────────────────────────────────────────────── */
+
+  // Steps 1 and 2 fold to their one-line summary once done, leaving room for
+  // the report; which are folded is remembered in this browser.
+  const [closed, setClosed] = useState<Set<StepId>>(new Set())
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STEPS_KEY)
+      if (raw) setClosed(new Set(JSON.parse(raw) as StepId[]))
+    } catch {}
+  }, [])
+  function toggleStep(s: StepId) {
+    const next = new Set(closed)
+    if (next.has(s)) next.delete(s)
+    else next.add(s)
+    setClosed(next)
+    try {
+      localStorage.setItem(STEPS_KEY, JSON.stringify([...next]))
+    } catch {}
+  }
+
+  const prSummary = !props.githubReady
+    ? 'chưa có GitHub token'
+    : !config.repos.length
+      ? 'chưa khai báo repo'
+      : prPending
+        ? 'đang lấy…'
+        : !prNote
+          ? 'chưa lấy'
+          : !prNote.ok
+            ? 'lấy lỗi'
+            : `${pickedPrs.length}/${prs.length} PR vào báo cáo`
+  const prTone: StepTone = !canFetchPrs || prNote?.ok === false ? 'warn' : prNote?.ok && !prPending ? 'good' : 'idle'
+
+  const mappedHit = dailyMatches.filter((d) => d.key).length
+  const dailyMapped = dailyMatches.length > 0 && !mapStale
+  const dailySummary = !dailies.trim()
+    ? 'chưa dán'
+    : mapPending
+      ? 'AI đang map…'
+      : mapStale
+        ? 'đã sửa — cần map lại'
+        : dailyMapped
+          ? `khớp ${mappedHit}/${dailyMatches.length} dòng`
+          : 'đã dán · chưa map'
+  const dailyTone: StepTone = !dailies.trim() || mapPending ? 'idle' : dailyMapped ? 'good' : 'warn'
+
+  // Below the two-column width the steps sit under the whole epic list;
+  // "Soạn báo cáo ↓" above the list jumps down to the first one.
+  const stepsRef = useRef<HTMLDivElement>(null)
 
   function polish() {
     startAi(async () => {
@@ -649,6 +831,28 @@ export function Workspace(props: {
             {p.platform}
           </button>
         ))}
+        <div className="ml-auto flex rounded-lg border border-line bg-surface p-0.5" role="group" aria-label="Giao diện danh sách">
+          {(
+            [
+              ['classic', 'Giao diện cũ'],
+              ['focus', 'Giao diện mới'],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => changeView(id)}
+              aria-pressed={view === id}
+              title={id === 'focus' ? 'Thêm Bỏ qua task/epic và lọc nhanh: đã chọn, daily nhắc tới, mới' : 'Danh sách như trước giờ'}
+              className={
+                'rounded-md px-2.5 py-1 text-small ' +
+                (view === id ? 'bg-accent-soft font-semibold text-accent-ink' : 'text-ink-2 hover:text-ink')
+              }
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -691,6 +895,7 @@ export function Workspace(props: {
 
       <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(420px,560px)]">
         {/* ── left: epics ── */}
+        {view === 'classic' ? (
         <div className="flex min-w-0 flex-col gap-3">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-small text-ink-2">
@@ -715,10 +920,10 @@ export function Workspace(props: {
             <span className="ml-auto flex flex-wrap gap-2">
               <button
                 type="button"
-                onClick={() => reportRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                onClick={() => stepsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
                 className={BTN + ' xl:hidden'}
               >
-                Xem báo cáo ↓
+                Soạn báo cáo ↓
               </button>
               <button type="button" onClick={() => pick(shownIssues.map((i) => i.key), true)} className={BTN} title="Tick mọi task đang hiện theo bộ lọc">
                 Chọn hết đang hiện
@@ -752,12 +957,338 @@ export function Workspace(props: {
             <EpicCard key={g.key} {...cardProps(g)} />
           ))}
         </div>
+        ) : (
+        <div className="flex min-w-0 flex-col gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap gap-1.5" role="group" aria-label="Lọc nhanh">
+              {FOCUS_FILTERS.map((f) => (
+                <button
+                  key={f.id}
+                  type="button"
+                  onClick={() => changeFocus(f.id)}
+                  aria-pressed={focus === f.id}
+                  title={f.hint}
+                  className={
+                    'flex items-center gap-1.5 rounded-full border px-3 py-1 text-small ' +
+                    (focus === f.id
+                      ? 'border-accent bg-accent-soft font-semibold text-accent-ink'
+                      : 'border-line text-ink-2 hover:border-line-strong hover:text-ink')
+                  }
+                >
+                  {f.label}
+                  <span className="font-mono text-micro opacity-70">{focusCounts[f.id]}</span>
+                </button>
+              ))}
+            </div>
+            <span className="ml-auto flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => stepsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                className={BTN + ' xl:hidden'}
+              >
+                Soạn báo cáo ↓
+              </button>
+              {focus !== 'ignored' && focus !== 'picked' && (
+                <button type="button" onClick={() => pick(focusIssues.map((i) => i.key), true)} className={BTN} title="Tick mọi task trong danh sách đang lọc">
+                  Chọn hết
+                </button>
+              )}
+              <button type="button" onClick={toggleAllFocus} className={BTN}>
+                {anyFocusOpen ? 'Thu gọn' : 'Mở hết'}
+              </button>
+            </span>
+          </div>
 
-        {/* ── right: report ── */}
-        <div className="flex min-w-0 flex-col gap-4 xl:sticky xl:top-5">
-          <section ref={reportRef} className="card scroll-mt-4 p-4">
+          <div className="text-small text-ink-2">
+            Đã chọn <b className="text-ink">{pickedShown}</b> task vào báo cáo
+            {focusCounts.ignored > 0 && <span className="text-ink-3"> · {focusCounts.ignored} task đã bỏ qua</span>}
+            {hiddenPicked > 0 && (
+              <span className="text-warn" title="Đã tick nhưng bị bộ lọc nền tảng ẩn — không đưa vào báo cáo">
+                {' '}
+                · {hiddenPicked} task đã chọn đang bị lọc ẩn
+              </span>
+            )}
+            {(qcHidden > 0 || showQc) && (
+              <span className="text-ink-3">
+                {' · '}
+                {showQc ? 'đang hiện cả task QC' : `${qcHidden} task QC đã ẩn`}{' '}
+                <button type="button" onClick={() => setShowQc((v) => !v)} className="underline underline-offset-2 hover:text-ink">
+                  {showQc ? 'ẩn lại' : 'hiện lại'}
+                </button>
+              </span>
+            )}
+          </div>
+
+          {undo && (
+            <div className="flex items-center gap-2 rounded-md bg-surface-2 px-3 py-1.5 text-small text-ink-2">
+              Đã bỏ qua {undo.keys.length === 1 ? (epicMap.has(undo.keys[0]) ? `epic ${undo.keys[0]}` : undo.keys[0]) : `${undo.keys.length} mục`} — xem lại ở “Đã bỏ qua”.
+              <button
+                type="button"
+                onClick={() => {
+                  ignore(undo.keys, null)
+                  pick(undo.repick, true)
+                  setUndo(null)
+                }}
+                className="ml-auto font-semibold text-accent-ink hover:underline"
+              >
+                Hoàn tác
+              </button>
+            </div>
+          )}
+
+          {focusGroups.length === 0 && (
+            <div className="card p-5 text-body text-ink-2">
+              {focus === 'daily'
+                ? dailyMatches.length
+                  ? 'Daily không nhắc tới task nào đang hiện.'
+                  : 'Chưa map daily — dán daily ở bước 2 rồi bấm ✦ AI map daily với task.'
+                : focus === 'new'
+                  ? 'Không có task mới từ lần trước.'
+                  : focus === 'ignored'
+                    ? 'Chưa bỏ qua task nào. Dùng “Bỏ qua…” ở mỗi task hoặc epic để cất những task không thuộc mình hay đã release.'
+                    : focus === 'picked'
+                      ? 'Chưa chọn task nào.'
+                      : 'Không có task nào khớp bộ lọc. Tick thêm tag ở trên để hiện.'}
+            </div>
+          )}
+
+          {focusGroups.map((g) => (
+            <EpicCard
+              key={g.key}
+              {...cardProps(g)}
+              expanded={focusOpen(g.key)}
+              onToggleExpand={() =>
+                setFlipped((prev) => {
+                  const next = new Set(prev)
+                  if (next.has(g.key)) next.delete(g.key)
+                  else next.add(g.key)
+                  return next
+                })
+              }
+              ignore={ignoreControls}
+            />
+          ))}
+        </div>
+        )}
+
+        {/* ── right: the three steps, in the order they are done ── */}
+        {/* Scrolls on its own while pinned, so the last step is never stuck
+            below the fold until the epic list ends. */}
+        <div
+          ref={stepsRef}
+          className="flex min-w-0 scroll-mt-4 flex-col gap-4 xl:sticky xl:top-5 xl:-mx-1 xl:max-h-[calc(100vh-2.5rem)] xl:overflow-y-auto xl:overscroll-contain xl:px-1 xl:pb-1"
+        >
+          <Step n={1} title="PR đã merge" summary={prSummary} tone={prTone} open={!closed.has('prs')} onToggle={() => toggleStep('prs')}>
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <input
+                type="date"
+                value={range.from}
+                max={range.to}
+                onChange={(e) => setRange((r) => ({ ...r, from: e.target.value }))}
+                className="rounded-md border border-line bg-surface px-2 py-1 text-small"
+                aria-label="Từ ngày"
+              />
+              <span className="text-ink-3">→</span>
+              <input
+                type="date"
+                value={range.to}
+                min={range.from}
+                onChange={(e) => setRange((r) => ({ ...r, to: e.target.value }))}
+                className="rounded-md border border-line bg-surface px-2 py-1 text-small"
+                aria-label="Đến ngày"
+              />
+              <button type="button" onClick={loadPrs} disabled={prPending || !canFetchPrs} className={BTN + ' ml-auto'}>
+                {prPending ? <Working>Đang lấy…</Working> : prNote ? 'Lấy lại' : 'Lấy PR'}
+              </button>
+            </div>
+            <p className="text-micro text-ink-3">
+              Tự lấy PR merge vào {config.envs.filter((e) => e.branch).map((e) => e.branch).join(' · ') || '(chưa khai báo nhánh)'} trong{' '}
+              {config.repos.length ? (
+                config.repos.join(', ')
+              ) : (
+                <>
+                  chưa khai báo repo —{' '}
+                  <button type="button" onClick={() => changeTab('config')} className="underline underline-offset-2 hover:text-ink">
+                    mở tab Cấu hình
+                  </button>
+                </>
+              )}
+              . Bỏ tick PR không muốn đưa vào báo cáo.
+            </p>
+            {prNote && !prNote.ok && <div className="mt-2 text-small text-crit">{prNote.message}</div>}
+            {prs.length > 0 && (
+              <div className="-mr-1 mt-2 flex max-h-72 flex-col gap-2.5 overflow-y-auto pr-1">
+                {config.envs
+                  .filter((e) => e.branch)
+                  .map((env) => {
+                    const list = prs.filter((p) => p.base === env.branch)
+                    return (
+                      <div key={env.branch}>
+                        <div className="text-small font-semibold">
+                          {env.label} <span className="font-mono font-normal text-ink-3">({env.branch})</span> · {list.length}
+                        </div>
+                        <ul className="mt-1 flex flex-col gap-1">
+                          {list.map((p) => {
+                            const id = prId(p)
+                            const on = !prOff.has(id)
+                            return (
+                              <li key={id} className="flex items-start gap-2 text-small">
+                                <input
+                                  type="checkbox"
+                                  checked={on}
+                                  onChange={() =>
+                                    setPrOff((prev) => {
+                                      const next = new Set(prev)
+                                      if (on) next.add(id)
+                                      else next.delete(id)
+                                      return next
+                                    })
+                                  }
+                                  className="mt-0.5 size-4 accent-[var(--color-accent)]"
+                                  aria-label={`Đưa PR ${p.number} vào báo cáo`}
+                                />
+                                <span className={'min-w-0 flex-1 ' + (on ? '' : 'text-ink-3 line-through')}>
+                                  <a href={p.url} target="_blank" rel="noreferrer" className="hover:underline">
+                                    {p.title}
+                                  </a>
+                                  <span className="block font-mono text-micro text-ink-3">
+                                    {p.repo}#{p.number} · {p.author}
+                                    {p.keys.length ? ` · ${p.keys.join(', ')}` : ''}
+                                  </span>
+                                </span>
+                              </li>
+                            )
+                          })}
+                        </ul>
+                      </div>
+                    )
+                  })}
+              </div>
+            )}
+            {prNote?.ok && prs.length === 0 && <div className="mt-2 text-small text-ink-3">Không có PR nào merge trong khoảng này.</div>}
+          </Step>
+
+          <Step n={2} title="Daily của team" summary={dailySummary} tone={dailyTone} open={!closed.has('dailies')} onToggle={() => toggleStep('dailies')}>
+            <p className="mb-2 text-micro text-ink-3">
+              Dán nguyên daily “hôm qua làm gì / hôm nay làm gì” của mọi người rồi bấm ✦ AI map — mỗi dòng được gắn với task trên Jira, để bước 3 thêm ghi chú (blocker, đang chờ…) và chỉ ra chỗ daily nói khác Jira.
+            </p>
+            <textarea
+              value={dailies}
+              onChange={(e) => setDailies(e.target.value)}
+              rows={dailies.trim() ? 8 : 4}
+              className="w-full resize-y rounded-lg border border-line bg-ground px-3 py-2 text-small leading-[1.55]"
+              placeholder={'Daily Report 05-10-2026 — Simon\nPrevious day:\n- ...\nToday:\n- ...\n\nDaily Report 05-10-2026 — Wind\n...'}
+              aria-label="Daily report của team"
+            />
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={mapDailiesNow}
+                disabled={mapPending || !props.aiReady || !dailies.trim()}
+                className={BTN_AI}
+                title={props.aiReady ? 'AI đọc từng dòng daily và tìm task/subtask trên Jira mà dòng đó nói tới' : 'Cần Google API key trong Settings'}
+              >
+                {mapPending ? <Working>AI đang map…</Working> : '✦ AI map daily với task'}
+              </button>
+              {mentionedUnpicked.length > 0 && !mapStale && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    pick(mentionedUnpicked, true)
+                    setExpanded((prev) => {
+                      const next = new Set(prev)
+                      for (const k of mentionedUnpicked) {
+                        const i = issueByKey.get(k)
+                        if (i) next.add(i.epicKey && epicMap.has(i.epicKey) ? i.epicKey : NO_EPIC)
+                      }
+                      return next
+                    })
+                  }}
+                  className={BTN}
+                  title={mentionedHidden ? `${mentionedHidden} task đang bị bộ lọc nền tảng ẩn — tick xong vẫn chưa vào báo cáo cho tới khi hiện chúng` : undefined}
+                >
+                  Tick {mentionedUnpicked.length} task daily nhắc tới mà chưa chọn
+                </button>
+              )}
+              {dailies.trim() && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (confirm('Xoá phần daily đã dán?')) setDailies('')
+                  }}
+                  className="ml-auto text-micro text-ink-3 hover:text-crit"
+                >
+                  Xoá daily
+                </button>
+              )}
+            </div>
+            {mapNote && !mapNote.ok && <div className="mt-2 text-small text-crit">{mapNote.message}</div>}
+            {mapStale && (
+              <div className="mt-2 rounded-md bg-warn-soft px-3 py-1.5 text-small text-warn">
+                Daily đã sửa sau lần map trước — bấm map lại để khớp với nội dung mới.
+              </div>
+            )}
+            {dailyMatches.length > 0 && (
+              <details className="mt-2 rounded-md border border-line bg-ground px-3 py-2" open={!mapStale}>
+                <summary className="cursor-pointer text-small text-ink-2">
+                  Khớp {mappedHit}/{dailyMatches.length} dòng
+                  {mappedHit < dailyMatches.length && (
+                    <span className="text-warn"> · {dailyMatches.length - mappedHit} dòng không thấy trên Jira</span>
+                  )}
+                </summary>
+                <ul className="mt-2 flex flex-col gap-1.5">
+                  {[...dailyMatches]
+                    .sort((a, b) => Number(Boolean(a.key)) - Number(Boolean(b.key)))
+                    .map((d, idx) => {
+                      const issue = d.key ? issueByKey.get(d.key) : undefined
+                      return (
+                        <li key={idx} className="text-small">
+                          <span className="text-ink-3">
+                            {[d.person, d.when === 'yesterday' ? 'hôm qua' : d.when === 'today' ? 'hôm nay' : '']
+                              .filter(Boolean)
+                              .join(' · ')}
+                            :
+                          </span>{' '}
+                          <span className="text-ink">{d.line}</span>
+                          <span className="block pl-3 text-micro">
+                            {issue ? (
+                              <>
+                                →{' '}
+                                <a
+                                  href={`${props.jiraBase}/browse/${d.subtaskKey ?? issue.key}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="font-mono text-accent-ink hover:underline"
+                                >
+                                  {d.subtaskKey ?? issue.key}
+                                </a>{' '}
+                                <span className="text-ink-2">{plainTitle(issue.summary)}</span>
+                                {d.subtaskKey && <span className="text-ink-3"> (subtask của {issue.key})</span>}
+                                {picked.has(issue.key) ? (
+                                  <span className="text-good"> · đã chọn</span>
+                                ) : ignoreOf(issue) ? (
+                                  <span className="text-ink-3"> · đã bỏ qua</span>
+                                ) : (
+                                  <span className="text-warn"> · chưa chọn</span>
+                                )}
+                                {d.reason && <span className="text-ink-3"> — {d.reason}</span>}
+                              </>
+                            ) : (
+                              <span className="text-warn">→ không thấy task nào trên Jira{d.reason ? ` — ${d.reason}` : ''}</span>
+                            )}
+                          </span>
+                        </li>
+                      )
+                    })}
+                </ul>
+              </details>
+            )}
+          </Step>
+
+          <section className="card p-4">
             <div className="mb-2.5 flex flex-wrap items-center gap-2">
-              <div className="eyebrow mr-auto text-ink-2">Báo cáo {platform}</div>
+              <StepNum n={3} />
+              <span className="mr-auto text-body font-semibold">Báo cáo {platform}</span>
               <select
                 value={template.id}
                 onChange={(e) => setTemplateId(e.target.value)}
@@ -833,7 +1364,31 @@ export function Workspace(props: {
               </div>
             )}
 
-            <div className="mt-3 flex flex-wrap items-center gap-2">
+            {/* What the AI is about to read — the two steps above, at a glance,
+                so a missing one is noticed before the rewrite, not after. */}
+            <div className="mt-3 text-micro text-ink-3">
+              AI sẽ đọc: {pickedShown} task · {pickedPrs.length} PR ·{' '}
+              {!dailies.trim() ? (
+                'chưa có daily'
+              ) : dailyMapped ? (
+                `daily đã map ${mappedHit}/${dailyMatches.length} dòng`
+              ) : (
+                <span className="text-warn">
+                  daily chưa map
+                  {props.aiReady && !mapPending && (
+                    <>
+                      {' — '}
+                      <button type="button" onClick={mapDailiesNow} className="font-semibold underline underline-offset-2">
+                        map trước
+                      </button>
+                    </>
+                  )}
+                  {mapPending && ' — đang map…'}
+                </span>
+              )}
+            </div>
+
+            <div className="mt-2 flex flex-wrap items-center gap-2">
               <button type="button" onClick={rebuild} className={BTN} title="Dựng lại từ template với lựa chọn hiện tại">
                 Dựng theo template
               </button>
@@ -865,216 +1420,6 @@ export function Workspace(props: {
               </details>
             )}
           </section>
-
-          <section className="card p-4">
-            <div className="mb-1.5 flex flex-wrap items-center gap-2">
-              <div className="eyebrow mr-auto text-ink-2">Daily report của team · hôm nay</div>
-              {dailies.trim() && (
-                <>
-                  <span className="text-micro text-ink-3">{dailies.length.toLocaleString('vi-VN')} ký tự</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (confirm('Xoá phần daily đã dán?')) setDailies('')
-                    }}
-                    className="text-micro text-ink-3 hover:text-crit"
-                  >
-                    Xoá
-                  </button>
-                </>
-              )}
-            </div>
-            <p className="mb-2 text-micro text-ink-3">
-              Dán nguyên daily “hôm qua làm gì / hôm nay làm gì” của mọi người. Bấm ✦ AI soạn báo cáo (dưới ô báo cáo): AI thêm ghi chú (blocker, đang chờ…) và liệt kê chỗ daily nói khác Jira. Số liệu vẫn giữ theo Jira.
-            </p>
-            <textarea
-              value={dailies}
-              onChange={(e) => setDailies(e.target.value)}
-              rows={dailies.trim() ? 8 : 4}
-              className="w-full resize-y rounded-lg border border-line bg-ground px-3 py-2 text-small leading-[1.55]"
-              placeholder={'Daily Report 05-10-2026 — Simon\nPrevious day:\n- ...\nToday:\n- ...\n\nDaily Report 05-10-2026 — Wind\n...'}
-              aria-label="Daily report của team"
-            />
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={mapDailiesNow}
-                disabled={mapPending || !props.aiReady || !dailies.trim()}
-                className={BTN_AI}
-                title={props.aiReady ? 'AI đọc từng dòng daily và tìm task/subtask trên Jira mà dòng đó nói tới' : 'Cần Google API key trong Settings'}
-              >
-                {mapPending ? <Working>AI đang map…</Working> : '✦ AI map daily với task'}
-              </button>
-              {mentionedUnpicked.length > 0 && !mapStale && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    pick(mentionedUnpicked, true)
-                    setExpanded((prev) => {
-                      const next = new Set(prev)
-                      for (const k of mentionedUnpicked) {
-                        const i = issueByKey.get(k)
-                        if (i) next.add(i.epicKey && epicMap.has(i.epicKey) ? i.epicKey : NO_EPIC)
-                      }
-                      return next
-                    })
-                  }}
-                  className={BTN}
-                  title={mentionedHidden ? `${mentionedHidden} task đang bị bộ lọc nền tảng ẩn — tick xong vẫn chưa vào báo cáo cho tới khi hiện chúng` : undefined}
-                >
-                  Tick {mentionedUnpicked.length} task daily nhắc tới mà chưa chọn
-                </button>
-              )}
-              {mapNote && <span className={'text-small ' + (mapNote.ok ? 'text-ink-2' : 'text-crit')}>{mapNote.message}</span>}
-            </div>
-            {mapStale && (
-              <div className="mt-2 rounded-md bg-warn-soft px-3 py-1.5 text-small text-warn">
-                Daily đã sửa sau lần map trước — bấm map lại để khớp với nội dung mới.
-              </div>
-            )}
-            {dailyMatches.length > 0 && (
-              <details className="mt-2 rounded-md border border-line bg-ground px-3 py-2" open={!mapStale}>
-                <summary className="cursor-pointer text-small text-ink-2">
-                  Khớp {dailyMatches.filter((d) => d.key).length}/{dailyMatches.length} dòng
-                  {dailyMatches.some((d) => !d.key) && (
-                    <span className="text-warn"> · {dailyMatches.filter((d) => !d.key).length} dòng không thấy trên Jira</span>
-                  )}
-                </summary>
-                <ul className="mt-2 flex flex-col gap-1.5">
-                  {[...dailyMatches]
-                    .sort((a, b) => Number(Boolean(a.key)) - Number(Boolean(b.key)))
-                    .map((d, idx) => {
-                      const issue = d.key ? issueByKey.get(d.key) : undefined
-                      return (
-                        <li key={idx} className="text-small">
-                          <span className="text-ink-3">
-                            {[d.person, d.when === 'yesterday' ? 'hôm qua' : d.when === 'today' ? 'hôm nay' : '']
-                              .filter(Boolean)
-                              .join(' · ')}
-                            :
-                          </span>{' '}
-                          <span className="text-ink">{d.line}</span>
-                          <span className="block pl-3 text-micro">
-                            {issue ? (
-                              <>
-                                →{' '}
-                                <a
-                                  href={`${props.jiraBase}/browse/${d.subtaskKey ?? issue.key}`}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="font-mono text-accent-ink hover:underline"
-                                >
-                                  {d.subtaskKey ?? issue.key}
-                                </a>{' '}
-                                <span className="text-ink-2">{plainTitle(issue.summary)}</span>
-                                {d.subtaskKey && <span className="text-ink-3"> (subtask của {issue.key})</span>}
-                                <span className={picked.has(issue.key) ? 'text-good' : 'text-warn'}>
-                                  {picked.has(issue.key) ? ' · đã chọn' : ' · chưa chọn'}
-                                </span>
-                                {d.reason && <span className="text-ink-3"> — {d.reason}</span>}
-                              </>
-                            ) : (
-                              <span className="text-warn">→ không thấy task nào trên Jira{d.reason ? ` — ${d.reason}` : ''}</span>
-                            )}
-                          </span>
-                        </li>
-                      )
-                    })}
-                </ul>
-              </details>
-            )}
-          </section>
-
-          <section className="card p-4">
-            <div className="mb-2.5 flex flex-wrap items-center gap-2">
-              <div className="eyebrow mr-auto text-ink-2">Deploy từ GitHub</div>
-              <input
-                type="date"
-                value={range.from}
-                max={range.to}
-                onChange={(e) => setRange((r) => ({ ...r, from: e.target.value }))}
-                className="rounded-md border border-line bg-surface px-2 py-1 text-small"
-                aria-label="Từ ngày"
-              />
-              <span className="text-ink-3">→</span>
-              <input
-                type="date"
-                value={range.to}
-                min={range.from}
-                onChange={(e) => setRange((r) => ({ ...r, to: e.target.value }))}
-                className="rounded-md border border-line bg-surface px-2 py-1 text-small"
-                aria-label="Đến ngày"
-              />
-              <button type="button" onClick={loadPrs} disabled={prPending} className={BTN}>
-                {prPending ? <Working>Đang lấy…</Working> : 'Lấy PR đã merge'}
-              </button>
-            </div>
-            <p className="text-micro text-ink-3">
-              PR merge vào {config.envs.filter((e) => e.branch).map((e) => e.branch).join(' · ') || '(chưa khai báo nhánh)'} trong{' '}
-              {config.repos.length ? (
-                config.repos.join(', ')
-              ) : (
-                <>
-                  chưa khai báo repo —{' '}
-                  <button type="button" onClick={() => changeTab('config')} className="underline underline-offset-2 hover:text-ink">
-                    mở tab Cấu hình
-                  </button>
-                </>
-              )}
-              . Bỏ tick PR không muốn đưa vào báo cáo.
-            </p>
-            {prNote && <div className={'mt-2 text-small ' + (prNote.ok ? 'text-ink-2' : 'text-crit')}>{prNote.message}</div>}
-            {prs.length > 0 && (
-              <div className="mt-2 flex flex-col gap-2.5">
-                {config.envs
-                  .filter((e) => e.branch)
-                  .map((env) => {
-                    const list = prs.filter((p) => p.base === env.branch)
-                    return (
-                      <div key={env.branch}>
-                        <div className="text-small font-semibold">
-                          {env.label} <span className="font-mono font-normal text-ink-3">({env.branch})</span> · {list.length}
-                        </div>
-                        <ul className="mt-1 flex flex-col gap-1">
-                          {list.map((p) => {
-                            const id = prId(p)
-                            const on = !prOff.has(id)
-                            return (
-                              <li key={id} className="flex items-start gap-2 text-small">
-                                <input
-                                  type="checkbox"
-                                  checked={on}
-                                  onChange={() =>
-                                    setPrOff((prev) => {
-                                      const next = new Set(prev)
-                                      if (on) next.add(id)
-                                      else next.delete(id)
-                                      return next
-                                    })
-                                  }
-                                  className="mt-0.5 size-4 accent-[var(--color-accent)]"
-                                  aria-label={`Đưa PR ${p.number} vào báo cáo`}
-                                />
-                                <span className={'min-w-0 flex-1 ' + (on ? '' : 'text-ink-3 line-through')}>
-                                  <a href={p.url} target="_blank" rel="noreferrer" className="hover:underline">
-                                    {p.title}
-                                  </a>
-                                  <span className="block font-mono text-micro text-ink-3">
-                                    {p.repo}#{p.number} · {p.author}
-                                    {p.keys.length ? ` · ${p.keys.join(', ')}` : ''}
-                                  </span>
-                                </span>
-                              </li>
-                            )
-                          })}
-                        </ul>
-                      </div>
-                    )
-                  })}
-              </div>
-            )}
-          </section>
-
         </div>
       </div>
       </div>
@@ -1107,5 +1452,57 @@ export function Workspace(props: {
         <ConfigPanel initial={config} githubReady={props.githubReady} />
       </section>
     </div>
+  )
+}
+
+const STEP_TONE: Record<StepTone, string> = { idle: 'text-ink-3', good: 'text-good', warn: 'text-warn' }
+
+function StepNum({ n, done }: { n: number; done?: boolean }) {
+  return (
+    <span
+      aria-hidden
+      className={
+        'inline-flex size-5 shrink-0 items-center justify-center rounded-full text-micro font-semibold ' +
+        (done ? 'bg-good-soft text-good' : 'bg-accent-soft text-accent-ink')
+      }
+    >
+      {done ? '✓' : n}
+    </span>
+  )
+}
+
+/**
+ * One input step ahead of the report. The header alone says how far the step
+ * got, so a folded step still shows whether it is done.
+ */
+function Step({
+  n,
+  title,
+  summary,
+  tone,
+  open,
+  onToggle,
+  children,
+}: {
+  n: number
+  title: string
+  summary: string
+  tone: StepTone
+  open: boolean
+  onToggle: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <section className="card p-4">
+      <button type="button" onClick={onToggle} aria-expanded={open} className="flex w-full items-center gap-2 text-left">
+        <StepNum n={n} done={tone === 'good'} />
+        <span className="shrink-0 text-body font-semibold">{title}</span>
+        <span className={'ml-auto min-w-0 truncate text-small ' + STEP_TONE[tone]}>{summary}</span>
+        <span aria-hidden className={'shrink-0 text-ink-3 transition-transform ' + (open ? 'rotate-90' : '')}>
+          ›
+        </span>
+      </button>
+      {open && <div className="mt-3">{children}</div>}
+    </section>
   )
 }

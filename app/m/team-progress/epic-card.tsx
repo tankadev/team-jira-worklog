@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from 'react'
 
 import {
   type EpicKind,
+  IGNORE_REASONS,
+  type IgnoreReason,
   PHASES,
   type Phase,
   type ProgressEpic,
@@ -33,6 +35,52 @@ export interface RowInfo {
   isNew: boolean
   /** Daily lines the AI matched to this issue. */
   daily?: DailyMatch[]
+}
+
+/**
+ * The new view's "set aside" controls. The classic view passes none, and the
+ * card then looks and behaves exactly as it always has.
+ */
+export interface IgnoreControls {
+  /** The reason a key (issue or epic) was set aside under, if it was itself. */
+  reasonOf: (key: string) => IgnoreReason | undefined
+  /** Showing the set-aside list: rows offer "restore" instead of a checkbox. */
+  listing: boolean
+  onIgnore: (keys: string[], reason: IgnoreReason | null) => void
+}
+
+const reasonLabel = (r: IgnoreReason) => IGNORE_REASONS.find((x) => x.id === r)?.label ?? r
+
+// Narrow when closed: a select is as wide as its longest reason otherwise, and
+// in the epic header that width comes out of the title.
+function IgnoreSelect({ label, onPick }: { label: string; onPick: (r: IgnoreReason) => void }) {
+  return (
+    <select
+      value=""
+      onChange={(e) => e.target.value && onPick(e.target.value as IgnoreReason)}
+      className="w-[74px] shrink-0 rounded-md border border-line bg-ground px-1 py-0.5 text-micro text-ink-3 hover:border-line-strong hover:text-ink"
+      aria-label={label}
+      title="Cất khỏi danh sách cho tới khi khôi phục — khác bỏ tick, lần sau mở trang không hiện lại"
+    >
+      <option value="">Bỏ qua…</option>
+      {IGNORE_REASONS.map((r) => (
+        <option key={r.id} value={r.id}>
+          {r.label}
+        </option>
+      ))}
+    </select>
+  )
+}
+
+function Restore({ reason, onRestore }: { reason: IgnoreReason; onRestore: () => void }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className="badge bg-surface-2 text-ink-3">{reasonLabel(reason)}</span>
+      <button type="button" onClick={onRestore} className="text-micro font-medium text-accent-ink hover:underline">
+        Khôi phục
+      </button>
+    </span>
+  )
 }
 
 const KIND_LABEL: Record<EpicKind, string> = {
@@ -107,6 +155,7 @@ export function EpicCard({
   onPhase,
   onNote,
   onName,
+  ignore,
 }: {
   group: EpicGroup
   picked: Set<string>
@@ -124,6 +173,7 @@ export function EpicCard({
   onPhase: (key: string, phase: Phase | null) => void
   onNote: (note: string) => void
   onName: (name: string) => void
+  ignore?: IgnoreControls
 }) {
   const [editingName, setEditingName] = useState(false)
   const keys = group.issues.map((i) => i.key)
@@ -134,11 +184,12 @@ export function EpicCard({
   const bugs = bugStats(chosen.filter((i) => phaseOf(i) === 'bug'))
   const fullName = group.epic ? epicName(group.epic.summary) : 'Chưa có epic'
   const dailyLines = group.issues.flatMap((i) => info(i).daily ?? [])
+  const epicReason = ignore && group.epic ? ignore.reasonOf(group.key) : undefined
 
   return (
     <section className={'card overflow-hidden ' + (chosen.length ? '' : 'opacity-[0.92]')}>
       <header className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-3">
-        <Check state={state} onChange={(on) => onPick(keys, on)} label={`Chọn cả epic ${fullName}`} />
+        {!ignore?.listing && <Check state={state} onChange={(on) => onPick(keys, on)} label={`Chọn cả epic ${fullName}`} />}
         <button
           type="button"
           onClick={onToggleExpand}
@@ -191,6 +242,13 @@ export function EpicCard({
           )}
           {!group.relevant && chosen.length === 0 && (
             <span className="badge bg-surface-2 text-ink-3">không có tag nền tảng này</span>
+          )}
+          {ignore && group.epic && (
+            epicReason ? (
+              <Restore reason={epicReason} onRestore={() => ignore.onIgnore([group.key], null)} />
+            ) : (
+              !ignore.listing && <IgnoreSelect label={`Bỏ qua cả epic ${fullName}`} onPick={(r) => ignore.onIgnore([group.key], r)} />
+            )
           )}
         </div>
       </header>
@@ -247,6 +305,8 @@ export function EpicCard({
               showSprintFlag={showSprintFlag}
               onPick={(on) => onPick([i.key], on)}
               onPhase={(p) => onPhase(i.key, p)}
+              ignore={ignore}
+              epicIgnored={Boolean(epicReason)}
             />
           ))}
         </ul>
@@ -265,6 +325,8 @@ function TaskRow({
   showSprintFlag,
   onPick,
   onPhase,
+  ignore,
+  epicIgnored,
 }: {
   issue: ProgressIssue
   picked: boolean
@@ -275,15 +337,22 @@ function TaskRow({
   showSprintFlag: boolean
   onPick: (on: boolean) => void
   onPhase: (p: Phase | null) => void
+  ignore?: IgnoreControls
+  epicIgnored?: boolean
 }) {
   const p = taskProgress(issue)
+  const ownReason = ignore?.reasonOf(issue.key)
   const isBug = phase === 'bug'
   // Two lines: what it is and how far along on the first, the details that
   // explain it on the second — one line squeezed the title to a few words.
   return (
     <li className={'grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 px-4 py-2 ' + (picked ? '' : 'text-ink-3')}>
       <span className="pt-0.5">
-        <Check state={picked} onChange={onPick} label={`Chọn ${issue.key}`} />
+        {ignore?.listing ? (
+          <span aria-hidden className="block size-4" />
+        ) : (
+          <Check state={picked} onChange={onPick} label={`Chọn ${issue.key}`} />
+        )}
       </span>
       <div className="min-w-0">
         <div className="flex items-center gap-2.5">
@@ -357,6 +426,17 @@ function TaskRow({
           {showSprintFlag && !issue.inSprint && (
             <span className="badge bg-surface-2 text-ink-3" title={issue.sprints.length ? issue.sprints.join(', ') : 'Chưa vào sprint nào'}>
               {issue.sprints.length ? 'sprint khác' : 'backlog'}
+            </span>
+          )}
+          {ignore && (
+            <span className="ml-auto">
+              {ownReason ? (
+                <Restore reason={ownReason} onRestore={() => ignore.onIgnore([issue.key], null)} />
+              ) : epicIgnored ? (
+                <span className="text-ink-3">bỏ qua theo epic</span>
+              ) : (
+                <IgnoreSelect label={`Bỏ qua ${issue.key}`} onPick={(r) => ignore.onIgnore([issue.key], r)} />
+              )}
             </span>
           )}
         </div>

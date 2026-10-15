@@ -370,9 +370,22 @@ export interface Selection {
   notes: Record<string, string>
   /** Per-epic display name, shorter than the Jira summary. */
   names: Record<string, string>
+  /**
+   * Issues and whole epics set aside for good — someone else's, or already
+   * released. Unlike an unticked box, which only means "not this time".
+   */
+  ignored: Record<string, IgnoreReason>
 }
 
-export const EMPTY_SELECTION: Selection = { selected: [], seen: [], phases: {}, notes: {}, names: {} }
+export type IgnoreReason = 'not-mine' | 'released' | 'other'
+
+export const IGNORE_REASONS: Array<{ id: IgnoreReason; label: string }> = [
+  { id: 'not-mine', label: 'Không thuộc mình' },
+  { id: 'released', label: 'Đã release' },
+  { id: 'other', label: 'Lý do khác' },
+]
+
+export const EMPTY_SELECTION: Selection = { selected: [], seen: [], phases: {}, notes: {}, names: {}, ignored: {} }
 
 /**
  * The platforms an issue belongs to: its own tags, else its epic's. A

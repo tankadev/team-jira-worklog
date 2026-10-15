@@ -10,9 +10,11 @@ import {
   DEFAULT_PLATFORMS,
   DEFAULT_TEMPLATE,
   EMPTY_SELECTION,
+  IGNORE_REASONS,
   PHASES,
   type DailyMatch,
   type DeployEnv,
+  type IgnoreReason,
   type Phase,
   type PlatformAlias,
   type Selection,
@@ -138,6 +140,7 @@ export function saveTemplates(list: ProgressTemplate[]) {
 
 export function getSelection(platform: string): Selection {
   const phaseIds = new Set(PHASES.map((p) => p.id))
+  const reasonIds = new Set(IGNORE_REASONS.map((r) => r.id))
   return readJson(`selection:${slot(platform)}`, EMPTY_SELECTION, (v) => {
     const o = (v ?? {}) as Record<string, unknown>
     return {
@@ -148,6 +151,9 @@ export function getSelection(platform: string): Selection {
       ) as Record<string, Phase>,
       notes: record(o.notes),
       names: record(o.names),
+      ignored: Object.fromEntries(
+        Object.entries(record(o.ignored)).filter(([, r]) => reasonIds.has(r as IgnoreReason)),
+      ) as Record<string, IgnoreReason>,
     }
   })
 }
