@@ -8,17 +8,23 @@ import {
   type DailyMatch,
   type DeployPr,
   type EpicKind,
+  IGNORE_REASONS,
   type IgnoreReason,
   NO_EPIC,
   type Phase,
   type ProgressIssue,
+  type ReportedMatch,
   type Selection,
   buildReportData,
   epicKind,
+  epicName,
+  initialPicks,
   issuePlatforms,
   lostMarks,
   plainTitle,
   phaseOf as guessPhase,
+  reportedTargets,
+  sprintScope,
   supersededKeys,
   taskProgress,
   unbackedFigures,
@@ -26,6 +32,8 @@ import {
 import type {
   DailiesPaste,
   DailyMap,
+  OthersMap,
+  OthersPaste,
   ProgressTemplate,
   ReportDraft,
   SentReport,
@@ -38,11 +46,13 @@ import { Icon } from '../../icons'
 import { Working } from '../../spinner'
 import {
   aiMapDailiesAction,
+  aiMapOthersAction,
   aiPolishAction,
   fetchPrsAction,
   recordSentAction,
   saveDailiesAction,
   saveDraftAction,
+  saveOthersAction,
   saveSelectionAction,
   setPlatformAction,
 } from './actions'
@@ -66,7 +76,7 @@ const UNKNOWN = '?'
 const filterKey = (platform: string) => `team-progress:filter:${platform}`
 const prId = (p: DeployPr) => `${p.repo}#${p.number}@${p.base}`
 /** The foldable steps — the report itself always stays open. */
-type StepId = 'prs' | 'dailies'
+type StepId = 'prs' | 'dailies' | 'others'
 type StepTone = 'idle' | 'good' | 'warn'
 const STEPS_KEY = 'team-progress:closed-steps'
 
@@ -100,6 +110,8 @@ export function Workspace(props: {
   draft: ReportDraft | null
   dailies: DailiesPaste | null
   dailyMap: DailyMap | null
+  others: OthersPaste | null
+  othersMap: OthersMap | null
   lastSent: SentReport | null
   githubReady: boolean
   aiReady: boolean
@@ -113,25 +125,18 @@ export function Workspace(props: {
 
   /* ── what is picked ─────────────────────────────────────────────────── */
 
-  const seen0 = useMemo(() => new Set(props.selection.seen), [props.selection])
+  // Unseen since last time, or moved to another epic since it was decided.
+  const start = useMemo(
+    () => initialPicks(data.issues, epicMap, props.selection, platform, config.platforms),
+    // Only what the page opened with: later ticks must not re-run the rule.
+    [data, props.selection],
+  )
   // On the very first visit everything is unseen; calling all of it "new"
   // would be noise, so the badge only starts meaning something from day two.
   const firstRun = props.selection.seen.length === 0
+  const isFresh = (i: ProgressIssue) => !firstRun && start.fresh.has(i.key)
 
-  const [picked, setPicked] = useState<Set<string>>(() => {
-    const chosen = new Set(props.selection.selected)
-    const out = new Set<string>()
-    for (const i of data.issues) {
-      if (seen0.has(i.key)) {
-        if (chosen.has(i.key)) out.add(i.key)
-        continue
-      }
-      // A new task under an epic set aside stays out, like the epic.
-      if (props.selection.ignored[i.epicKey ?? '']) continue
-      if (issuePlatforms(i, epicMap.get(i.epicKey ?? ''), config.platforms).includes(platform)) out.add(i.key)
-    }
-    return out
-  })
+  const [picked, setPicked] = useState<Set<string>>(() => start.picked)
   const [phases, setPhases] = useState(props.selection.phases)
   const [notes, setNotes] = useState(props.selection.notes)
   const [names, setNames] = useState(props.selection.names)
@@ -152,6 +157,13 @@ export function Workspace(props: {
       // Decisions about issues outside this sprint's view are kept, not lost.
       const keepSelected = props.selection.selected.filter((k) => !here.has(k))
       const seen = [...new Set([...props.selection.seen, ...here])].slice(-4000)
+      const kept = new Set(seen)
+      const placed = Object.fromEntries(
+        [
+          ...Object.entries(props.selection.placed),
+          ...data.issues.map((i) => [i.key, i.epicKey ?? ''] as const),
+        ].filter(([k]) => kept.has(k)),
+      )
       void saveSelectionAction(platform, {
         selected: [...keepSelected, ...picked].slice(-4000),
         seen,
@@ -159,6 +171,7 @@ export function Workspace(props: {
         notes,
         names,
         ignored,
+        placed,
       })
     }, 600)
     return () => clearTimeout(t)
@@ -226,10 +239,10 @@ export function Workspace(props: {
    */
   const [showQc, setShowQc] = useState(false)
   const isQc = (i: ProgressIssue) => guessPhase(i) === 'test'
-  const inScope = useMemo(
-    () => data.issues.filter((i) => !superseded.has(i.key) && (scope === 'all' || i.inSprint)),
-    [data, superseded, scope],
-  )
+  const inScope = useMemo(() => {
+    const live = data.issues.filter((i) => !superseded.has(i.key))
+    return scope === 'all' ? live : sprintScope(live)
+  }, [data, superseded, scope])
   const visible = useMemo(() => (showQc ? inScope : inScope.filter((i) => !isQc(i))), [inScope, showQc])
   const qcHidden = showQc ? 0 : inScope.length - visible.length
 
@@ -323,7 +336,6 @@ export function Workspace(props: {
     name: names[g.key] ?? '',
     expanded: expanded.has(g.key),
     jiraBase: props.jiraBase,
-    showSprintFlag: scope === 'all',
     onToggleExpand: () =>
       setExpanded((prev) => {
         const next = new Set(prev)
@@ -353,10 +365,10 @@ export function Workspace(props: {
 
   const rowInfo = (i: ProgressIssue): RowInfo => ({
     platforms: platformsOf(i),
-    isNew: !firstRun && !seen0.has(i.key),
+    isNew: isFresh(i),
     daily: matchesByKey.get(i.key),
   })
-  const newCount = firstRun ? 0 : shownIssues.filter((i) => !seen0.has(i.key)).length
+  const newCount = shownIssues.filter(isFresh).length
   /** Ticked, but hidden by the filter — and so left out of the report. */
   const hiddenPicked = visible.filter((i) => picked.has(i.key) && !shownIssues.includes(i)).length
 
@@ -408,7 +420,7 @@ export function Workspace(props: {
         sprintName: props.sprintName,
         epics: groups.map((g) => g.epic).filter((e): e is NonNullable<typeof e> => Boolean(e)),
         issues: shownIssues.filter((i) => picked.has(i.key)),
-        selection: { selected: [], seen: [], phases, notes, names, ignored },
+        selection: { selected: [], seen: [], phases, notes, names, ignored, placed: {} },
         platforms: config.platforms,
         envs: config.envs,
         prs: prs.filter((p) => !prOff.has(prId(p))),
@@ -575,7 +587,7 @@ export function Workspace(props: {
     if (ignoreOf(i)) return false
     if (f === 'picked') return picked.has(i.key)
     if (f === 'daily') return matchesByKey.has(i.key)
-    if (f === 'new') return !firstRun && !seen0.has(i.key)
+    if (f === 'new') return isFresh(i)
     return true
   }
   const focusCounts = Object.fromEntries(
@@ -619,6 +631,70 @@ export function Workspace(props: {
     listing: focus === 'ignored',
     onIgnore: ignoreFromList,
   }
+
+  /* ── someone else's report ──────────────────────────────────────────── */
+
+  // Another lead's report for today, pasted so what it already covers can be
+  // set aside here instead of reported twice. Only today's paste is shown back.
+  const [others, setOthers] = useState(props.others?.date === today ? props.others.text : '')
+  const othersLoaded = useRef(true)
+  useEffect(() => {
+    if (othersLoaded.current) {
+      othersLoaded.current = false
+      return
+    }
+    const t = setTimeout(() => void saveOthersAction(platform, today, others), 700)
+    return () => clearTimeout(t)
+  }, [others, platform, today])
+
+  // Which line is about which epic or task — only while the paste is the one
+  // it was made from, like the daily map.
+  const savedOthers = props.othersMap && props.othersMap.date === today ? props.othersMap : null
+  const [othersMatches, setOthersMatches] = useState<ReportedMatch[]>(savedOthers?.matches ?? [])
+  const [othersFrom, setOthersFrom] = useState(savedOthers?.source ?? '')
+  const othersStale = othersMatches.length > 0 && othersFrom !== others
+  const [othersNote, setOthersNote] = useState<Note>(null)
+  const [othersPending, startOthers] = useTransition()
+  /** Matched lines the user unticked: left in the report after all. */
+  const [othersOff, setOthersOff] = useState<Set<number>>(new Set())
+
+  function mapOthersNow() {
+    // Every epic and every live task on the board: another platform's report
+    // can name a feature this one has not ticked or even filtered in.
+    const candidates = [
+      ...data.epics.map((e) => ({ key: e.key, kind: 'epic' as const, title: e.summary, status: e.statusName })),
+      ...data.issues
+        .filter((i) => !superseded.has(i.key) && (showQc || !isQc(i)))
+        .map((i) => ({
+          key: i.key,
+          kind: 'issue' as const,
+          title: i.summary,
+          epic: epicMap.get(i.epicKey ?? '')?.summary,
+          status: i.statusName,
+        })),
+    ]
+    const source = others
+    startOthers(async () => {
+      const res = await aiMapOthersAction({ platform, date: today, report: source, candidates })
+      setOthersNote(res)
+      if (res.ok && res.data) {
+        setOthersMatches(res.data)
+        setOthersFrom(source)
+        setOthersOff(new Set())
+      }
+    })
+  }
+
+  /** What one click sets aside: the ticked matches, as whole epics and single tasks. */
+  const othersTargets = useMemo(
+    () => reportedTargets(othersStale ? [] : othersMatches.filter((_, idx) => !othersOff.has(idx)), data.issues, ignored),
+    [othersMatches, othersStale, othersOff, data.issues, ignored],
+  )
+  const othersPendingCount = othersTargets.epics.length + othersTargets.issues.length
+  function setAsideReported() {
+    ignoreFromList([...othersTargets.epics, ...othersTargets.issues], 'reported')
+  }
+  const reasonLabel = (r: IgnoreReason) => IGNORE_REASONS.find((x) => x.id === r)?.label ?? r
 
   /* ── the steps' headers ─────────────────────────────────────────────── */
 
@@ -667,27 +743,44 @@ export function Workspace(props: {
           : 'đã dán · chưa map'
   const dailyTone: StepTone = !dailies.trim() || mapPending ? 'idle' : dailyMapped ? 'good' : 'warn'
 
+  const othersHit = othersMatches.filter((m) => m.key).length
+  const othersMapped = othersMatches.length > 0 && !othersStale
+  const othersSummary = !others.trim()
+    ? 'chưa dán — tuỳ chọn'
+    : othersPending
+      ? 'AI đang đối chiếu…'
+      : othersStale
+        ? 'đã sửa — cần đối chiếu lại'
+        : othersMapped
+          ? othersPendingCount
+            ? `${othersHit} dòng trùng · ${othersPendingCount} mục chờ bỏ qua`
+            : `${othersHit} dòng trùng · đã bỏ qua hết`
+          : 'đã dán · chưa đối chiếu'
+  const othersTone: StepTone = !others.trim() || othersPending ? 'idle' : othersMapped && !othersPendingCount ? 'good' : 'warn'
+
   // Below the two-column width the steps sit under the whole epic list;
   // "Soạn báo cáo ↓" above the list jumps down to the first one.
   const stepsRef = useRef<HTMLDivElement>(null)
 
   function polish() {
+    // A second rewrite starts again from the template's output as it is now —
+    // not the one the last rewrite was made from, which still carries the
+    // ticks and figures of that moment — rather than compounding the first
+    // one's liberties. Hand edits are kept.
+    const fromTemplate = (follow || source === 'ai') && !rendered.error
     startAi(async () => {
       const res = await aiPolishAction({
         platform,
         date: today,
-        // A second rewrite starts again from the template's output rather than
-        // compounding the first one's liberties; hand edits are kept.
-        draft: source === 'ai' ? baseline : text,
+        draft: fromTemplate ? rendered.text : text,
         prTitles: pickedPrs.map((p) => ({ env: props.config.envs.find((e) => e.branch === p.base)?.label ?? p.base, title: p.title })),
         dailies,
         dailyMap: dailyMapLines,
       })
       setAiNote(res)
       if (res.ok && res.data) {
-        // The figures are checked against what the template produced, so the
-        // baseline stays as it is when the text was still the template's.
-        if (follow) setBaseline(rendered.text)
+        // The figures are checked against what the rewrite was made from.
+        if (fromTemplate) setBaseline(rendered.text)
         setFollow(false)
         setText(res.data.text)
         setSource('ai')
@@ -781,7 +874,7 @@ export function Workspace(props: {
                 key={id}
                 type="button"
                 onClick={() => changeScope(id)}
-                title={id === 'all' ? 'Mọi task của epic, cả sprint trước và backlog' : 'Chỉ task nằm trong sprint đang chọn'}
+                title={id === 'all' ? 'Mọi task của epic, cả sprint trước và backlog' : 'Task trong sprint đang chọn, kèm task cùng epic đã có người nhận nhưng chưa vào sprint'}
                 className={
                   'rounded-md px-2.5 py-1 text-small ' +
                   (scope === id ? 'bg-accent-soft font-semibold text-accent-ink' : 'text-ink-2 hover:text-ink')
@@ -1170,7 +1263,7 @@ export function Workspace(props: {
 
           <Step n={2} title="Daily của team" summary={dailySummary} tone={dailyTone} open={!closed.has('dailies')} onToggle={() => toggleStep('dailies')}>
             <p className="mb-2 text-micro text-ink-3">
-              Dán nguyên daily “hôm qua làm gì / hôm nay làm gì” của mọi người rồi bấm ✦ AI map — mỗi dòng được gắn với task trên Jira, để bước 3 thêm ghi chú (blocker, đang chờ…) và chỉ ra chỗ daily nói khác Jira.
+              Dán nguyên daily “hôm qua làm gì / hôm nay làm gì” của mọi người rồi bấm ✦ AI map — mỗi dòng được gắn với task trên Jira, để bước 4 thêm ghi chú (blocker, đang chờ…) và chỉ ra chỗ daily nói khác Jira.
             </p>
             <textarea
               value={dailies}
@@ -1285,9 +1378,139 @@ export function Workspace(props: {
             )}
           </Step>
 
+          <Step n={3} title="Report của người khác" summary={othersSummary} tone={othersTone} open={!closed.has('others')} onToggle={() => toggleStep('others')}>
+            <p className="mb-2 text-micro text-ink-3">
+              Có người đã report một phần việc rồi (nền tảng khác, hay cùng tính năng)? Dán báo cáo của họ, bấm ✦ AI đối chiếu — những epic/task trùng hiện ra bên dưới, bấm một nút để bỏ qua, không đưa vào báo cáo của mình nữa.
+            </p>
+            <textarea
+              value={others}
+              onChange={(e) => setOthers(e.target.value)}
+              rows={others.trim() ? 8 : 4}
+              className="w-full resize-y rounded-lg border border-line bg-ground px-3 py-2 text-small leading-[1.55]"
+              placeholder={'iOS - 05/10/2026\n\n- Unread Counter (Deploy Staging)\n + Implement: 88%\n + Fix: 1/2\n\n- Improvements W39/2026\n + iOS: 3 (2 bug · 1 improve)'}
+              aria-label="Báo cáo của người khác"
+            />
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={mapOthersNow}
+                disabled={othersPending || !props.aiReady || !others.trim()}
+                className={BTN_AI}
+                title={props.aiReady ? 'AI đọc từng dòng báo cáo và tìm epic/task trên board mà dòng đó nói tới' : 'Cần Google API key trong Settings'}
+              >
+                {othersPending ? <Working>AI đang đối chiếu…</Working> : '✦ AI đối chiếu với epic/task'}
+              </button>
+              {othersPendingCount > 0 && (
+                <button
+                  type="button"
+                  onClick={setAsideReported}
+                  className={BTN_PRI}
+                  title={`Cất ${othersTargets.epics.length} epic và ${othersTargets.issues.length} task với lý do “Người khác đã report” — khôi phục ở lọc “Đã bỏ qua” (giao diện mới)`}
+                >
+                  Bỏ qua {othersPendingCount} mục đã được report
+                </button>
+              )}
+              {others.trim() && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (confirm('Xoá báo cáo đã dán?')) setOthers('')
+                  }}
+                  className="ml-auto text-micro text-ink-3 hover:text-crit"
+                >
+                  Xoá
+                </button>
+              )}
+            </div>
+            {othersNote && !othersNote.ok && <div className="mt-2 text-small text-crit">{othersNote.message}</div>}
+            {othersStale && (
+              <div className="mt-2 rounded-md bg-warn-soft px-3 py-1.5 text-small text-warn">
+                Báo cáo đã sửa sau lần đối chiếu trước — bấm đối chiếu lại để khớp với nội dung mới.
+              </div>
+            )}
+            {othersMatches.length > 0 && (
+              <div className="mt-2 rounded-md border border-line bg-ground px-3 py-2">
+                <div className="text-small text-ink-2">
+                  {othersHit}/{othersMatches.length} dòng trùng với board này
+                  {othersHit < othersMatches.length && <span className="text-ink-3"> · {othersMatches.length - othersHit} dòng không thuộc mình</span>}
+                </div>
+                <ul className="mt-2 flex flex-col gap-1.5">
+                  {othersMatches.map((m, idx) => {
+                    const epic = m.kind === 'epic' && m.key ? epicMap.get(m.key) : undefined
+                    const issue = m.kind === 'issue' && m.key ? issueByKey.get(m.key) : undefined
+                    const key = epic?.key ?? issue?.key
+                    const already = epic ? ignored[epic.key] : issue ? ignoreOf(issue) : undefined
+                    // Counted over what is on screen: that is what the report is built from.
+                    const pickedUnder = epic
+                      ? shownIssues.filter((i) => i.epicKey === epic.key && picked.has(i.key)).length
+                      : issue && picked.has(issue.key)
+                        ? 1
+                        : 0
+                    const on = !othersOff.has(idx)
+                    return (
+                      <li key={idx} className="flex items-start gap-2 text-small">
+                        {key && !already && !othersStale ? (
+                          <input
+                            type="checkbox"
+                            checked={on}
+                            onChange={() =>
+                              setOthersOff((prev) => {
+                                const next = new Set(prev)
+                                if (on) next.add(idx)
+                                else next.delete(idx)
+                                return next
+                              })
+                            }
+                            className="mt-0.5 size-4 accent-[var(--color-accent)]"
+                            aria-label={`Bỏ qua ${key}`}
+                          />
+                        ) : (
+                          <span aria-hidden className="mt-0.5 block size-4 shrink-0" />
+                        )}
+                        <span className="min-w-0 flex-1">
+                          <span className={key && on && !already ? 'text-ink' : 'text-ink-3'}>{m.line}</span>
+                          <span className="block text-micro">
+                            {key ? (
+                              <>
+                                →{' '}
+                                <a href={`${props.jiraBase}/browse/${key}`} target="_blank" rel="noreferrer" className="font-mono text-accent-ink hover:underline">
+                                  {key}
+                                </a>{' '}
+                                <span className="text-ink-2">{epic ? epicName(epic.summary) : plainTitle(issue!.summary)}</span>
+                                <span className="text-ink-3">{epic ? ' · cả epic' : ' · một task'}</span>
+                                {already ? (
+                                  <>
+                                    <span className="text-ink-3"> · đã bỏ qua ({reasonLabel(already)})</span>
+                                    {ignored[key] && (
+                                      <>
+                                        {' '}
+                                        <button type="button" onClick={() => ignore([key], null)} className="font-medium text-accent-ink hover:underline">
+                                          Khôi phục
+                                        </button>
+                                      </>
+                                    )}
+                                  </>
+                                ) : pickedUnder > 0 ? (
+                                  <span className="text-warn"> · đang chọn{epic ? ` ${pickedUnder} task` : ''}</span>
+                                ) : null}
+                                {m.reason && <span className="text-ink-3"> — {m.reason}</span>}
+                              </>
+                            ) : (
+                              <span className="text-ink-3">→ không thấy trên board này{m.reason ? ` — ${m.reason}` : ''}</span>
+                            )}
+                          </span>
+                        </span>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </div>
+            )}
+          </Step>
+
           <section className="card p-4">
             <div className="mb-2.5 flex flex-wrap items-center gap-2">
-              <StepNum n={3} />
+              <StepNum n={4} />
               <span className="mr-auto text-body font-semibold">Báo cáo {platform}</span>
               <select
                 value={template.id}
@@ -1384,6 +1607,12 @@ export function Workspace(props: {
                     </>
                   )}
                   {mapPending && ' — đang map…'}
+                </span>
+              )}
+              {othersPendingCount > 0 && (
+                <span className="text-warn">
+                  {' · '}
+                  {othersPendingCount} mục người khác đã report chưa bỏ qua
                 </span>
               )}
             </div>

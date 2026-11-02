@@ -17,6 +17,7 @@ import {
   type IgnoreReason,
   type Phase,
   type PlatformAlias,
+  type ReportedMatch,
   type Selection,
 } from './model'
 
@@ -154,6 +155,7 @@ export function getSelection(platform: string): Selection {
       ignored: Object.fromEntries(
         Object.entries(record(o.ignored)).filter(([, r]) => reasonIds.has(r as IgnoreReason)),
       ) as Record<string, IgnoreReason>,
+      placed: record(o.placed),
     }
   })
 }
@@ -262,6 +264,55 @@ export function getDailyMap(platform: string): DailyMap | null {
 
 export function saveDailyMap(platform: string, m: DailyMap) {
   setRaw(`daily-map:${slot(platform)}`, JSON.stringify(m))
+}
+
+/**
+ * Someone else's progress report for the day, pasted in so what it already
+ * covers can be set aside here. Per day, like the dailies: tomorrow their
+ * report will be a different one.
+ */
+export interface OthersPaste {
+  date: string
+  text: string
+}
+
+export function getOthers(platform: string): OthersPaste | null {
+  return readJson(`others:${slot(platform)}`, null as OthersPaste | null, (v) => {
+    const o = (v ?? {}) as Record<string, unknown>
+    return typeof o.text === 'string' ? { date: String(o.date ?? ''), text: o.text } : null
+  })
+}
+
+export function saveOthers(platform: string, d: OthersPaste) {
+  setRaw(`others:${slot(platform)}`, JSON.stringify(d))
+}
+
+/** The AI's matching of that report's lines to epics and issues here; tied to its text like the daily map. */
+export interface OthersMap {
+  date: string
+  source: string
+  matches: ReportedMatch[]
+}
+
+export function getOthersMap(platform: string): OthersMap | null {
+  return readJson(`others-map:${slot(platform)}`, null as OthersMap | null, (v) => {
+    const o = (v ?? {}) as Record<string, unknown>
+    if (!Array.isArray(o.matches)) return null
+    return {
+      date: String(o.date ?? ''),
+      source: String(o.source ?? ''),
+      matches: (o.matches as Array<Record<string, unknown>>).map((m) => ({
+        line: String(m.line ?? ''),
+        key: typeof m.key === 'string' ? m.key : null,
+        kind: m.kind === 'epic' || m.kind === 'issue' ? m.kind : null,
+        reason: String(m.reason ?? ''),
+      })),
+    }
+  })
+}
+
+export function saveOthersMap(platform: string, m: OthersMap) {
+  setRaw(`others-map:${slot(platform)}`, JSON.stringify(m))
 }
 
 export function getLastPlatform(): string | null {

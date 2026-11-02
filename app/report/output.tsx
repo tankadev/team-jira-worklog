@@ -1,7 +1,7 @@
 'use client'
 
 import { useSearchParams } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 import { type ReportIssue, renderReport } from '@/lib/report'
 import { statusStyle } from '@/lib/status-style'
@@ -22,6 +22,16 @@ interface Picks {
   skip: string[]
   today: string[]
   off: boolean
+}
+
+/**
+ * The report text once the user has typed into it, with the generated text it
+ * started from. Absent while the box still follows the ticks.
+ */
+interface Edit {
+  text: string
+  /** The generated report at the moment editing began — what `stale` compares against. */
+  baseline: string
 }
 
 /**
@@ -102,6 +112,29 @@ export function ReportOutput({
     }
   }, [storageKey])
 
+  // The box follows the ticks until the first keystroke; from then on the
+  // user's text is kept, per report day, so a reload does not lose it.
+  const editKey = `report-text:${date}`
+  const [edit, setEdit] = useState<Edit | null>(null)
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(editKey)
+      setEdit(saved ? (JSON.parse(saved) as Edit) : null)
+    } catch {
+      setEdit(null)
+    }
+  }, [editKey])
+
+  function saveEdit(next: Edit | null) {
+    setEdit(next)
+    try {
+      if (next) localStorage.setItem(editKey, JSON.stringify(next))
+      else localStorage.removeItem(editKey)
+    } catch {
+      // Not remembered across reloads, but the edit still stands on screen.
+    }
+  }
+
   function update(next: Picks) {
     setPicks(next)
     try {
@@ -128,6 +161,27 @@ export function ReportOutput({
     showKey,
     todayIssues: selectedToday.map((t) => ({ key: t.key, summary: t.summary, seconds: 0 })),
   })
+
+  const shown = edit?.text ?? body
+  // Ticks, template or the key toggle moved on since editing began: the edited
+  // text no longer says what the picks say, and silently keeping it would be
+  // copying a report that misses the task just ticked.
+  const stale = edit !== null && edit.baseline !== body
+
+  // Grown to fit after every change, so the whole report reads at once the way
+  // the read-only block did. A line count is not enough: long task titles wrap.
+  const box = useRef<HTMLTextAreaElement>(null)
+  useLayoutEffect(() => {
+    const el = box.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${el.scrollHeight + 2}px`
+  }, [shown])
+
+  function rebuild() {
+    if (edit && edit.text !== edit.baseline && !confirm('Dựng lại sẽ thay bản đang sửa bằng bản tự động. Tiếp tục?')) return
+    saveEdit(null)
+  }
 
   function pickTemplate(id: string) {
     const q = new URLSearchParams(params.toString())
@@ -159,19 +213,13 @@ export function ReportOutput({
 
   async function copy() {
     try {
-      await navigator.clipboard.writeText(body)
+      await navigator.clipboard.writeText(shown)
       setCopied(true)
       setTimeout(() => setCopied(false), 1800)
     } catch {
       // Clipboard needs a secure context; selecting the text is the fallback.
-      const pre = document.getElementById('report-body')
-      if (pre) {
-        const range = document.createRange()
-        range.selectNodeContents(pre)
-        const sel = window.getSelection()
-        sel?.removeAllRanges()
-        sel?.addRange(range)
-      }
+      const box = document.getElementById('report-body') as HTMLTextAreaElement | null
+      box?.select()
     }
   }
 
@@ -283,12 +331,50 @@ export function ReportOutput({
           </PickGroup>
         </div>
 
-        <pre
-          id="report-body"
-          className="whitespace-pre-wrap break-words rounded-xl border border-line bg-ground px-4 py-3.5 font-mono text-small leading-[1.75] xl:sticky xl:top-5"
-        >
-          {body}
-        </pre>
+        <div className="flex flex-col gap-2 xl:sticky xl:top-5">
+          <div className="flex items-center gap-2">
+            <span
+              className={'badge ' + (edit ? 'bg-warn-soft text-warn' : 'bg-good-soft text-good')}
+              title={
+                edit
+                  ? 'Đã sửa — tick thêm task sẽ không tự đổi nội dung này'
+                  : 'Nội dung tự cập nhật khi bạn tick task; gõ vào để sửa'
+              }
+            >
+              {edit ? 'đã sửa tay' : 'tự cập nhật'}
+            </span>
+            {edit && (
+              <button
+                type="button"
+                onClick={rebuild}
+                className="text-small font-medium text-accent-ink hover:underline"
+              >
+                Dựng lại
+              </button>
+            )}
+          </div>
+
+          <textarea
+            id="report-body"
+            ref={box}
+            value={shown}
+            onChange={(e) => saveEdit({ text: e.target.value, baseline: edit?.baseline ?? body })}
+            rows={8}
+            spellCheck={false}
+            aria-label="Nội dung report"
+            className="w-full resize-none overflow-hidden rounded-xl border border-line bg-ground px-4 py-3.5 font-mono text-small leading-[1.75] focus:border-accent focus:outline-none"
+          />
+
+          {stale && (
+            <div className="rounded-md bg-warn-soft px-3 py-1.5 text-small text-warn">
+              Lựa chọn đã đổi so với bản đang sửa —{' '}
+              <button type="button" onClick={rebuild} className="font-semibold underline underline-offset-2">
+                dựng lại
+              </button>{' '}
+              để cập nhật, hoặc tự sửa tiếp.
+            </div>
+          )}
+        </div>
       </div>
     </section>
   )

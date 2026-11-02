@@ -13,6 +13,8 @@ import {
   getDraft,
   getHistory,
   getLastPlatform,
+  getOthers,
+  getOthersMap,
   getSelection,
   listTemplates,
 } from '@/lib/modules/team-progress/store'
@@ -88,6 +90,8 @@ async function page(props: PageProps<'/m/team-progress'>) {
       draft={getDraft(platform)}
       dailies={getDailies(platform)}
       dailyMap={getDailyMap(platform)}
+      others={getOthers(platform)}
+      othersMap={getOthersMap(platform)}
       lastSent={getHistory(platform)[0] ?? null}
       githubReady={Boolean(getSetting(SETTING_KEYS.githubToken)?.trim())}
       aiReady={Boolean(getSetting(SETTING_KEYS.googleApiKey)?.trim())}

@@ -149,7 +149,6 @@ export function EpicCard({
   name,
   expanded,
   jiraBase,
-  showSprintFlag,
   onToggleExpand,
   onPick,
   onPhase,
@@ -166,8 +165,6 @@ export function EpicCard({
   name: string
   expanded: boolean
   jiraBase: string
-  /** Whole-feature view: mark tasks that are not in the sprint. */
-  showSprintFlag: boolean
   onToggleExpand: () => void
   onPick: (keys: string[], on: boolean) => void
   onPhase: (key: string, phase: Phase | null) => void
@@ -302,7 +299,6 @@ export function EpicCard({
               overridden={i.key in phases}
               info={info(i)}
               jiraBase={jiraBase}
-              showSprintFlag={showSprintFlag}
               onPick={(on) => onPick([i.key], on)}
               onPhase={(p) => onPhase(i.key, p)}
               ignore={ignore}
@@ -322,7 +318,6 @@ function TaskRow({
   overridden,
   info,
   jiraBase,
-  showSprintFlag,
   onPick,
   onPhase,
   ignore,
@@ -334,7 +329,6 @@ function TaskRow({
   overridden: boolean
   info: RowInfo
   jiraBase: string
-  showSprintFlag: boolean
   onPick: (on: boolean) => void
   onPhase: (p: Phase | null) => void
   ignore?: IgnoreControls
@@ -423,9 +417,10 @@ function TaskRow({
               clone
             </span>
           )}
-          {showSprintFlag && !issue.inSprint && (
+          {/* Shown in either view: "Trong sprint" keeps owned work not pulled in yet. */}
+          {!issue.inSprint && (
             <span className="badge bg-surface-2 text-ink-3" title={issue.sprints.length ? issue.sprints.join(', ') : 'Chưa vào sprint nào'}>
-              {issue.sprints.length ? 'sprint khác' : 'backlog'}
+              {issue.sprints.length ? 'sprint khác' : 'chưa vào sprint'}
             </span>
           )}
           {ignore && (

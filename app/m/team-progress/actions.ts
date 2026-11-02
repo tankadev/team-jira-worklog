@@ -4,9 +4,9 @@ import { revalidatePath } from 'next/cache'
 
 import { SETTING_KEYS, getSetting } from '@/lib/settings'
 import { isModuleEnabled } from '@/lib/modules/state'
-import { type MapCandidate, mapDailies, polishReport } from '@/lib/modules/team-progress/ai'
+import { type MapCandidate, type ReportCandidate, mapDailies, mapOthersReport, polishReport } from '@/lib/modules/team-progress/ai'
 import { fetchMergedPrs } from '@/lib/modules/team-progress/github'
-import type { DailyMatch, DeployPr, Selection } from '@/lib/modules/team-progress/model'
+import type { DailyMatch, DeployPr, ReportedMatch, Selection } from '@/lib/modules/team-progress/model'
 import {
   type ProgressTemplate,
   type ReportDraft,
@@ -18,6 +18,8 @@ import {
   saveDailies,
   saveDailyMap,
   saveDraft,
+  saveOthers,
+  saveOthersMap,
   saveSelection,
   saveTemplates,
   setLastPlatform,
@@ -75,6 +77,31 @@ export async function aiMapDailiesAction(input: {
     saveDailyMap(input.platform, { date: input.date, source: input.dailies, matches })
     const hit = matches.filter((m) => m.key).length
     return { ok: true, message: `Đã map ${hit}/${matches.length} dòng daily với task trên Jira`, data: matches }
+  } catch (error) {
+    return fail(error, 'AI lỗi')
+  }
+}
+
+export async function saveOthersAction(platform: string, date: string, text: string): Promise<Result> {
+  if (!enabled()) return OFF
+  saveOthers(platform, { date, text })
+  return { ok: true, message: '' }
+}
+
+export async function aiMapOthersAction(input: {
+  platform: string
+  date: string
+  report: string
+  candidates: ReportCandidate[]
+}): Promise<Result<ReportedMatch[]>> {
+  if (!enabled()) return OFF
+  if (!getSetting(SETTING_KEYS.googleApiKey)) return { ok: false, message: 'Chưa có Google API key — điền ở Settings › AI & GitHub' }
+  if (!input.report.trim()) return { ok: false, message: 'Chưa dán báo cáo nào' }
+  try {
+    const matches = await mapOthersReport(input.report, input.candidates)
+    saveOthersMap(input.platform, { date: input.date, source: input.report, matches })
+    const hit = matches.filter((m) => m.key).length
+    return { ok: true, message: `${hit}/${matches.length} dòng trùng với epic/task của mình`, data: matches }
   } catch (error) {
     return fail(error, 'AI lỗi')
   }

@@ -35,6 +35,12 @@ function daysBetween(from: string, to: string): string[] {
  * sprint as a whole is covered — which is the thing worth checking before it
  * closes. Days after today are listed but not counted as short: they simply
  * have not happened yet.
+ *
+ * When the selected day falls after the sprint's end — the weekend between two
+ * sprints, worked as overtime on this one — the days from the end up to it are
+ * listed too, under their own heading. Their hours count toward the sprint
+ * total, since that is what they were worked for, but they are never "short":
+ * the sprint did not expect them.
  */
 export function SprintPanel({
   sprintName,
@@ -65,6 +71,7 @@ export function SprintPanel({
   const all = daysBetween(start, end)
   const elapsed = all.filter((d) => d <= today)
   const upcoming = all.filter((d) => d > today)
+  const after = selectedDate > end ? daysBetween(addDays(end, 1), selectedDate) : []
 
   const quotaFor = (d: string) => quotaForDate(d, rules)
   /**
@@ -82,7 +89,7 @@ export function SprintPanel({
   const short = workdays.filter((d) => (secondsByDate[d] ?? 0) < quotaFor(d) * 3600)
   const complete = workdays.length - short.length
 
-  const totalSeconds = all.reduce((n, d) => n + (secondsByDate[d] ?? 0), 0)
+  const totalSeconds = [...all, ...after].reduce((n, d) => n + (secondsByDate[d] ?? 0), 0)
   const expectedSeconds = workdays.reduce((n, d) => n + quotaFor(d) * 3600, 0)
   const missingSeconds = short.reduce(
     (n, d) => n + Math.max(0, quotaFor(d) * 3600 - (secondsByDate[d] ?? 0)),
@@ -150,6 +157,27 @@ export function SprintPanel({
                 />
               ))}
             </details>
+          )}
+
+          {after.length > 0 && (
+            <>
+              <div className="mt-1.5 border-t border-line px-1.5 pt-1.5 text-small font-medium text-ot">
+                Sau sprint · OT
+              </div>
+              {after.map((d) => (
+                <DayRow
+                  key={d}
+                  date={d}
+                  href={hrefFor(d)}
+                  seconds={secondsByDate[d] ?? 0}
+                  quota={0}
+                  dayOff={rules.daysOff[d] ?? null}
+                  split={split}
+                  selected={d === selectedDate}
+                  isToday={d === today}
+                />
+              ))}
+            </>
           )}
         </div>
 

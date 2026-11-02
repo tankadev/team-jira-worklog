@@ -3,6 +3,7 @@
 import { useSearchParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
+import { sprintForDate } from '@/lib/sprint-window'
 import { todayIn } from '@/lib/time'
 
 import { NavSpinner, useNav } from './navigation'
@@ -128,6 +129,10 @@ export function BoardFilters({
    * a day outside the sprint you are now looking at, which reads as a bug. The
    * current sprint lands on today; any other sprint lands on its first day,
    * since that is where you would start reviewing it.
+   *
+   * "Covers today" is the same question the date picker asks, gap days
+   * included: on the Sunday after a sprint closes, choosing that sprint keeps
+   * today rather than jumping back to its first day.
    */
   function pickSprint(value: string) {
     const q = new URLSearchParams(params.toString())
@@ -135,9 +140,7 @@ export function BoardFilters({
 
     const sprint = sprints.find((s) => String(s.id) === value)
     const today = todayIn()
-    const coversToday = Boolean(
-      sprint?.start && sprint?.end && today >= sprint.start && today <= sprint.end,
-    )
+    const coversToday = Boolean(sprint && sprintForDate(sprints, today)?.id === sprint.id)
 
     // No `date` param means today, so deleting it is how we select today.
     if (!sprint || coversToday) q.delete('date')

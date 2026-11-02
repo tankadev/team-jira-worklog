@@ -3,7 +3,7 @@ import 'server-only'
 import { runPrompt } from '@/lib/ai/gemini'
 import { RetryableError } from '@/lib/ai/retry'
 
-import type { DailyMatch } from './model'
+import type { DailyMatch, ReportedMatch } from './model'
 
 /**
  * What the model does here. It never produces a figure: every number in the
@@ -161,6 +161,82 @@ Trả về DUY NHẤT một object JSON:
             // A subtask is shown under its task, so the task is the match.
             key: named ? (named.parentKey ?? named.key) : null,
             subtaskKey: named?.parentKey ? named.key : null,
+            reason: String(m.reason ?? '').trim().slice(0, 120),
+          }
+        })
+        .filter((m) => m.line)
+      return { matches }
+    },
+    0.1,
+  )
+  return out.matches
+}
+
+/** One epic or issue on this board that someone else's report may be about. */
+export interface ReportCandidate {
+  key: string
+  kind: 'epic' | 'issue'
+  title: string
+  /** For an issue: the epic it sits under, so a feature line can be told from a task line. */
+  epic?: string
+  status: string
+}
+
+/**
+ * Reads another lead's progress report and says which features and tasks on
+ * this board it already covers, so they can be set aside here rather than
+ * reported twice.
+ *
+ * Such a report names a feature per line ("- Unread Counter (Deploy Staging)")
+ * with phase lines under it (" + Implement: 88%") that are about the same
+ * feature, not a task of their own; a task is named only when the report goes
+ * that fine. The model decides which level a line is at; the code then keeps
+ * only keys that exist and the kind the key really has.
+ */
+export async function mapOthersReport(report: string, candidates: ReportCandidate[]): Promise<ReportedMatch[]> {
+  const text = report.trim().slice(0, DAILIES_MAX)
+  if (!text || !candidates.length) return []
+  const byKey = new Map(candidates.map((c) => [c.key, c]))
+
+  const prompt = `Bạn đối chiếu BÁO CÁO TIẾN ĐỘ của một trưởng nhóm khác (cùng công ty, có thể nền tảng khác) với danh sách epic và task trên Jira của nhóm mình.
+
+Mục đích: tìm những tính năng/task mà báo cáo kia ĐÃ nói tới, để nhóm mình không báo cáo trùng.
+
+Báo cáo thường có dạng: dòng tính năng bắt đầu bằng "-" (tên tính năng, có thể kèm "(Deploy ...)" và ghi chú sau " - "), các dòng con " + Implement: 88%", " + Fix: 1/2", " + Web/Desktop: 3 (2 bug · 1 improve)" nói về CÙNG tính năng của dòng cha. Tên tính năng có thể viết tắt, bỏ tag [CTALK], [Web], khác ngôn ngữ với tiêu đề Jira.
+
+Với MỖI dòng tính năng (dòng "-") và mỗi dòng con nêu một task cụ thể, trả về một phần tử — kể cả khi không khớp gì (key null), để người đọc thấy dòng nào không thuộc nhóm mình:
+- line: nguyên văn dòng (bỏ dấu gạch đầu dòng)
+- key: mã epic hoặc task trong danh sách dưới khớp nhất; null nếu không có gì thực sự cùng một việc
+- kind: "epic" nếu dòng nói về cả tính năng (khớp một epic), "issue" nếu nói về một task/bug cụ thể, null nếu key null
+- reason: lý do ngắn dưới 10 từ, tiếng Việt
+
+Bỏ qua: dòng tiêu đề/ngày, các dòng con chỉ nêu % hay phân số của tính năng cha (chúng không phải task riêng), phần "🚀 Đã deploy" và mọi dòng dưới nó, lời chào.
+Chỉ chọn key khi chắc chắn cùng một tính năng/việc. Cùng tên nhưng khác nền tảng vẫn là cùng tính năng nếu epic đó không ghi nền tảng hoặc ghi nhiều nền tảng.
+
+DANH SÁCH (key | loại | tiêu đề | thuộc epic | status):
+${candidates.map((c) => `${c.key} | ${c.kind} | ${c.title} | ${c.epic ?? '-'} | ${c.status}`).join('\n')}
+
+BÁO CÁO CỦA NGƯỜI KHÁC:
+"""
+${text}
+"""
+
+Trả về DUY NHẤT một object JSON:
+{"matches": [{"line": "...", "key": "VT-1", "kind": "epic", "reason": "..."}]}`
+
+  const out = await runPrompt(
+    prompt,
+    (raw) => {
+      const list = Array.isArray(raw.matches) ? (raw.matches as Array<Record<string, unknown>>) : null
+      if (!list) throw new RetryableError('Gemini trả về thiếu danh sách matches')
+      const matches: ReportedMatch[] = list
+        .map((m) => {
+          const named = typeof m.key === 'string' ? byKey.get(m.key.trim()) : undefined
+          return {
+            line: String(m.line ?? '').trim(),
+            key: named?.key ?? null,
+            // The candidate list knows what the key is; the model's say is only a hint.
+            kind: named?.kind ?? null,
             reason: String(m.reason ?? '').trim().slice(0, 120),
           }
         })

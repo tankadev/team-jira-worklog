@@ -375,17 +375,25 @@ export interface Selection {
    * released. Unlike an unticked box, which only means "not this time".
    */
   ignored: Record<string, IgnoreReason>
+  /**
+   * The epic each seen issue sat under when it was last decided ('' for none).
+   * A tick is a decision about an issue in its feature: a bug left unticked in
+   * the bug pool and later moved into this week's bucket was never decided
+   * there, so it is decided again rather than kept out of the report.
+   */
+  placed: Record<string, string>
 }
 
-export type IgnoreReason = 'not-mine' | 'released' | 'other'
+export type IgnoreReason = 'not-mine' | 'released' | 'reported' | 'other'
 
 export const IGNORE_REASONS: Array<{ id: IgnoreReason; label: string }> = [
   { id: 'not-mine', label: 'Không thuộc mình' },
   { id: 'released', label: 'Đã release' },
+  { id: 'reported', label: 'Người khác đã report' },
   { id: 'other', label: 'Lý do khác' },
 ]
 
-export const EMPTY_SELECTION: Selection = { selected: [], seen: [], phases: {}, notes: {}, names: {}, ignored: {} }
+export const EMPTY_SELECTION: Selection = { selected: [], seen: [], phases: {}, notes: {}, names: {}, ignored: {}, placed: {} }
 
 /**
  * The platforms an issue belongs to: its own tags, else its epic's. A
@@ -400,6 +408,66 @@ export function issuePlatforms(issue: ProgressIssue, epic: ProgressEpic | undefi
 /** Initial pick for an issue nobody has decided on yet. */
 export function defaultPicked(issue: ProgressIssue, epic: ProgressEpic | undefined, platform: string, platforms: PlatformAlias[]): boolean {
   return issuePlatforms(issue, epic, platforms).includes(platform)
+}
+
+const keyNumber = (k: string) => Number(k.split('-').pop()) || 0
+
+/**
+ * Whether an issue's remembered tick no longer applies: it has been seen, but
+ * under another epic than the one it is in now.
+ *
+ * Selections saved before `placed` existed have no record; there, an issue
+ * older than its epic can only have been filed elsewhere and moved in (the
+ * weekly bucket takes its bugs from the pool), so it counts as moved.
+ */
+export function movedSinceDecided(issue: ProgressIssue, selection: Pick<Selection, 'placed'>): boolean {
+  const now = issue.epicKey ?? ''
+  const then = selection.placed[issue.key]
+  if (then !== undefined) return then !== now
+  return Boolean(now) && keyNumber(issue.key) < keyNumber(now)
+}
+
+/**
+ * The boxes ticked when the page opens, and the issues to flag as new.
+ *
+ * A remembered decision stands while the issue is where it was decided.
+ * Anything unseen, or moved to another epic since, is decided by the platform
+ * rule — except under an epic set aside, which keeps new arrivals out too. A
+ * move can bring a task into the report but never drops one that was ticked.
+ */
+export function initialPicks(
+  issues: ProgressIssue[],
+  epics: Map<string, ProgressEpic>,
+  selection: Selection,
+  platform: string,
+  platforms: PlatformAlias[],
+): { picked: Set<string>; fresh: Set<string> } {
+  const chosen = new Set(selection.selected)
+  const seen = new Set(selection.seen)
+  const picked = new Set<string>()
+  const fresh = new Set<string>()
+  for (const i of issues) {
+    if (seen.has(i.key) && !movedSinceDecided(i, selection)) {
+      if (chosen.has(i.key)) picked.add(i.key)
+      continue
+    }
+    fresh.add(i.key)
+    if (chosen.has(i.key)) picked.add(i.key)
+    if (selection.ignored[i.epicKey ?? '']) continue
+    if (defaultPicked(i, epics.get(i.epicKey ?? ''), platform, platforms)) picked.add(i.key)
+  }
+  return { picked, fresh }
+}
+
+/**
+ * The "in this sprint" view: the sprint's issues, plus work someone already
+ * owns under the same features that has not been pulled into the sprint yet.
+ * Leaving those out reads a feature whose first two tasks are picked up as
+ * nearly finished, when the rest of it is assigned and waiting.
+ */
+export function sprintScope(issues: ProgressIssue[]): ProgressIssue[] {
+  const active = new Set(issues.filter((i) => i.inSprint && i.epicKey).map((i) => i.epicKey))
+  return issues.filter((i) => i.inSprint || (i.assignee && active.has(i.epicKey) && !isDevDone(i.statusName)))
 }
 
 /* ── team dailies ───────────────────────────────────────────────────────── */
@@ -420,6 +488,47 @@ export interface DailyMatch {
   key: string | null
   subtaskKey: string | null
   reason: string
+}
+
+/**
+ * One line of someone else's progress report, and what on this board it is
+ * about. A report names features more often than tasks, so `key` may be an
+ * epic (`kind: 'epic'`) or a standard-level issue (`kind: 'issue'`); null
+ * means nothing here matches — another platform's work, or a deploy line.
+ */
+export interface ReportedMatch {
+  line: string
+  key: string | null
+  kind: 'epic' | 'issue' | null
+  reason: string
+}
+
+/**
+ * What to set aside once someone else's report has been matched: the epics
+ * it covers whole, and the single issues it names — minus anything already
+ * set aside, and minus issues whose epic is going too, which would only be
+ * set aside twice.
+ */
+export function reportedTargets(
+  matches: ReportedMatch[],
+  issues: Pick<ProgressIssue, 'key' | 'epicKey'>[],
+  ignored: Record<string, IgnoreReason>,
+): { epics: string[]; issues: string[] } {
+  const epics = new Set<string>()
+  const singles = new Set<string>()
+  for (const m of matches) {
+    if (!m.key || ignored[m.key]) continue
+    if (m.kind === 'epic') epics.add(m.key)
+    else if (m.kind === 'issue') singles.add(m.key)
+  }
+  const epicOf = new Map(issues.map((i) => [i.key, i.epicKey ?? '']))
+  return {
+    epics: [...epics],
+    issues: [...singles].filter((k) => {
+      const e = epicOf.get(k) ?? ''
+      return !epics.has(e) && !ignored[e]
+    }),
+  }
 }
 
 /* ── report data ─────────────────────────────────────────────────────────── */
@@ -519,14 +628,25 @@ export function buildReportData(input: BuildInput) {
     const stats = bugStats(bugs)
     const work = issues.filter((i) => !['document', 'research', 'test', 'support'].includes(phaseFor(i)))
 
-    // Per-platform counts of bugs and improves — how a weekly bucket is reported.
-    const counts = new Map<string, { count: number; fixed: number }>()
+    // Per-platform counts of bugs and improves — how a weekly bucket is
+    // reported. Kept apart as well as summed: "Web/Desktop: 18" alone does not
+    // say whether that is 18 bugs or mostly polish.
+    const counts = new Map<string, { count: number; fixed: number; bug_count: number; bug_fixed: number; improve_count: number; improve_fixed: number }>()
     for (const i of [...bugs, ...improves]) {
       const ps = issuePlatforms(i, epic, input.platforms)
+      const bug = phaseFor(i) === 'bug'
+      const fixed = isFixed(i.statusName)
       for (const p of ps.length ? ps : ['Khác']) {
-        const c = counts.get(p) ?? { count: 0, fixed: 0 }
+        const c = counts.get(p) ?? { count: 0, fixed: 0, bug_count: 0, bug_fixed: 0, improve_count: 0, improve_fixed: 0 }
         c.count++
-        if (isFixed(i.statusName)) c.fixed++
+        if (fixed) c.fixed++
+        if (bug) {
+          c.bug_count++
+          if (fixed) c.bug_fixed++
+        } else {
+          c.improve_count++
+          if (fixed) c.improve_fixed++
+        }
         counts.set(p, c)
       }
     }
@@ -574,7 +694,11 @@ export function buildReportData(input: BuildInput) {
       ]
         .filter(Boolean)
         .join(' · '),
-      breakdown: [...counts].map(([platform, c]) => ({ platform, count: c.count, fixed: c.fixed })),
+      breakdown: [...counts].map(([platform, c]) => ({
+        platform,
+        ...c,
+        detail: [c.bug_count && `${c.bug_count} bug`, c.improve_count && `${c.improve_count} improve`].filter(Boolean).join(' · '),
+      })),
     }
   })
 
@@ -623,6 +747,7 @@ export const TEMPLATE_VARIABLES: Array<[string, string]> = [
   ['{{bug_status}}', '"Done 6 · Verified 3 · chờ test 2 · đang fix 1"'],
   ['{{#bugs}}…{{/bugs}}', 'lặp từng bug (name, status…)'],
   ['{{#breakdown}}{{platform}}: {{count}}{{/breakdown}}', 'đếm bug + improve theo nền tảng ({{fixed}} = đã fix)'],
+  ['{{bug_count}} {{bug_fixed}} {{improve_count}} {{improve_fixed}} {{detail}}', 'trong {{#breakdown}}: tách riêng bug / improve của nền tảng đó (và số đã fix); {{detail}} = "6 bug · 12 improve"'],
   ['{{#deploys}}…{{/deploys}}', 'từng môi trường có nhánh: {{env}}, {{#prs}}{{title}}{{/prs}}, {{^prs}}N/A{{/prs}}'],
   ['{{^name}}…{{/name}}', 'chỉ hiện khi name rỗng / bằng 0'],
 ]
@@ -645,7 +770,7 @@ export const DEFAULT_TEMPLATE = `{{platform}} - {{date}}
 {{/selftest}}
 {{#is_bucket}}
 {{#breakdown}}
- + {{platform}}: {{count}}
+ + {{platform}}: {{count}}{{#detail}} ({{detail}}){{/detail}}
 {{/breakdown}}
 {{/is_bucket}}
 {{^is_bucket}}

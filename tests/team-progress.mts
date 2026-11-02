@@ -18,10 +18,13 @@ import {
   bugStats,
   commonEnv,
   epicKind,
+  initialPicks,
   lostMarks,
   phaseOf,
   plainTitle,
   platformsFromTitle,
+  reportedTargets,
+  sprintScope,
   supersededKeys,
   taskProgress,
   unbackedFigures,
@@ -154,6 +157,7 @@ const data = buildReportData({
     issue({ key: 'B2', summary: '[Bug][Web] b', typeName: 'Bug', statusName: 'In Progress' }),
     issue({ key: 'W1', epicKey: 'E-2', summary: '[Bug][Web] c', typeName: 'Bug', statusName: 'READY TO TEST ON STAGING' }),
     issue({ key: 'W2', epicKey: 'E-2', summary: '[Bug][BE] d', typeName: 'Bug', statusName: 'VERIFIED ON STAGING' }),
+    issue({ key: 'W3', epicKey: 'E-2', summary: '[Improve][Web] e', typeName: 'Improve', statusName: 'VERIFIED ON STAGING' }),
   ],
   selection: { ...EMPTY_SELECTION, notes: { 'E-1': 'đang review' } },
   platforms: P,
@@ -171,8 +175,8 @@ eq(
  + Fix: 1/2
 
 - Improvements W39/2026 (Deploy Staging)
- + Web/Desktop: 1
- + BE: 1
+ + Web/Desktop: 2 (1 bug · 1 improve)
+ + BE: 1 (1 bug)
 
 🚀 Đã deploy lên môi trường CTalk-Develop:
  - N/A
@@ -186,6 +190,64 @@ eq(
 `,
   'the default template reproduces the report the team writes by hand',
 )
+
+eq(data.epics[1].breakdown[0], { platform: 'Web/Desktop', count: 2, fixed: 1, bug_count: 1, bug_fixed: 0, improve_count: 1, improve_fixed: 1, detail: '1 bug · 1 improve' },
+   'a bucket counts bugs and improves apart as well as together')
+
+/* ── what is ticked on opening ──────────────────────────────────────────── */
+{
+  const epics = new Map([
+    ['VT-125', { key: 'VT-125', summary: 'The pool of bugs re-test Web/Desktop', statusName: 'To Do' }],
+    ['VT-4282', { key: 'VT-4282', summary: '[CTALK][W43/2026] Improvements & Bug Fixes', statusName: 'In Progress' }],
+  ])
+  const moved = issue({ key: 'VT-1385', epicKey: 'VT-4282', summary: '[Improve][Web] dark theme', typeName: 'Improve' })
+  const stays = issue({ key: 'VT-1225', epicKey: 'VT-125', summary: '[Bug][Web] system messages', typeName: 'Bug' })
+  const decided = { ...EMPTY_SELECTION, seen: ['VT-1385', 'VT-1225'] }
+  const start = (sel: typeof decided) => initialPicks([moved, stays], epics, sel, 'Web/Desktop', P)
+
+  eq([...start({ ...decided, placed: { 'VT-1385': 'VT-125', 'VT-1225': 'VT-125' } }).picked], ['VT-1385'],
+     'unticked in the pool, then moved into the bucket: decided again, so it reaches the report')
+  eq([...start({ ...decided, placed: { 'VT-1385': 'VT-125', 'VT-1225': 'VT-125' } }).fresh], ['VT-1385'],
+     'and it is flagged new, so the move is noticed')
+  eq([...start({ ...decided, placed: { 'VT-1385': 'VT-4282', 'VT-1225': 'VT-125' } }).picked], [],
+     'unticked where it is now: the decision stands')
+  eq([...start(decided).picked], ['VT-1385'],
+     'saved before epics were remembered: an issue older than its epic was moved in')
+  eq([...start({ ...decided, selected: ['VT-1225'], placed: { 'VT-1225': 'VT-4282' } }).picked].includes('VT-1225'), true,
+     'a move never drops a task that was ticked')
+}
+
+/* ── the sprint view ────────────────────────────────────────────────────── */
+eq(
+  sprintScope([
+    issue({ key: 'A', inSprint: true }),
+    issue({ key: 'B', inSprint: false, assignee: 'Max', statusName: 'To Do' }),
+    issue({ key: 'C', inSprint: false, statusName: 'To Do' }),
+    issue({ key: 'D', inSprint: false, assignee: 'Max', statusName: 'Done' }),
+    issue({ key: 'E', inSprint: false, assignee: 'Max', epicKey: 'E-9', statusName: 'To Do' }),
+  ]).map((i) => i.key),
+  ['A', 'B'],
+  'owned, unfinished work of a feature in the sprint is kept; unowned, finished or other features are not',
+)
+
+/* ── someone else's report ──────────────────────────────────────────────── */
+{
+  const board = [
+    issue({ key: 'A1', epicKey: 'E-1' }),
+    issue({ key: 'A2', epicKey: 'E-1' }),
+    issue({ key: 'B1', epicKey: 'E-2' }),
+    issue({ key: 'C1', epicKey: 'E-3' }),
+  ]
+  const m = (key: string | null, kind: 'epic' | 'issue' | null) => ({ line: key ?? 'x', key, kind, reason: '' })
+  eq(reportedTargets([m('E-1', 'epic'), m('A1', 'issue'), m('B1', 'issue'), m(null, null)], board, {}),
+     { epics: ['E-1'], issues: ['B1'] },
+     'a task under an epic that goes whole is not set aside twice; an unmatched line is nothing')
+  eq(reportedTargets([m('E-1', 'epic'), m('E-1', 'epic'), m('C1', 'issue')], board, { 'E-1': 'reported' }),
+     { epics: [], issues: ['C1'] },
+     'what is already set aside is not offered again, and a repeat counts once')
+  eq(reportedTargets([m('B1', 'issue')], board, { 'E-2': 'not-mine' }), { epics: [], issues: [] },
+     'a task whose epic is set aside is already out')
+}
 
 /* ── checking edits ─────────────────────────────────────────────────────── */
 eq(unbackedFigures('Implement: 90% · Fix: 1/2 — 05/10/2026', 'Implement: 88% Fix: 1/2'), ['90%'],

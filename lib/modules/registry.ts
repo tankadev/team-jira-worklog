@@ -6,7 +6,14 @@
  * both read it directly). Adding a module is adding an entry plus its route
  * under `app/m/<id>/`; nav, Settings and the route guard all derive from here.
  */
-export type ModuleId = 'progress' | 'team-progress' | 'ios-publish' | 'releases' | 'sdk-release' | 'code-review'
+export type ModuleId =
+  | 'progress'
+  | 'team-progress'
+  | 'self-review'
+  | 'ios-publish'
+  | 'releases'
+  | 'sdk-release'
+  | 'code-review'
 
 export interface ModuleManifest {
   id: ModuleId
@@ -43,6 +50,15 @@ export const MODULES: ModuleManifest[] = [
     nav: { href: '/m/team-progress', label: 'Tiến độ team' },
     status: 'ready',
     configHint: 'GitHub token + repo cho phần deploy · Google API key cho AI',
+  },
+  {
+    id: 'self-review',
+    name: 'Đánh giá cá nhân',
+    icon: '🏅',
+    description:
+      'Tổng hợp subtask của bạn theo từng sprint: point đã Done trên tổng point, số task 1 / 2 / 3 point, giờ cho mỗi point — có biểu đồ để so các sprint với nhau.',
+    nav: { href: '/m/self-review', label: 'Đánh giá cá nhân' },
+    status: 'ready',
   },
   {
     id: 'ios-publish',

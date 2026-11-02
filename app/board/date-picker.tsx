@@ -3,15 +3,12 @@
 import { useSearchParams } from 'next/navigation'
 import { useRef } from 'react'
 
+import { type SprintWindow, sprintForDate } from '@/lib/sprint-window'
 import { addDays, todayIn } from '@/lib/time'
 
 import { NavSpinner, useNav } from './navigation'
 
-interface SprintRange {
-  id: number
-  start: string | null
-  end: string | null
-}
+type SprintRange = SprintWindow
 
 export function DatePicker({
   date,
@@ -48,11 +45,15 @@ export function DatePicker({
     if (next === todayIn()) q.delete('date')
     else q.set('date', next)
 
-    const match = sprints.find((s) => s.start && s.end && next >= s.start && next <= s.end)
+    // A day between two sprints — the weekend after one closes, before the next
+    // opens — belongs to the sprint that just ended, so overtime on it can be
+    // logged against that sprint's tasks. It used to resolve to "no sprint" and
+    // an empty board, which left those two days impossible to log.
+    const match = sprintForDate(sprints, next)
 
     if (!match) {
-      // No sprint covers this day. Holding on to the previous one would show a
-      // task list from a different fortnight, so say so instead.
+      // Nothing has ended before this day either. Holding on to the previous
+      // sprint would show a task list from a different fortnight, so say so.
       q.set('sprint', 'none')
       q.delete('epic')
       q.delete('parent')

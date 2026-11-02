@@ -6,6 +6,7 @@ import { getBoard, getSprintPoints, getSprintTasks } from '@/lib/jira/issues'
 import { getProjectMeta } from '@/lib/jira/meta'
 import { type SprintTask, summarisePoints } from '@/lib/jira/types'
 import { getSprints } from '@/lib/jira/sprints'
+import { sprintForDate } from '@/lib/sprint-window'
 import { getWorklogs, sumByDate, sumByIssue } from '@/lib/jira/worklog'
 import { listDaysOff } from '@/lib/days-off'
 import { type QuotaRules, quotaForDate } from '@/lib/quota'
@@ -84,12 +85,20 @@ async function boardPage(props: PageProps<'/'>) {
   // Three states, not two: a specific sprint, every sprint, or a date that sits
   // outside every sprint — which must not silently fall back to "every".
   const noSprintMatch = sprintParam === 'none'
+  const sprintWindows = sprints.map((s) => ({
+    id: s.id,
+    start: s.startDate?.slice(0, 10) ?? null,
+    end: s.endDate?.slice(0, 10) ?? null,
+  }))
+  // With no sprint in the URL the date decides, the same way the picker does:
+  // a `?date=` link to the weekend after a sprint closes must open that sprint,
+  // not whichever one is running when the link is followed.
   const sprintId =
     sprintParam === 'all' || noSprintMatch
       ? null
       : sprintParam
         ? Number(sprintParam)
-        : (current?.id ?? null)
+        : (sprintForDate(sprintWindows, date)?.id ?? current?.id ?? null)
 
   // With a sprint selected, statistics cover the whole sprint: a sprint runs two
   // weeks, so a single calendar week cannot show whether it is fully covered.
@@ -234,11 +243,7 @@ async function boardPage(props: PageProps<'/'>) {
       label={dateLabel}
       isToday={isToday}
       sprintId={sprintId}
-      sprints={sprints.map((s) => ({
-        id: s.id,
-        start: s.startDate?.slice(0, 10) ?? null,
-        end: s.endDate?.slice(0, 10) ?? null,
-      }))}
+      sprints={sprintWindows}
     />
   )
 
@@ -468,8 +473,8 @@ function EmptyBoard({
           <b className="font-mono font-semibold">{dateLabel}</b> không nằm trong sprint nào.
         </p>
         <p className="mx-auto mt-2 max-w-lg text-body leading-relaxed text-ink-3">
-          Ngày này rơi ngoài khoảng của mọi sprint trên board — thường là khoảng nghỉ giữa hai
-          sprint. Chọn ngày khác, hoặc đổi bộ lọc sang{' '}
+          Ngày này nằm trước sprint sớm nhất trên board, nên không có sprint nào để gắn vào.
+          Chọn ngày khác, hoặc đổi bộ lọc sang{' '}
           <b className="font-medium text-ink-2">Mọi sprint</b> để xem hết task.
         </p>
       </div>
