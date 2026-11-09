@@ -231,7 +231,7 @@ function linksBlock(links: RoundLink[]): string {
   const bad = links.filter((l) => l.error)
   const list = ok
     .map(
-      (l) => `- **${l.repoName}** ${l.prNumber ? `PR #${l.prNumber}` : 'nhánh'} "${l.title}" (\`${l.headRef}\` → \`${l.baseRef}\`)
+      (l) => `- **${l.repoName}** ${l.prNumber ? `PR #${l.prNumber}` : 'nhánh'} "${l.title}" (\`${l.headRef}\` → \`${l.baseRef}\`)${l.together ? ' — đang được review cùng lượt' : ''}
   - Diff đầy đủ (đọc bằng Read): ${l.diffPath}
   - Code ở commit head ${l.headSha} (Read / Grep / Glob theo đường dẫn tuyệt đối): ${l.workdir}`,
     )
@@ -245,7 +245,12 @@ Khi review, kiểm tra thêm chỗ nối giữa hai bên:
 - Thay đổi hành vi bên kia (luồng, thread / actor gọi callback, thứ tự sự kiện, case mới) bên này đã xử lý chưa.
 - Bên này có dựa vào điều bên kia chưa làm, hoặc làm khác đi không; breaking change nào chưa được cập nhật.
 - Những vấn đề này dùng \`category\` = "Lệch với PR liên quan".
-Finding vẫn chỉ gắn vào file / dòng của PR ĐANG review (repo hiện tại); nói rõ file / dòng bên PR kia trong nội dung comment. Không review chất lượng code của PR kia — nó có lượt review riêng.
+Finding vẫn chỉ gắn vào file / dòng của PR ĐANG review (repo hiện tại); nói rõ file / dòng bên PR kia trong nội dung comment. Không review chất lượng code của PR kia — nó có lượt review riêng.${
+    ok.some((l) => l.together)
+      ? `
+PR đánh dấu "đang được review cùng lượt" có một lượt review khác chạy song song, đọc lại chính PR này. Để hai bên không cùng báo một chỗ lệch: chỉ tạo finding "Lệch với PR liên quan" khi chỗ cần sửa nằm ở PR ĐANG review (hoặc chưa rõ nên sửa bên nào). Nếu rõ là bên kia phải sửa, đừng tạo finding — lượt review của PR kia sẽ báo; chỉ nhắc một dòng trong \`reviewer_note\`.`
+      : ''
+  }
 `
 }
 

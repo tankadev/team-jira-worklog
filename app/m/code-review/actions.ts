@@ -11,6 +11,7 @@ import {
   type GithubAccess,
   GithubError,
   checkAccess,
+  getPull,
   type PullSummary,
   type ReviewEvent,
   getDiscussion,
@@ -36,11 +37,12 @@ import { type DiffFile, parseDiff } from '@/lib/modules/code-review/diff'
 import { buildFreshRows } from '@/lib/modules/code-review/findings'
 import { ForbiddenAction } from '@/lib/modules/code-review/guard'
 import { type TicketPreview, previewTickets } from '@/lib/modules/code-review/jira'
-import { type ConfluenceRef, type JiraContext, OWN_CATEGORY, SEVERITIES, type Severity, NO_JIRA, parseJiraKeys, confluencePages, type SubpageInfo, type Addressee, type DocFile, type DocTemplate, type FindingStatus, HONORIFICS, type PrLink, addressOf, anchorInDiff, cleanHandle, validHandle, type FindingView, type ItemSummary, type RepoPreset, type RoundView, where } from '@/lib/modules/code-review/model'
+import { type ConfluenceRef, type JiraContext, OWN_CATEGORY, SEVERITIES, type Severity, NO_JIRA, parseJiraKeys, confluencePages, type SubpageInfo, type Addressee, type DocFile, type DocTemplate, type FindingStatus, HONORIFICS, type PrLink, addressOf, anchorInDiff, linkLabel, cleanHandle, validHandle, type FindingView, type ItemSummary, type ItemView, type RepoPreset, type RoundView, where } from '@/lib/modules/code-review/model'
 import { type LogLine, cancelRound, ensureTicker, tick, updateRoundSummary, viewLog } from '@/lib/modules/code-review/runner'
 import {
   createItem,
   deleteItem,
+  findLinkedItem,
   findPrItem,
   getFinding,
   getItem,
@@ -129,7 +131,8 @@ export async function listPullsAction(repoId: string): Promise<Result & { pulls:
 
 export async function queuePullsAction(input: {
   repoId: string
-  pulls: Array<Pick<PullSummary, 'number' | 'title' | 'author' | 'headRef' | 'baseRef' | 'url'>>
+  /** Each PR may carry its own pair (the SDK PR for this iOS PR…), on top of `links`. */
+  pulls: Array<Pick<PullSummary, 'number' | 'title' | 'author' | 'headRef' | 'baseRef' | 'url'> & { links?: PrLink[] }>
   note: string
   /** Spec / TDD PDFs to compare the implementation against, applied to every PR picked. */
   docs?: DocFile[]
@@ -139,6 +142,8 @@ export async function queuePullsAction(input: {
   sources?: unknown
   /** Jira tickets the PRs implement. */
   jira?: JiraContext
+  /** Also review the linked PRs, now, each with the others as context. */
+  together?: boolean
 }): Promise<Result> {
   const blocked = await ready()
   if (blocked) return blocked
@@ -150,6 +155,7 @@ export async function queuePullsAction(input: {
   const jira = cleanJira(input.jira)
   let queued = 0
   let skipped = 0
+  const pair = pairTally()
   for (const p of input.pulls) {
     const existing = findPrItem(input.repoId, p.number)
     const itemId =
@@ -170,23 +176,21 @@ export async function queuePullsAction(input: {
     if (existing && input.note.trim()) patchItem(itemId, { note: input.note.trim() })
     if (existing && sources.length) setItemSources(itemId, mergeSources(existing.sources, sources))
     if (existing) setItemJira(itemId, { keys: [...new Set([...existing.jira.keys, ...jira.keys])], auto: jira.auto })
-    if (input.links?.length) {
-      const merged = [...(existing?.links ?? []), ...input.links]
-      await setLinksAction(itemId, merged)
+    const added = [...(p.links ?? []), ...(input.links ?? [])]
+    if (added.length) await setLinksAction(itemId, [...(existing?.links ?? []), ...added])
+    if (hasLiveRound(itemId)) skipped++
+    else {
+      queueRound(itemId, docs.length ? docs : carriedDocs(itemId))
+      queued++
     }
-    if (hasLiveRound(itemId)) {
-      skipped++
-      continue
-    }
-    queueRound(itemId, docs.length ? docs : carriedDocs(itemId))
-    queued++
+    if (input.together) pair.add(await queueLinked(getItem(itemId)!, { docs, sources, jira, note: input.note }))
   }
   ensureTicker()
   void tick()
   revalidatePath('/m/code-review')
   return {
     ok: true,
-    message: `Đã xếp hàng ${queued} PR${skipped ? ` · ${skipped} PR đang review dở nên bỏ qua` : ''}.`,
+    message: `Đã xếp hàng ${queued} PR${pair.text()}${skipped ? ` · ${skipped} PR đang review dở nên bỏ qua` : ''}.`,
   }
 }
 
@@ -212,6 +216,8 @@ export async function queueBranchesAction(input: {
   links?: PrLink[]
   sources?: unknown
   jira?: JiraContext
+  /** Also review the linked PRs, now, each with the others as context. */
+  together?: boolean
 }): Promise<Result & { itemId?: number }> {
   const blocked = await ready()
   if (blocked) return blocked
@@ -236,10 +242,120 @@ export async function queueBranchesAction(input: {
   })
   if (input.links?.length) await setLinksAction(itemId, input.links)
   queueRound(itemId, docs)
+  const pair = pairTally()
+  if (input.together) pair.add(await queueLinked(getItem(itemId)!, { docs, sources, jira: cleanJira(input.jira), note: input.note }))
   ensureTicker()
   void tick()
   revalidatePath('/m/code-review')
-  return { ok: true, message: 'Đã xếp hàng.', itemId }
+  return { ok: true, message: `Đã xếp hàng${pair.text()}.`, itemId }
+}
+
+/* ── reviewing linked PRs as a pair ────────────────────────────────────── */
+
+interface PairResult {
+  queued: number
+  busy: number
+  failed: string[]
+}
+
+function pairTally() {
+  const t: PairResult = { queued: 0, busy: 0, failed: [] }
+  return {
+    add(r: PairResult) {
+      t.queued += r.queued
+      t.busy += r.busy
+      t.failed.push(...r.failed)
+    },
+    text() {
+      const parts = [
+        t.queued ? ` + ${t.queued} PR liên kết` : '',
+        t.busy ? ` · ${t.busy} PR liên kết đang review dở` : '',
+        t.failed.length ? ` · không xếp được: ${t.failed.join('; ')}` : '',
+      ]
+      return parts.join('')
+    },
+  }
+}
+
+/**
+ * Puts every PR `item` is linked to in the queue as well — SDK and iOS
+ * reviewed in one go. Each side gets its own round (findings stay anchored to
+ * the PR they belong to, so posting works as usual) and reads the others'
+ * diff and code. Linked PRs not tracked yet get an item here; every member
+ * ends up linked to the whole group. Context given with the click (tickets,
+ * pages, PDFs) applies to the new rounds too.
+ */
+async function queueLinked(
+  item: ItemView,
+  ctx: { docs: DocFile[]; sources: ConfluenceRef[]; jira: JiraContext; note: string },
+): Promise<PairResult> {
+  const out: PairResult = { queued: 0, busy: 0, failed: [] }
+  const self: PrLink = { repoId: item.repoId, prNumber: item.prNumber, headRef: item.headRef, baseRef: item.baseRef, title: item.title, url: item.url }
+  for (const l of item.links) {
+    const repo = getRepo(l.repoId)
+    if (!repo) {
+      out.failed.push(`${l.headRef} — repo không còn trong Cấu hình`)
+      continue
+    }
+    let other = findLinkedItem(l)
+    if (!other) {
+      let meta = { title: l.title, author: '', url: l.url, headRef: l.headRef, baseRef: l.baseRef }
+      if (l.prNumber && repo.githubRepo) {
+        try {
+          const p = await getPull(repo.githubRepo, l.prNumber)
+          meta = { title: p.title, author: p.author, url: p.url, headRef: p.headRef, baseRef: p.baseRef }
+        } catch (err) {
+          out.failed.push(`${linkLabel(l, repo.name)} — ${(err as Error).message}`)
+          continue
+        }
+      }
+      const id = createItem({
+        kind: 'pr',
+        repoId: l.repoId,
+        prNumber: l.prNumber,
+        ...meta,
+        title: meta.title || `${meta.headRef} → ${meta.baseRef}`,
+        note: ctx.note.trim(),
+        sources: ctx.sources,
+        jira: ctx.jira,
+      })
+      other = getItem(id)!
+    } else {
+      if (ctx.sources.length) setItemSources(other.id, mergeSources(other.sources, ctx.sources))
+      if (ctx.jira.keys.length) setItemJira(other.id, { keys: [...new Set([...other.jira.keys, ...ctx.jira.keys])], auto: other.jira.auto })
+    }
+    // The rest of the group, minus itself; links it already had stay.
+    const group = [self, ...item.links.filter((x) => x !== l)]
+    const merged = cleanLinks([...other.links, ...group], other)
+    if (typeof merged !== 'string') setItemLinks(other.id, merged)
+    if (hasLiveRound(other.id)) {
+      out.busy++
+      continue
+    }
+    queueRound(other.id, ctx.docs.length ? ctx.docs : carriedDocs(other.id))
+    out.queued++
+  }
+  return out
+}
+
+/**
+ * "Review cả cặp" on an item's page: a new round for it and for every PR it
+ * is linked to, all at once.
+ */
+export async function reviewTogetherAction(itemId: number): Promise<Result> {
+  const blocked = await ready()
+  if (blocked) return blocked
+  const item = getItem(itemId)
+  if (!item || item.kind !== 'pr') return { ok: false, message: 'Không thấy hồ sơ PR.' }
+  if (!item.links.length) return { ok: false, message: 'PR này chưa liên kết PR nào.' }
+  const selfBusy = hasLiveRound(itemId)
+  if (!selfBusy) queueRound(itemId, carriedDocs(itemId))
+  const pair = pairTally()
+  pair.add(await queueLinked(item, { docs: [], sources: [], jira: { ...NO_JIRA, auto: true }, note: '' }))
+  ensureTicker()
+  void tick()
+  revalidatePath('/m/code-review')
+  return { ok: true, message: `${selfBusy ? 'PR này đang review dở' : 'Đã xếp hàng PR này'}${pair.text()}.` }
 }
 
 /**

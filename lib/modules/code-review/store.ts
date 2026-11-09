@@ -166,6 +166,29 @@ export function findPrItem(repoId: string, prNumber: number): ItemView | null {
   return r ? toItem(r) : null
 }
 
+/** An open item reviewing this branch pair by hand (no PR number). */
+export function findBranchItem(repoId: string, headRef: string): ItemView | null {
+  const r = db
+    .select()
+    .from(reviewItems)
+    .where(
+      and(
+        eq(reviewItems.kind, 'pr'),
+        eq(reviewItems.repoId, repoId),
+        sql`${reviewItems.prNumber} IS NULL`,
+        eq(reviewItems.headRef, headRef),
+        eq(reviewItems.status, 'open'),
+      ),
+    )
+    .get()
+  return r ? toItem(r) : null
+}
+
+/** The open item tracking what a link points at, if any. */
+export function findLinkedItem(l: Pick<PrLink, 'repoId' | 'prNumber' | 'headRef'>): ItemView | null {
+  return l.prNumber ? findPrItem(l.repoId, l.prNumber) : findBranchItem(l.repoId, l.headRef)
+}
+
 export function createItem(
   input: Omit<ItemView, 'id' | 'status' | 'updatedAt' | 'seenAt' | 'links' | 'addressee' | 'templateId' | 'sources' | 'jira'> & {
     links?: PrLink[]

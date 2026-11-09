@@ -50,6 +50,7 @@ import {
   setAddresseeAction,
   setDocReposAction,
   setJiraAction,
+  reviewTogetherAction,
   setLinksAction,
   setSourcesAction,
   setTemplateAction,
@@ -585,6 +586,23 @@ function LinksBar({ item, repos, linkedItems }: { item: ItemView; repos: RepoPre
         <button type="button" className="text-ink-3 underline-offset-2 hover:text-ink hover:underline" onClick={() => setEditing((v) => !v)}>
           {editing ? 'Đóng' : item.links.length ? 'Sửa' : '+ Liên kết PR'}
         </button>
+        {item.links.length > 0 && !editing && (
+          <button
+            type="button"
+            className={BTN}
+            disabled={busy}
+            title="Xếp hàng vòng mới cho PR này và mọi PR liên kết cùng lúc — mỗi bên đọc diff của bên kia"
+            onClick={() =>
+              start(async () => {
+                const r = await reviewTogetherAction(item.id)
+                setMsg(r.message)
+                router.refresh()
+              })
+            }
+          >
+            🔗 Review cả cặp
+          </button>
+        )}
         {msg && <span className="text-ink-2">{msg}</span>}
       </div>
       {editing && (

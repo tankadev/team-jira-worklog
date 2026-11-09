@@ -36,9 +36,11 @@ import { type LogLine, bootTime, lastResult, parseLog, pidAlive, readLog, strayL
 export type { LogLine }
 import {
   type RoundRow,
+  findLinkedItem,
   finishRound,
   getItem,
   getRound,
+  hasLiveRound,
   insertFindings,
   lastDoneRound,
   openFindings,
@@ -217,7 +219,11 @@ async function prepareAndSpawn(roundId: number) {
       })
 
       // The other side of a cross-repo change (SDK ↔ iOS), read-only context.
-      links = await prepareLinks(roundId, item.links)
+      // A side with its own round live right now is being reviewed as a pair.
+      links = (await prepareLinks(roundId, item.links)).map((l) => {
+        const other = findLinkedItem(l)
+        return other && hasLiveRound(other.id) ? { ...l, together: true } : l
+      })
       updateRound(roundId, { links: JSON.stringify(links) })
       addDirs.push(...linkDirs(links))
 

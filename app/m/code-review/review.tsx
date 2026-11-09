@@ -359,14 +359,31 @@ function NewPr({
     })
 
   const attach = useAttachments()
-  const [links, setLinks] = useState<PrLink[]>([])
+  /** PR number → the PRs in other repos it is reviewed with. */
+  const [pairs, setPairs] = useState<Record<number, PrLink[]>>({})
+  const [together, setTogether] = useState(true)
+  /** Open PRs of the other repos, to suggest a pair by shared Jira ticket. */
+  const [others, setOthers] = useState<Array<PullRow & { repoId: string }>>([])
+  useEffect(() => {
+    setPairs({})
+    let live = true
+    const rest = repos.filter((r) => r.id !== repoId && r.githubRepo)
+    void Promise.all(rest.map((r) => listPullsAction(r.id).then((x) => x.pulls.map((p) => ({ ...p, repoId: r.id }))))).then((all) => {
+      if (live) setOthers(all.flat())
+    })
+    return () => {
+      live = false
+    }
+  }, [repoId, repos])
+  const pairsOf = (n: number) => (picked.has(n) ? (pairs[n] ?? []) : [])
+  const anyPair = [...picked].some((n) => pairsOf(n).length > 0)
 
   const submit = () =>
     start(async () => {
       const docs = await attach.upload()
       if (!docs) return
       const chosen = pulls.filter((p) => picked.has(p.number))
-      const r = await queuePullsAction({ repoId, pulls: chosen, note, docs, links, ...contextPayload(context) })
+      const r = await queuePullsAction({ repoId, pulls: chosen.map((p) => ({ ...p, links: pairsOf(p.number) })), note, docs, together: together && anyPair, ...contextPayload(context) })
       setMsg(r.message)
       if (r.ok) {
         attach.clear()
@@ -436,6 +453,16 @@ function NewPr({
                           ↗
                         </a>
                       </label>
+                      {picked.has(p.number) && (
+                        <PairPicker
+                          pull={p}
+                          repos={repos}
+                          repoId={repoId}
+                          others={others}
+                          value={pairs[p.number] ?? []}
+                          onChange={(v) => setPairs((m) => ({ ...m, [p.number]: v }))}
+                        />
+                      )}
                     </li>
                   )
                 })}
@@ -457,18 +484,12 @@ function NewPr({
             {attach.section(
               'Mô tả chức năng, TDD… Claude sẽ kiểm tra PR có làm đúng và đủ theo tài liệu không. Áp dụng cho mọi PR đang chọn; các vòng Review tiếp tự dùng lại.',
             )}
-            <details className="mt-2 rounded-md border border-line px-3 py-2" open={links.length > 0}>
-              <summary className="cursor-pointer text-[12.5px] text-ink-2">
-                🔗 Liên kết PR ở repo khác{links.length ? ` · ${links.length}` : ' (không bắt buộc)'}
-              </summary>
-              <p className="mb-2 mt-1 text-[11.5px] text-ink-3">
-                Vd PR SDK mà PR iOS này dựa vào (hoặc ngược lại). Claude đọc thêm diff và code của PR kia để soi chỗ nối giữa hai bên. Áp dụng cho mọi PR đang chọn.
-              </p>
-              <LinkPicker repos={repos} value={links} onChange={setLinks} preferNot={repoId} />
-            </details>
+            {anyPair && <TogetherToggle value={together} onChange={setTogether} />}
             <div className="mt-2 flex items-center gap-2">
               <button type="button" className={BTN_PRI} disabled={busy || !canRun || picked.size === 0 || !contextReady(context)} onClick={submit}>
-                {busy && attach.count ? 'Đang tải tài liệu…' : `Review ${picked.size || ''} PR`}
+                {busy && attach.count
+                  ? 'Đang tải tài liệu…'
+                  : `Review ${picked.size || ''} PR${together && anyPair ? ` + ${new Set([...picked].flatMap((n) => pairsOf(n).map((l) => `${l.repoId}#${l.prNumber ?? l.headRef}`))).size} PR ghép cặp` : ''}`}
               </button>
               {!canRun && <span className="text-[12px] text-crit">Claude CLI chưa sẵn sàng.</span>}
             </div>
@@ -485,6 +506,7 @@ function NewPr({
 
 function BranchForm({ repo, repos, canRun, onDone }: { repo: RepoPreset; repos: RepoPreset[]; canRun: boolean; onDone: () => void }) {
   const [links, setLinks] = useState<PrLink[]>([])
+  const [together, setTogether] = useState(true)
   const [branches, setBranches] = useState<string[]>([])
   const [base, setBase] = useState('')
   const [head, setHead] = useState('')
@@ -540,6 +562,7 @@ function BranchForm({ repo, repos, canRun, onDone }: { repo: RepoPreset; repos: 
         </summary>
         <div className="mt-2">
           <LinkPicker repos={repos} value={links} onChange={setLinks} preferNot={repo.id} />
+          {links.length > 0 && <TogetherToggle value={together} onChange={setTogether} />}
         </div>
       </details>
       <div className="mt-2 flex items-center gap-2">
@@ -551,7 +574,7 @@ function BranchForm({ repo, repos, canRun, onDone }: { repo: RepoPreset; repos: 
             start(async () => {
               const docs = await attach.upload()
               if (!docs) return
-              const r = await queueBranchesAction({ repoId: repo.id, baseRef: base, headRef: head, title, note, docs, links, ...contextPayload(context) })
+              const r = await queueBranchesAction({ repoId: repo.id, baseRef: base, headRef: head, title, note, docs, links, together: together && links.length > 0, ...contextPayload(context) })
               setMsg(r.message)
               if (r.ok) {
                 attach.clear()
@@ -1486,17 +1509,97 @@ function Config({ repos, runner, onClaude }: { repos: RepoPreset[]; runner: Runn
  * Picks PRs in other repos to review alongside — e.g. the SDK PR an iOS PR
  * builds on. Claude reads their diff and code; findings stay on this PR.
  */
+/**
+ * Under a picked PR: the PR(s) in another repo it goes with (SDK ↔ iOS).
+ * Open PRs there sharing a Jira ticket with this one are offered first;
+ * any other is one pick away. Review still runs one item per PR.
+ */
+function PairPicker({
+  pull,
+  repos,
+  repoId,
+  others,
+  value,
+  onChange,
+}: {
+  pull: PullRow
+  repos: RepoPreset[]
+  repoId: string
+  others: Array<PullRow & { repoId: string }>
+  value: PrLink[]
+  onChange: (v: PrLink[]) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const name = (id: string) => repos.find((r) => r.id === id)?.name ?? '?'
+  const keys = detectJiraKeys({ branch: pull.headRef, title: pull.title })
+  const has = (o: { repoId: string; number: number }) => value.some((v) => v.repoId === o.repoId && v.prNumber === o.number)
+  const suggested = keys.length
+    ? others.filter((o) => !has(o) && detectJiraKeys({ branch: o.headRef, title: o.title }).some((k) => keys.includes(k)))
+    : []
+  const toLink = (o: PullRow & { repoId: string }): PrLink => ({ repoId: o.repoId, prNumber: o.number, headRef: o.headRef, baseRef: o.baseRef, title: o.title, url: o.url })
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 px-3 pb-2 pl-8 text-[12px]">
+      <span className="text-ink-3">🔗 Cặp:</span>
+      {value.length === 0 && !suggested.length && <span className="text-ink-3">chưa ghép</span>}
+      {value.map((l, i) => (
+        <span key={i} className="flex items-center gap-1 rounded-md border border-accent/40 bg-accent-soft px-2 py-0.5">
+          <span className="font-medium">{linkLabel(l, name(l.repoId))}</span>
+          <span className="max-w-[240px] truncate text-ink-3">{l.title}</span>
+          <button type="button" className="text-ink-3 hover:text-crit" onClick={() => onChange(value.filter((_, j) => j !== i))}>
+            ✕
+          </button>
+        </span>
+      ))}
+      {suggested.map((o) => (
+        <button
+          key={`${o.repoId}#${o.number}`}
+          type="button"
+          className="rounded-md border border-dashed border-line-strong px-2 py-0.5 text-ink-2 hover:border-accent hover:text-accent-ink"
+          title={`Cùng ticket Jira — ${o.headRef}`}
+          onClick={() => onChange([...value, toLink(o)])}
+        >
+          + {name(o.repoId)} #{o.number} <span className="text-ink-3">{o.title.slice(0, 50)}</span>
+        </button>
+      ))}
+      <button type="button" className="text-ink-3 underline-offset-2 hover:text-ink hover:underline" onClick={() => setOpen((v) => !v)}>
+        {open ? 'Đóng' : 'Chọn PR khác…'}
+      </button>
+      {open && (
+        <div className="mt-1 w-full">
+          <LinkPicker repos={repos} value={value} onChange={onChange} preferNot={repoId} hideChips />
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** Under a link picker: review the linked PRs in the same go, not just read them. */
+function TogetherToggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <label className="mt-2 flex items-start gap-2 text-[12px] text-ink-2">
+      <input type="checkbox" className="mt-0.5" checked={value} onChange={(e) => onChange(e.target.checked)} />
+      <span>
+        <b className="font-medium text-ink">Review luôn PR liên kết cùng lượt</b> — mỗi PR một vòng chạy song song, bên nào cũng đọc diff + code bên kia; comment gắn đúng vào PR của nó. Bỏ chọn nếu chỉ muốn đọc PR kia làm ngữ cảnh.
+      </span>
+    </label>
+  )
+}
+
 export function LinkPicker({
   repos,
   value,
   onChange,
   preferNot,
+  hideChips = false,
 }: {
   repos: RepoPreset[]
   value: PrLink[]
   onChange: (links: PrLink[]) => void
   /** The repo being reviewed — offered last, since the pair is usually cross-repo. */
   preferNot?: string
+  /** The caller shows the chosen links itself. */
+  hideChips?: boolean
 }) {
   const ordered = [...repos].sort((a, b) => Number(a.id === preferNot) - Number(b.id === preferNot))
   const [repoId, setRepoId] = useState(ordered[0]?.id ?? '')
@@ -1528,7 +1631,7 @@ export function LinkPicker({
 
   return (
     <div>
-      {value.length > 0 && (
+      {value.length > 0 && !hideChips && (
         <ul className="mb-2 flex flex-wrap gap-1.5">
           {value.map((l, i) => (
             <li key={i} className="flex items-center gap-1.5 rounded-md border border-line bg-surface-2 px-2 py-0.5 text-[12px]">

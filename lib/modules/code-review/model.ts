@@ -264,6 +264,8 @@ export interface RoundLink extends PrLink {
   diffPath: string
   /** Why it could not be prepared, when it could not. */
   error: string
+  /** The linked PR had its own review queued or running at the same time (reviewed as a pair). */
+  together?: boolean
 }
 
 export function linkLabel(l: Pick<PrLink, 'prNumber' | 'headRef' | 'title'>, repoName: string): string {
