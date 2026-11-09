@@ -47,6 +47,19 @@ const tasks: TaskLike[] = [
 const cands = publishCandidates(tasks, 'Lite', 'Staging', ENVS)
 eq(cands.map((c) => `${c.code}/${c.kind}`), ['VT-2633/fix', 'VT-2700/feature', 'VT-2900/feature'], 'only built, unpublished codes at Staging+ are offered')
 eq(renderWhatToTest(cands), '- CTalk: VT-2633 (fix VT-2511), VT-2900\n- Hir: VT-2700', 'What to Test groups by team, fixes name their feature')
+{
+  const two = publishCandidates(
+    [
+      t({ id: 1, taskId: 'VT-2511', buildStatus: 'đã public', fixes: [{ code: 'VT-2633', status: 'đã build' }, { code: 'VT-2640', status: 'đã build' }] }),
+      t({ id: 2, taskId: 'VT-2700' }),
+      t({ id: 3, taskId: 'VT-2512', buildStatus: 'đã public', fixes: [{ code: 'VT-2650', status: 'đã build' }] }),
+    ],
+    'Lite',
+    'Staging',
+    ENVS,
+  )
+  eq(renderWhatToTest(two), '- CTalk: VT-2633 | VT-2640 (fix VT-2511), VT-2700, VT-2650 (fix VT-2512)', 'fixes of one feature share an entry')
+}
 
 const pub = publishedCodes(tasks, 'Lite')
 eq([...pub.entries()], [['VT-2511', 'Lite 2.3.0 (512)'], ['VT-2601', 'Lite 2.3.0 (515)']], 'published codes remember their build')

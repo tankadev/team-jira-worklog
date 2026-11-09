@@ -315,18 +315,25 @@ export function republished(text: string, published: Map<string, string>): Array
 }
 
 /**
- * "What to Test" from the chosen codes, grouped by team in first-seen order:
+ * "What to Test" from the chosen codes, grouped by team in first-seen order.
+ * Fixes of the same feature share one entry, joined by " | ", placed where
+ * the first of them stood:
  *
- *   - CTalk: VT-2511, VT-2633 (fix VT-2511)
+ *   - CTalk: VT-2633 | VT-2640 (fix VT-2511), VT-2700
  *   - Hir: VT-2256
  */
 export function renderWhatToTest(chosen: PublishCandidate[]): string {
   const teams = [...new Set(chosen.map((c) => c.team))]
   return teams
     .map((team) => {
-      const codes = chosen
-        .filter((c) => c.team === team)
-        .map((c) => (c.kind === 'fix' && c.feature && !sameCode(c.feature, c.code) ? `${c.code} (fix ${c.feature})` : c.code))
+      const entries: Array<{ feature: string; codes: string[] }> = []
+      for (const c of chosen.filter((x) => x.team === team)) {
+        const feature = c.kind === 'fix' && c.feature && !sameCode(c.feature, c.code) ? c.feature : ''
+        const same = feature ? entries.find((e) => e.feature && sameCode(e.feature, feature)) : undefined
+        if (same) same.codes.push(c.code)
+        else entries.push({ feature, codes: [c.code] })
+      }
+      const codes = entries.map((e) => (e.feature ? `${e.codes.join(' | ')} (fix ${e.feature})` : e.codes[0]))
       return `- ${team || 'Khác'}: ${codes.join(', ')}`
     })
     .join('\n')
