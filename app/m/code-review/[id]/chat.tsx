@@ -1,12 +1,19 @@
 'use client'
 
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState, useTransition } from 'react'
+import { createContext, forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState, useTransition } from 'react'
 
 import type { ChatChanges, ChatMessage } from '@/lib/modules/code-review/chat'
 import { type Addressee, type FindingView, SEVERITY_LABEL, type Severity, addressOf, where } from '@/lib/modules/code-review/model'
 
 import { applyChatAction, cancelChatAction, chatAction, sendChatAction } from '../actions'
 import { BTN, BTN_PRI, CARD, CTITLE, INPUT } from '../ui'
+
+/**
+ * Puts a question in the round chat closest to where it is asked (the
+ * review tab's, the diff drawer's) and brings it into view. Null where no
+ * chat can take it — a round still running, a doc review.
+ */
+export const AskClaude = createContext<((text: string) => void) | null>(null)
 
 export interface ChatHandle {
   /** Starts a question about one finding and brings the chat into view. */
@@ -209,7 +216,9 @@ function Proposal({
         <span className="font-semibold">Đề xuất sửa bản review</span>
         <span className="text-ink-3">
           {[
-            updates.filter((u) => !u.dismiss).length && `sửa ${updates.filter((u) => !u.dismiss).length}`,
+            updates.filter((u) => u.follow_reply?.trim()).length && `${updates.filter((u) => u.follow_reply?.trim()).length} câu trả lời tiếp`,
+            updates.filter((u) => !u.dismiss && (u.title || u.comment || u.severity)).length &&
+              `sửa ${updates.filter((u) => !u.dismiss && (u.title || u.comment || u.severity)).length}`,
             updates.filter((u) => u.dismiss).length && `bỏ ${updates.filter((u) => u.dismiss).length}`,
             adds.length && `thêm ${adds.length}`,
           ]
@@ -236,7 +245,7 @@ function Proposal({
             return (
               <div key={`u${i}`} className="border-l-2 border-line pl-2">
                 <div className="font-medium">
-                  {u.dismiss ? '🗑 Bỏ' : '✏️ Sửa'} #{u.id} {f ? `“${f.title}”` : '(không thuộc vòng này — sẽ bỏ qua)'}
+                  {u.dismiss ? '🗑 Bỏ' : u.title || u.comment || u.severity ? '✏️ Sửa' : '↩ Trả lời tiếp'} #{u.id} {f ? `“${f.title}”` : '(không thuộc vòng này — sẽ bỏ qua)'}
                   {u.severity && f && u.severity !== f.severity && (
                     <span className="ml-1 text-ink-3">
                       {SEVERITY_LABEL[f.severity]} → {SEVERITY_LABEL[u.severity as Severity] ?? u.severity}
@@ -246,6 +255,12 @@ function Proposal({
                 {u.reason && <div className="text-ink-3">{u.reason}</div>}
                 {u.title && u.title !== f?.title && <div className="text-ink-2">Tiêu đề: {u.title}</div>}
                 {u.comment && <div className="mt-0.5 whitespace-pre-wrap text-ink-2">{u.comment}</div>}
+                {u.follow_reply?.trim() && (
+                  <div className="mt-1 rounded bg-accent-soft/40 px-2 py-1">
+                    <div className="text-[11.5px] font-medium text-accent-ink">↩ Câu trả lời tiếp trên PR — Áp dụng sẽ đưa vào ô “Trả lời tiếp” của finding (chưa gửi)</div>
+                    <div className="mt-0.5 whitespace-pre-wrap text-ink-2">{u.follow_reply}</div>
+                  </div>
+                )}
               </div>
             )
           })}

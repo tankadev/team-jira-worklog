@@ -511,6 +511,10 @@ export const CHAT_SCHEMA = {
               comment: { type: 'string', description: 'Nội dung comment mới, hoàn chỉnh.' },
               severity: { type: 'string', enum: ['blocker', 'major', 'minor', 'nit'] },
               dismiss: { type: 'boolean', description: 'true nếu finding này sai / không cần nêu.' },
+              follow_reply: {
+                type: 'string',
+                description: 'Câu trả lời tiếp trên PR cho finding ĐÃ gửi lên PR — khi người review nhờ soạn / sửa câu trả lời tiếp. Hoàn chỉnh, paste thẳng lên PR được.',
+              },
               reason: { type: 'string', description: 'Vì sao đổi — một câu.' },
             },
             required: ['id'],
@@ -552,7 +556,7 @@ export function chatPrompt(input: {
     ? input.findings
         .map((f) => {
           const loc = input.kind === 'doc' ? f.location || f.file : `${f.file}${f.line ? `:${f.line}` : ''}`
-          return `- id ${f.id} [${f.severity}] (${f.status})${f.category === OWN_CATEGORY ? ' (người review tự viết)' : ''} ${loc} — ${f.title}\n  ${f.body.replace(/\n+/g, ' ').slice(0, 500)}`
+          return `- id ${f.id} [${f.severity}] (${f.status})${f.category === OWN_CATEGORY ? ' (người review tự viết)' : ''}${f.ghUrl ? ' (đã gửi lên PR)' : ''} ${loc} — ${f.title}\n  ${f.body.replace(/\n+/g, ' ').slice(0, 500)}`
         })
         .join('\n')
     : '(không có finding nào)'
@@ -580,6 +584,7 @@ ${input.message.trim()}
 Nếu tin nhắn có kết quả chạy test / log do người review tự chạy: đọc kỹ, nói rõ test nào pass / fail và vì sao, finding nào được xác nhận hay bị bác bỏ, rồi đề xuất cập nhật trong \`changes\` (dismiss finding sai, đổi severity, sửa nội dung, thêm finding nếu lộ lỗi mới).
 Trả lời trong \`reply\`: tiếng Việt, đi thẳng vào câu hỏi; mở lại code / tài liệu để kiểm chứng khi cần, đừng trả lời theo trí nhớ nếu không chắc. Nếu người review yêu cầu (hoặc bạn thấy rõ là cần) sửa bản review, đề xuất trong \`changes\`:
 - \`update\`: sửa title / comment / severity của finding theo id, hoặc \`dismiss: true\` nếu nó sai; kèm \`reason\`.
+- \`update[].follow_reply\`: khi người review hỏi về trao đổi sau một finding "đã gửi lên PR" (member trả lời, câu trả lời tiếp đang soạn) hoặc nhờ soạn / sửa câu trả lời tiếp — đặt câu trả lời tiếp HOÀN CHỈNH ở đây (paste thẳng lên PR được), kèm \`reason\`. Đừng sửa \`comment\` của finding đó: comment đã gửi rồi. Trong \`reply\` chỉ cần nói ngắn vì sao viết vậy.
 - \`add\`: finding mới (cùng dạng như lúc review${input.kind === 'pr' ? '; điều không gắn với dòng code nào là comment rời — bỏ trống file / line' : ''}).
 Comment đề xuất giữ đúng giọng văn đã quy định (tiếng Việt, paste thẳng lên GitHub được). Không có gì cần đổi thì bỏ \`changes\`. Người review sẽ tự bấm áp dụng.
 ${addressBlock(input.addressee)}

@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useCallback, useContext, useEffect, useState, useTransition } from 'react'
+import { createContext, useCallback, useContext, useEffect, useRef, useState, useTransition } from 'react'
 
 import type { Discussion, GhComment, GhThread, GithubAccess } from '@/lib/modules/code-review/github'
 import { type FindingView, type RoundView, where } from '@/lib/modules/code-review/model'
@@ -16,6 +16,7 @@ import {
   submitReviewAction,
 } from '../actions'
 import { BTN, BTN_PRI, CARD, CTITLE, INPUT, SeverityPill, Ago } from '../ui'
+import { AskClaude } from './chat'
 
 /**
  * Talking to the PR from inside the module: post findings, submit a review,
@@ -201,10 +202,96 @@ export function FindingGithub({ f, onPosted }: { f: FindingView; onPosted: () =>
       <a href={f.ghUrl} target="_blank" rel="noreferrer" className="text-[12px] font-medium text-good hover:underline">
         ✓ Đã gửi lên PR{f.ghCommentId ? '' : ' (comment chung)'} ↗
       </a>
-      {thread && <ThreadView thread={thread} skipFirst compact hideReply />}
+      {thread ? <ThreadView thread={thread} skipFirst compact hideReply /> : !f.ghCommentId && <ConversationReplies f={f} />}
       {gh.canWrite && <FollowUp f={f} onSent={onPosted} />}
     </div>
   )
+}
+
+const quote = (author: string, body: string, viewer: string) =>
+  `> **${author}${author === viewer ? ' (tôi)' : ''}:** ${(body.length > 1500 ? `${body.slice(0, 1500)}…` : body).replace(/\n/g, '\n> ')}`
+
+/**
+ * A finding already on the PR as a question for Claude: what was said after
+ * it (its thread, or for a conversation comment, the PR comments since) and
+ * the reply being drafted — is it right, and how should it read.
+ */
+/** CI bots post status reports, not answers. */
+const isBot = (c: GhComment) => /\[bot\]$|^github-actions$/i.test(c.author)
+
+/**
+ * What was said after a finding went up: its thread for an inline comment;
+ * for a conversation comment, GitHub has no thread, so the comments posted
+ * after it — minus bots, the reviewer's other findings and follow-ups, and
+ * anything quoting a different comment.
+ */
+function repliesAfter(f: FindingView, d: Discussion | null): GhComment[] {
+  if (!d) return []
+  if (f.ghCommentId) return d.threads.find((t) => t.comments.some((c) => c.id === f.ghCommentId))?.comments.filter((c) => c.id !== f.ghCommentId) ?? []
+  const mine = d.comments.find((c) => c.url === f.ghUrl)
+  if (!mine) return []
+  const links = (c: GhComment) => [...c.body.matchAll(/#issuecomment-(\d+)/g)].map((m) => Number(m[1]))
+  return d.comments.filter((c) => {
+    if (c.createdAt <= mine.createdAt || isBot(c)) return false
+    const linked = links(c)
+    // Quoting another comment ("[comment trước](…)") = talking about something else.
+    if (linked.length && !linked.includes(mine.id)) return false
+    // The reviewer's own comments here are other findings or follow-ups; only this finding's follow-ups belong.
+    if (c.author === d.viewer) return linked.includes(mine.id)
+    return true
+  })
+}
+
+/**
+ * The talk after a conversation comment, under the finding — collapsible,
+ * open while the last word is someone else's (it is waiting on the reviewer).
+ */
+function ConversationReplies({ f }: { f: FindingView }) {
+  const gh = useGh()
+  const ask = useContext(AskClaude)
+  const viewer = gh.discussion?.viewer ?? ''
+  const after = repliesAfter(f, gh.discussion)
+  const pending = after.length > 0 && after.at(-1)!.author !== viewer
+  const [open, setOpen] = useState<boolean | null>(null)
+  const shown = open ?? pending
+  if (!gh.discussion) return null
+  return (
+    <div className="mt-2 border-l-2 border-line pl-2.5">
+      <div className="flex flex-wrap items-center gap-2 text-[11.5px]">
+        <span className="text-ink-3" title="Comment chung không có thread trên GitHub — đây là các comment trên PR sau comment này">
+          {after.length ? `${after.length} comment trên PR sau comment này` : 'Chưa có ai trả lời'}
+        </span>
+        {pending && <span className="rounded bg-blue-soft px-1.5 text-blue-ink">Chờ bạn trả lời</span>}
+        {after.length > 0 && ask && (
+          <button type="button" className="ml-auto text-accent-ink hover:underline" onClick={() => ask(followUpQuestion(f, '', gh.discussion))}>
+            🤖 Hỏi Claude
+          </button>
+        )}
+        {after.length > 0 && (
+          <button type="button" className={(ask ? '' : 'ml-auto ') + 'text-ink-3 hover:text-ink'} onClick={() => setOpen(!shown)}>
+            {shown ? 'Thu gọn' : 'Mở'}
+          </button>
+        )}
+      </div>
+      {shown && after.length > 0 && (
+        <div className="mt-1.5 flex flex-col gap-1.5">
+          {after.map((c) => (
+            <CommentView key={c.id} c={c} viewer={viewer} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function followUpQuestion(f: FindingView, draft: string, d: Discussion | null): string {
+  const viewer = d?.viewer ?? ''
+  const after = repliesAfter(f, d)
+  const talk = after.length ? `\nTrao đổi sau comment đó:\n${after.map((c) => quote(c.author, c.body, viewer)).join('\n>\n')}\n` : '\nChưa có ai trả lời comment đó.\n'
+  const reply = draft.trim() ? `\nCâu trả lời tiếp tôi đang định gửi:\n${quote(viewer || 'tôi', draft.trim(), viewer)}\n` : ''
+  return `Về finding #${f.id} "${f.title}" (${where(f) || 'comment chung'}) đã gửi lên PR.${talk}${reply}\n${
+    reply ? 'Câu trả lời này đã đúng và đủ chưa, so với code hiện tại và những gì member đã nói? Sửa giúp nếu cần.' : 'Nên trả lời tiếp thế nào? Soạn giúp câu trả lời.'
+  }`
 }
 
 /**
@@ -214,6 +301,7 @@ export function FindingGithub({ f, onPosted }: { f: FindingView; onPosted: () =>
  */
 function FollowUp({ f, onSent }: { f: FindingView; onSent: () => void }) {
   const gh = useGh()
+  const ask = useContext(AskClaude)
   // Where the reply text can come from: what Claude drafted for the thread in
   // this round, the comment as it reads now (edited or not), or this round's note.
   const sources = [
@@ -231,6 +319,11 @@ function FollowUp({ f, onSent }: { f: FindingView; onSent: () => void }) {
     setText(sources[0].text)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [f.followReply, f.body])
+  // A draft applied from the chat: show it, even if a follow-up was sent before.
+  const firstDraft = useRef(f.followReply)
+  useEffect(() => {
+    if (f.followReply && f.followReply !== firstDraft.current) setOpen(true)
+  }, [f.followReply])
 
   return (
     <div className="mt-2">
@@ -289,6 +382,16 @@ function FollowUp({ f, onSent }: { f: FindingView; onSent: () => void }) {
                 })
               }
             />
+            {ask && (
+              <button
+                type="button"
+                className={BTN}
+                title="Đưa finding, các trả lời của member và câu trả lời đang soạn vào khung chat với Claude"
+                onClick={() => ask(followUpQuestion(f, text, gh.discussion))}
+              >
+                🤖 Hỏi Claude
+              </button>
+            )}
             <button type="button" className={BTN} onClick={() => setOpen(false)}>
               Đóng
             </button>
@@ -348,6 +451,22 @@ function ReplyBox({ onSend, placeholder }: { onSend: (body: string) => Promise<{
   )
 }
 
+/**
+ * A thread as a question for Claude: where it is, everything said in it, and
+ * what to do — judge the last reply against the code, draft the next one.
+ * Prefilled, not sent: the reviewer adds what they actually want to know.
+ */
+function threadQuestion(t: GhThread, viewer: string): string {
+  const where = t.path ? `${t.path}${t.line ? `:${t.line}` : ''}` : 'PR'
+  const said = t.comments.map((c) => quote(c.author, c.body, viewer)).join('\n>\n')
+  const last = t.comments.at(-1)
+  const ask =
+    last && last.author !== viewer
+      ? `${last.author} trả lời như trên có đúng không? Đối chiếu với code hiện tại của PR, rồi soạn giúp câu trả lời tiếp trong thread này (nếu cần).`
+      : 'Đánh giá giúp trao đổi này dựa trên code hiện tại của PR.'
+  return `Về thread trên PR ở ${where}${t.isOutdated ? ' (code đã đổi sau comment)' : ''}${t.isResolved ? ' (đã đánh dấu xong)' : ''}:\n${said}\n\n${ask}`
+}
+
 export function ThreadView({
   thread,
   skipFirst,
@@ -361,6 +480,7 @@ export function ThreadView({
   hideReply?: boolean
 }) {
   const gh = useGh()
+  const ask = useContext(AskClaude)
   const [busy, start] = useTransition()
   const [open, setOpen] = useState(!thread.isResolved)
   const viewer = gh.discussion?.viewer ?? ''
@@ -388,7 +508,17 @@ export function ThreadView({
         {thread.isResolved && <span className="rounded bg-good-soft px-1.5 text-good">Đã xong</span>}
         {thread.isOutdated && <span className="rounded bg-surface-2 px-1.5 text-ink-3">Code đã đổi</span>}
         {pending && !thread.isResolved && <span className="rounded bg-blue-soft px-1.5 text-blue-ink">Chờ bạn trả lời</span>}
-        <button type="button" className="ml-auto text-ink-3 hover:text-ink" onClick={() => setOpen((v) => !v)}>
+        {ask && (!compact || shown.length > 0) && (
+          <button
+            type="button"
+            className="ml-auto text-accent-ink hover:underline"
+            title="Đưa cả trao đổi trong thread này vào khung chat với Claude — sửa câu hỏi rồi gửi"
+            onClick={() => ask(threadQuestion(thread, viewer))}
+          >
+            🤖 Hỏi Claude
+          </button>
+        )}
+        <button type="button" className={(ask && (!compact || shown.length > 0) ? '' : 'ml-auto ') + 'text-ink-3 hover:text-ink'} onClick={() => setOpen((v) => !v)}>
           {open ? 'Thu gọn' : 'Mở'}
         </button>
         {gh.canWrite && (

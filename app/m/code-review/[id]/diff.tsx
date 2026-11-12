@@ -8,7 +8,7 @@ import { type Addressee, type FindingView, type ItemView, type RoundView, SEVERI
 
 import { type RoundDiff, addOwnFindingAction, postFindingAction, roundDiffAction } from '../actions'
 import { BTN, BTN_PRI, CARD, INPUT } from '../ui'
-import { type ChatHandle, ChatPanel } from './chat'
+import { AskClaude, type ChatHandle, ChatPanel } from './chat'
 import { ConfirmButton, useGh } from './github'
 
 /**
@@ -227,6 +227,10 @@ export function CodeTab({
     setChatOpen(true)
     setTimeout(() => chat.current?.ask(f), 50)
   }, [])
+  const askText = useCallback((text: string) => {
+    setChatOpen(true)
+    setTimeout(() => chat.current?.prefill(text), 50)
+  }, [])
   const showFinding = useCallback((f: FindingView) => latest.current.renderFinding(f, () => askFinding(f)), [askFinding])
   const cancel = useCallback(() => setSel(null), [])
   const saved = useCallback((message?: string) => {
@@ -241,7 +245,7 @@ export function CodeTab({
   }, [])
 
   return (
-    <>
+    <AskClaude.Provider value={done ? askText : null}>
       {/* Lets the app's main column use the full screen width, like GitHub's diff (globals.css). */}
       <span className="wide-page" hidden />
       <div className="mb-3 flex flex-wrap items-center gap-2 text-[12.5px]">
@@ -372,7 +376,7 @@ export function CodeTab({
           💬 Chat với Claude
         </button>
       )}
-    </>
+    </AskClaude.Provider>
   )
 }
 

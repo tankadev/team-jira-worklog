@@ -5,13 +5,16 @@ import { revalidatePath } from 'next/cache'
 import { type ChatMessage, applyChanges, cancelChat, listChat, sendChat } from '@/lib/modules/code-review/chat'
 import { type ClaudeCheck, checkClaude } from '@/lib/modules/code-review/claude'
 import { getRepo, getTemplate, rememberPerson, setRepos, setRunnerConfig, setTemplates } from '@/lib/modules/code-review/config'
-import { changedPaths, commitExists, diffRanges, diffText, isRepo, listRemoteBranches, fetchAll, gitSays, withRepoLock } from '@/lib/modules/code-review/git'
+import { changedPaths, commitExists, diffRanges, diffText, isRepo, listRemoteBranches, fetchAll, fetchPull, gitSays, withRepoLock } from '@/lib/modules/code-review/git'
 import {
   type Discussion,
   type GithubAccess,
   GithubError,
   checkAccess,
+  type CommitRow,
+  compareCommits,
   getPull,
+  listPullCommits,
   type PullSummary,
   type ReviewEvent,
   getDiscussion,
@@ -723,6 +726,64 @@ export interface RoundDiff extends Result {
  * (merge-base…head), or for a later round only what changed since the round
  * before it.
  */
+/** What changed in code between the last reviewed head and the PR's head now. */
+export interface CommitDrift {
+  /** Round whose head is no longer among the PR's commits. */
+  round: number
+  from: string
+  to: string
+  /** Files that differ; empty = same code (history rewritten, nothing new). */
+  files: string[]
+  /** Why it could not be compared, when it could not. */
+  error: string
+}
+
+/**
+ * The PR's commits as GitHub has them now, for the "Commit" tab — read only.
+ * Which round covered which commit is worked out on the page from the rounds'
+ * head shas, so commits pushed after the last round stand out.
+ *
+ * When the last finished round's head is gone from the list (squash /
+ * rebase / force-push), the PR head is fetched into the module's own ref and
+ * diffed against it locally, to tell "same code, new history" from real
+ * changes nobody has reviewed.
+ */
+export async function commitsAction(itemId: number): Promise<Result & { commits: CommitRow[]; drift: CommitDrift | null }> {
+  const none = (message: string) => ({ ok: false, message, commits: [], drift: null })
+  if (!enabled()) return none(OFF.message)
+  const item = getItem(itemId)
+  if (!item || item.kind !== 'pr') return none('Không thấy hồ sơ PR.')
+  const repo = getRepo(item.repoId)
+  if (!repo?.githubRepo) return none('Repo này chưa gắn GitHub nên không lấy được danh sách commit.')
+  let commits: CommitRow[]
+  try {
+    commits = item.prNumber
+      ? await listPullCommits(repo.githubRepo, item.prNumber)
+      : await compareCommits(repo.githubRepo, item.baseRef, item.headRef)
+  } catch (err) {
+    return none((err as Error).message)
+  }
+
+  let drift: CommitDrift | null = null
+  const last = listRounds(itemId).filter((r) => r.state === 'done' && r.headSha).at(-1)
+  const head = commits.at(-1)?.sha
+  if (last && head && !commits.some((c) => c.sha === last.headSha)) {
+    drift = { round: last.round, from: last.headSha, to: head, files: [], error: '' }
+    try {
+      await withRepoLock(repo.localPath, async () => {
+        if (item.prNumber) await fetchPull(repo.localPath, item.prNumber, item.baseRef)
+        else await fetchAll(repo.localPath)
+      })
+      if (!(await commitExists(repo.localPath, last.headSha))) drift.error = 'Clone không còn commit của vòng trước.'
+      else if (!(await commitExists(repo.localPath, head))) drift.error = 'Chưa lấy được head mới của PR về clone.'
+      else drift.files = await changedPaths(repo.localPath, last.headSha, head)
+    } catch (err) {
+      drift.error = gitSays(err)
+    }
+  }
+  return { ok: true, message: '', commits, drift }
+}
+
 export async function roundDiffAction(roundId: number, scope: 'all' | 'since'): Promise<RoundDiff> {
   const none = (message: string): RoundDiff => ({ ok: false, message, files: [], from: '', to: '', truncated: false, since: [] })
   if (!enabled()) return none(OFF.message)

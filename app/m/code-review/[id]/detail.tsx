@@ -58,7 +58,8 @@ import {
 } from '../actions'
 import { ContextPicker, type DocRepo, LinkPicker, type PrContext, RepoRows, type SourceRow, SourceRows, contextReady, sourcePayload, useAttachments, useDocUpload } from '../review'
 import { CfAccessNote, CfProvider, FindingConfluence, SendAllConfluence } from './confluence'
-import { type ChatHandle, ChatPanel, ChatShortcut } from './chat'
+import { AskClaude, type ChatHandle, ChatPanel, ChatShortcut } from './chat'
+import { CommitsTab } from './commits'
 import { CodeTab } from './diff'
 import { AccessNote, DiscussionPanel, FindingGithub, GhProvider, ReplyWithBody, SubmitReview, useGh } from './github'
 import {
@@ -77,7 +78,7 @@ import {
   Elapsed,
 } from '../ui'
 
-type Tab = 'review' | 'code' | 'discussion'
+type Tab = 'review' | 'code' | 'commits' | 'discussion'
 
 export function ReviewDetail({
   item,
@@ -109,16 +110,30 @@ export function ReviewDetail({
 }) {
   const [claude, setClaude] = useState(initialClaude)
   const onGithub = item.kind === 'pr' && Boolean(item.prNumber) && Boolean(githubRepo)
-  const tabs: Tab[] = item.kind === 'pr' ? ['review', 'code', ...(onGithub && access.read ? (['discussion'] as const) : [])] : ['review']
+  const tabs: Tab[] =
+    item.kind === 'pr'
+      ? ['review', 'code', ...(githubRepo ? (['commits'] as const) : []), ...(onGithub && access.read ? (['discussion'] as const) : [])]
+      : ['review']
   const [tab, setTab] = useState<Tab>(tabs.includes(initialTab) ? initialTab : 'review')
   const [detail, setDetail] = useState<ItemDetail>({ rounds: [], findings: {}, log: [], logRoundId: null })
   const [selected, setSelected] = useState<number | null>(null)
   const [loaded, setLoaded] = useState(false)
+  /** A question asked from the Discussion tab, waiting for the review tab's chat. */
+  const [pendingAsk, setPendingAsk] = useState<{ roundId: number; text: string } | null>(null)
 
   const rounds = detail.rounds
   const current = rounds.find((r) => r.id === selected) ?? rounds.at(-1) ?? null
   const latest = rounds.at(-1) ?? null
   const live = latest ? LIVE_STATES.includes(latest.state) : false
+  // The Discussion tab has no chat of its own: a question goes to the last finished round's.
+  const chatRound = [...rounds].reverse().find((r) => r.state === 'done') ?? null
+  const askFromDiscussion = chatRound
+    ? (text: string) => {
+        setPendingAsk({ roundId: chatRound.id, text })
+        setSelected(chatRound.id)
+        setTab('review')
+      }
+    : null
 
   const refresh = useCallback(
     async (roundId?: number) => {
@@ -198,6 +213,11 @@ export function ReviewDetail({
           <TabBtn on={tab === 'code'} onClick={() => setTab('code')}>
             Thay đổi code
           </TabBtn>
+          {tabs.includes('commits') && (
+            <TabBtn on={tab === 'commits'} onClick={() => setTab('commits')}>
+              Commit
+            </TabBtn>
+          )}
           {tabs.includes('discussion') && (
             <TabBtn on={tab === 'discussion'} onClick={() => setTab('discussion')}>
               <DiscussionLabel />
@@ -207,7 +227,11 @@ export function ReviewDetail({
       )}
 
       {tab === 'discussion' ? (
-        <DiscussionPanel />
+        <AskClaude.Provider value={askFromDiscussion}>
+          <DiscussionPanel />
+        </AskClaude.Provider>
+      ) : tab === 'commits' ? (
+        <CommitsTab itemId={item.id} rounds={rounds} roundsLoaded={loaded} onReview={() => setTab('review')} />
       ) : (
         <>
       {rounds.length > 0 && (
@@ -269,6 +293,8 @@ export function ReviewDetail({
           canRun={claude.ok}
           addressee={addressee}
           templates={templates}
+          pendingAsk={pendingAsk?.roundId === current.id ? pendingAsk.text : null}
+          onPendingAsked={() => setPendingAsk(null)}
           onChanged={() => refresh(current.id)}
         />
       )}
@@ -723,6 +749,8 @@ function RoundPanel({
   canRun,
   addressee,
   templates,
+  pendingAsk,
+  onPendingAsked,
   onChanged,
 }: {
   item: ItemView
@@ -735,6 +763,9 @@ function RoundPanel({
   canRun: boolean
   addressee: Addressee | null
   templates: DocTemplate[]
+  /** A question from the Discussion tab for this round's chat. */
+  pendingAsk: string | null
+  onPendingAsked: () => void
   onChanged: () => void
 }) {
   const live = LIVE_STATES.includes(round.state)
@@ -829,7 +860,7 @@ function RoundPanel({
       {item.kind === 'doc' && (item.repoId || round.links.length > 0) && <CodeChecked item={item} round={round} repos={repos} />}
 
       {round.state === 'done' && (
-        <DoneRound item={item} round={round} findings={findings} githubRepo={githubRepo} isLatest={isLatest} canRun={canRun} addressee={addressee} onChanged={onChanged} />
+        <DoneRound item={item} round={round} findings={findings} githubRepo={githubRepo} isLatest={isLatest} canRun={canRun} addressee={addressee} pendingAsk={pendingAsk} onPendingAsked={onPendingAsked} onChanged={onChanged} />
       )}
     </div>
   )
@@ -968,6 +999,8 @@ function DoneRound({
   isLatest,
   canRun,
   addressee,
+  pendingAsk,
+  onPendingAsked,
   onChanged,
 }: {
   item: ItemView
@@ -977,12 +1010,23 @@ function DoneRound({
   isLatest: boolean
   canRun: boolean
   addressee: Addressee | null
+  pendingAsk: string | null
+  onPendingAsked: () => void
   onChanged: () => void
 }) {
   const [findings, setFindings] = useState(initial)
   const [summary, setSummary] = useState(round.summary)
   const [filter, setFilter] = useState<Filter>('live')
   const chat = useRef<ChatHandle>(null)
+  const askText = useCallback((text: string) => chat.current?.prefill(text), [])
+
+  // Asked from the Discussion tab before this panel existed.
+  useEffect(() => {
+    if (!pendingAsk) return
+    // Not cleared on cleanup: clearing pendingAsk re-runs this effect before the chat has mounted.
+    setTimeout(() => chat.current?.prefill(pendingAsk), 150)
+    onPendingAsked()
+  }, [pendingAsk, onPendingAsked])
 
   useEffect(() => setFindings(initial), [initial])
   // Claude's accepted proposal may have rewritten the summary.
@@ -1037,7 +1081,7 @@ function DoneRound({
     ).length
 
   return (
-    <>
+    <AskClaude.Provider value={canRun ? askText : null}>
       <div className="flex flex-wrap items-center gap-2">
         {round.round > 1 && item.kind === 'pr' && (
           <span className="text-[12px] text-ink-2">
@@ -1128,7 +1172,7 @@ function DoneRound({
       )}
 
       <ChatPanel ref={chat} roundId={round.id} findings={findings} canRun={canRun} addressee={addressee} onApplied={onChanged} />
-    </>
+    </AskClaude.Provider>
   )
 }
 

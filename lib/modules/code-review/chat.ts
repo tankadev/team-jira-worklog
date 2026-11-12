@@ -51,7 +51,7 @@ const SUPERVISOR = path.join(process.cwd(), 'lib/modules/code-review/supervise.m
 
 export interface ChatChanges {
   summary_comment?: string
-  update?: Array<{ id: number; title?: string; comment?: string; severity?: string; dismiss?: boolean; reason?: string }>
+  update?: Array<{ id: number; title?: string; comment?: string; severity?: string; dismiss?: boolean; reason?: string; follow_reply?: string }>
   add?: RawFinding[]
 }
 
@@ -313,8 +313,14 @@ export async function applyChanges(messageId: number): Promise<{ ok: boolean; me
   const mine = new Map<number, FindingView>(listFindings(round.id).map((f) => [f.id, f]))
   let edited = 0
   let dismissed = 0
+  let replied = 0
   for (const u of changes.update ?? []) {
     if (!mine.has(u.id)) continue
+    // The next thing to say on the PR: lands in the finding's "Trả lời tiếp" box, sent only by its own button.
+    if (u.follow_reply?.trim() && mine.get(u.id)!.ghUrl) {
+      patchFindingFull(u.id, { followReply: u.follow_reply.trim() })
+      replied++
+    }
     if (u.dismiss) {
       patchFindingFull(u.id, { status: 'dismissed' })
       dismissed++
@@ -347,6 +353,6 @@ export async function applyChanges(messageId: number): Promise<{ ok: boolean; me
   // The round note is Claude's read for the reviewer, not part of what gets
   // posted — chat does not rewrite it.
   updateMessage(m.id, { applied: true })
-  const parts = [edited && `sửa ${edited}`, dismissed && `bỏ ${dismissed}`, added && `thêm ${added}`]
+  const parts = [edited && `sửa ${edited}`, dismissed && `bỏ ${dismissed}`, added && `thêm ${added}`, replied && `${replied} câu trả lời tiếp (đã vào ô trả lời của finding)`]
   return { ok: true, message: `Đã áp dụng: ${parts.filter(Boolean).join(', ') || 'không có gì thay đổi'}.` }
 }

@@ -122,6 +122,55 @@ export async function getPull(repo: string, number: number): Promise<PullDetail>
   return { ...toSummary(p), body: p.body ?? '' }
 }
 
+export interface CommitRow {
+  sha: string
+  /** First line of the message. */
+  title: string
+  /** The rest of the message, trimmed. */
+  body: string
+  author: string
+  /** Author date, epoch seconds. */
+  date: number
+  url: string
+}
+
+interface RawCommit {
+  sha: string
+  html_url: string
+  author: { login: string } | null
+  commit: { message: string; author: { name: string; date: string } | null }
+}
+
+const toCommit = (c: RawCommit): CommitRow => {
+  const [title, ...rest] = c.commit.message.split('\n')
+  return {
+    sha: c.sha,
+    title,
+    body: rest.join('\n').trim(),
+    author: c.author?.login ?? c.commit.author?.name ?? '',
+    date: c.commit.author?.date ? Math.floor(Date.parse(c.commit.author.date) / 1000) : 0,
+    url: c.html_url,
+  }
+}
+
+/** A PR's commits, oldest first, as GitHub's Commits tab lists them (GitHub stops at 250). */
+export async function listPullCommits(repo: string, number: number): Promise<CommitRow[]> {
+  const out: CommitRow[] = []
+  for (let page = 1; page <= 3; page++) {
+    const rows = await gh<RawCommit[]>(`/repos/${repo}/pulls/${number}/commits?per_page=100&page=${page}`)
+    out.push(...rows.map(toCommit))
+    if (rows.length < 100) break
+  }
+  return out
+}
+
+/** Commits on `head` not on `base`, oldest first — for a branch pair with no PR. */
+export async function compareCommits(repo: string, base: string, head: string): Promise<CommitRow[]> {
+  const enc = (r: string) => r.split('/').map(encodeURIComponent).join('/')
+  const res = await gh<{ commits: RawCommit[] }>(`/repos/${repo}/compare/${enc(base)}...${enc(head)}?per_page=250`)
+  return res.commits.map(toCommit)
+}
+
 /**
  * What people have already said on the PR, so the review does not repeat it.
  * Best-effort: a failure here costs context, not the review.
