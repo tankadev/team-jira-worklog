@@ -407,7 +407,33 @@ export interface ItemView {
   sources: ConfluenceRef[]
   /** PR reviews: Jira tickets to read as requirements. */
   jira: JiraContext
+  /** PRs this review followed before, oldest first — the member closed one and reopened the work as another. */
+  movedFrom: MovedPr[]
   updatedAt: number
+}
+
+export interface MovedPr {
+  prNumber: number
+  url: string
+  /** Epoch seconds the review moved off it. */
+  at: number
+}
+
+/** The PR a GitHub comment / review link sits on, from its URL. */
+export function ghPrNumber(url: string): number | null {
+  const m = /\/pull\/(\d+)/.exec(url)
+  return m ? Number(m[1]) : null
+}
+
+/**
+ * Whether a finding is on the PR the review follows now. One posted on a PR
+ * the review moved off still shows its old link, but counts as not posted:
+ * its thread cannot be replied to from here and it can go to the new PR.
+ */
+export function postedHere(f: Pick<FindingView, 'ghUrl'>, prNumber: number | null): boolean {
+  if (!f.ghUrl) return false
+  const on = ghPrNumber(f.ghUrl)
+  return on === null || prNumber === null || on === prNumber
 }
 
 /** A row on the dashboard: the item plus where its latest round stands. */

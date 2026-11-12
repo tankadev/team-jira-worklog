@@ -6,7 +6,7 @@
  * GitHub refuses ("could not be resolved") a comment whose lines are not all
  * inside one hunk — the bug a finding at 121–135 hit against a 120–133 hunk.
  */
-import { anchorInDiff } from '@/lib/modules/code-review/model'
+import { anchorInDiff, ghPrNumber, postedHere } from '@/lib/modules/code-review/model'
 
 let n = 0
 let bad = 0
@@ -28,6 +28,15 @@ eq(anchorInDiff(H, 130, 310), { line: 133, startLine: 130 }, 'range across two h
 eq(anchorInDiff(H, 133, 133), { line: 133 }, 'last line of a hunk')
 eq(anchorInDiff([], 125, 130), null, 'no hunks for the file')
 eq(anchorInDiff(H, null, null), null, 'no line (loose comment)')
+
+// A review moved from PR #1925 to #1931: comments on #1925 are not "sent" here.
+const U = 'https://github.com/o/r/pull/1925#discussion_r42'
+eq(ghPrNumber(U), 1925, 'PR number from a comment link')
+eq(ghPrNumber('https://x.atlassian.net/wiki/pages/1'), null, 'not a PR link')
+eq(postedHere({ ghUrl: U }, 1925), true, 'posted on the PR it follows')
+eq(postedHere({ ghUrl: U }, 1931), false, 'posted on a PR the review moved off')
+eq(postedHere({ ghUrl: '' }, 1931), false, 'not posted')
+eq(postedHere({ ghUrl: 'https://x.atlassian.net/wiki/pages/1' }, null), true, 'Confluence comment counts as posted')
 
 console.log(bad ? `${bad}/${n} failed` : `code-review anchor: ${n} ok`)
 process.exit(bad ? 1 : 0)

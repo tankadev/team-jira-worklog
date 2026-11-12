@@ -337,6 +337,8 @@ export const reviewItems = sqliteTable(
     sources: text("sources").notNull().default("[]"),
     /** JSON {keys, auto}: Jira tickets a PR review reads; '' = none pasted, auto-detect on. */
     jira: text("jira").notNull().default(""),
+    /** JSON [{prNumber, url, at}]: PRs this review followed before (member closed one, reopened as another). */
+    movedFrom: text("moved_from").notNull().default("[]"),
     createdAt: integer("created_at").notNull().default(now),
     updatedAt: integer("updated_at").notNull().default(now),
   },

@@ -2,7 +2,7 @@ import 'server-only'
 
 import type { PullComment } from './github'
 import type { TemplateUse } from './config'
-import { type Addressee, type DocFile, type FindingView, OWN_CATEGORY, type RoundLink, addressOf } from './model'
+import { type Addressee, type DocFile, type FindingView, OWN_CATEGORY, type RoundLink, addressOf, ghPrNumber, postedHere } from './model'
 
 /**
  * What Claude is asked, and the shape it must answer in.
@@ -197,13 +197,17 @@ function rulesBlock(globalRules: string, repoRules: string): string {
  */
 export type ThreadTalk = Map<number, Array<{ author: string; body: string }>>
 
-function previousBlock(prev: FindingView[], kind: 'code' | 'doc', talk?: ThreadTalk): string {
+function previousBlock(prev: FindingView[], kind: 'code' | 'doc', talk?: ThreadTalk, prNumber: number | null = null): string {
   if (!prev.length) return ''
   const target = kind === 'doc' ? 'Confluence' : 'PR'
   const list = prev
     .map((f) => {
       const loc = kind === 'doc' ? f.location : `${f.file}${f.line ? `:${f.line}` : ''}` || 'comment rời'
-      const posted = f.ghUrl ? ` (đã gửi lên ${target})` : ''
+      const posted = !f.ghUrl
+        ? ''
+        : postedHere(f, prNumber)
+          ? ` (đã gửi lên ${target})`
+          : ` (đã comment ở PR cũ #${ghPrNumber(f.ghUrl)} — PR đó đã bỏ, KHÔNG viết \`reply\`)`
       const replies = (talk?.get(f.id) ?? [])
         .map((c) => `    ↳ ${c.author}: ${c.body.replace(/\s+/g, ' ').slice(0, 400)}`)
         .join('\n')
@@ -339,9 +343,14 @@ export function codePrompt(input: {
   addressee: Addressee | null
   /** Member replies in the GitHub threads of previous findings. */
   talk?: ThreadTalk
+  /** PRs this review followed before — the member closed them and reopened the work here. */
+  movedFrom?: number[]
 }): string {
   const pr = input.prNumber ? `PR #${input.prNumber}` : 'Nhánh'
   const followUp = input.round > 1
+  const moved = input.movedFrom?.length
+    ? `\n\nPR này **thay cho ${input.movedFrom.map((n) => `PR #${n}`).join(', ')}** — member đã đóng PR cũ (vd vì conflict) và mở lại phần việc ở đây. Các vòng trước review trên PR cũ; coi danh sách "vòng trước" là của chính phần việc này và đánh giá lại từng điểm trên code hiện tại. Code có thể đã được rebase / làm lại, nên nếu không so được với head cũ thì review lại toàn bộ.`
+    : ''
   const scope = followUp
     ? input.incremental
       ? `Đây là **vòng review thứ ${input.round}**. Member đã push thêm code sau lần review trước (head cũ ${input.prevHeadSha}).
@@ -356,7 +365,7 @@ Việc cần làm:
   return `Bạn đang review code cho ${pr} của repo **${input.repoName}**: "${input.title}"${input.author ? ` — tác giả ${input.author}` : ''}.
 Merge từ \`${input.headRef}\` vào \`${input.baseRef}\`. Thư mục hiện tại là worktree đang đứng đúng commit head ${input.headSha}.
 
-${scope}
+${scope}${moved}
 
 Cách làm:
 - Chỉ đọc. Dùng git diff/log/show, Read, Grep, Glob để hiểu thay đổi; mở file đầy đủ và nơi gọi hàm khi cần ngữ cảnh. Tuyệt đối không sửa file, không chạy build/test.
@@ -379,7 +388,7 @@ ${addressBlock(input.addressee)}
 \`\`\`
 ${input.diffStat.slice(0, 6000)}
 \`\`\`
-${linksBlock(input.links)}${docsBlock(input.docs, input.docsChanged, input.context)}${input.prBody.trim() ? `\n## Mô tả PR\n${input.prBody.trim().slice(0, 4000)}\n` : ''}${input.note.trim() ? `\n## Ghi chú của người review\n${input.note.trim()}\n` : ''}${rulesBlock(input.globalRules, input.repoRules)}${commentsBlock(input.comments)}${previousBlock(input.previous, 'code', input.talk)}
+${linksBlock(input.links)}${docsBlock(input.docs, input.docsChanged, input.context)}${input.prBody.trim() ? `\n## Mô tả PR\n${input.prBody.trim().slice(0, 4000)}\n` : ''}${input.note.trim() ? `\n## Ghi chú của người review\n${input.note.trim()}\n` : ''}${rulesBlock(input.globalRules, input.repoRules)}${commentsBlock(input.comments)}${previousBlock(input.previous, 'code', input.talk, input.prNumber)}
 Khi xong, trả kết quả qua structured output theo schema.`
 }
 

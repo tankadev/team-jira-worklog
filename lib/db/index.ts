@@ -363,6 +363,8 @@ function open() {
   ensureColumn(sqlite, "review_findings", "comment_kind", "comment_kind TEXT NOT NULL DEFAULT ''");
   // PR reviews: Jira tickets read as requirements (Confluence pages reuse `sources`).
   ensureColumn(sqlite, "review_items", "jira", "jira TEXT NOT NULL DEFAULT ''");
+  // PRs a review followed before the member moved the work to a new one.
+  ensureColumn(sqlite, "review_items", "moved_from", "moved_from TEXT NOT NULL DEFAULT '[]'");
   return drizzle(sqlite, { schema });
 }
 

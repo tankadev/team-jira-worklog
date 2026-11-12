@@ -16,6 +16,7 @@ import {
   type Addressee,
   type ConfluenceRef,
   type JiraContext,
+  type MovedPr,
   NO_JIRA,
   type PrLink,
   type RoundLink,
@@ -92,6 +93,7 @@ const toItem = (r: typeof reviewItems.$inferSelect): ItemView => ({
   templateId: r.templateId,
   sources: parseJsonArray<ConfluenceRef>(r.sources),
   jira: parseJira(r.jira),
+  movedFrom: parseJsonArray<MovedPr>(r.movedFrom),
   updatedAt: r.updatedAt,
 })
 
@@ -190,7 +192,7 @@ export function findLinkedItem(l: Pick<PrLink, 'repoId' | 'prNumber' | 'headRef'
 }
 
 export function createItem(
-  input: Omit<ItemView, 'id' | 'status' | 'updatedAt' | 'seenAt' | 'links' | 'addressee' | 'templateId' | 'sources' | 'jira'> & {
+  input: Omit<ItemView, 'id' | 'status' | 'updatedAt' | 'seenAt' | 'links' | 'addressee' | 'templateId' | 'sources' | 'jira' | 'movedFrom'> & {
     links?: PrLink[]
     templateId?: string
     sources?: ConfluenceRef[]
@@ -217,8 +219,26 @@ export function setItemJira(id: number, jira: JiraContext) {
   db.update(reviewItems).set({ jira: JSON.stringify(jira) }).where(eq(reviewItems.id, id)).run()
 }
 
-export function patchItem(id: number, patch: Partial<Omit<ItemView, 'id' | 'links' | 'addressee' | 'templateId' | 'sources' | 'jira'>>) {
+export function patchItem(id: number, patch: Partial<Omit<ItemView, 'id' | 'links' | 'addressee' | 'templateId' | 'sources' | 'jira' | 'movedFrom'>>) {
   db.update(reviewItems).set({ ...patch, updatedAt: nowSql }).where(eq(reviewItems.id, id)).run()
+}
+
+/**
+ * Points the review at another PR of the same repo — the member closed the
+ * old one (conflict, wrong base…) and reopened the work as a new PR. Rounds
+ * and findings stay; the old PR is remembered in `movedFrom`.
+ */
+export function moveItemToPr(
+  id: number,
+  from: MovedPr,
+  to: { prNumber: number; title: string; baseRef: string; headRef: string; author: string; url: string },
+) {
+  const item = getItem(id)
+  if (!item) return
+  db.update(reviewItems)
+    .set({ ...to, movedFrom: JSON.stringify([...item.movedFrom, from]), seenAt: null, updatedAt: nowSql })
+    .where(eq(reviewItems.id, id))
+    .run()
 }
 
 /** Marks the discussion read without bumping the item up the dashboard. */

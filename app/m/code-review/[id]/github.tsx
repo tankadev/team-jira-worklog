@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, useTransition } from 'react'
 
 import type { Discussion, GhComment, GhThread, GithubAccess } from '@/lib/modules/code-review/github'
-import { type FindingView, type RoundView, where } from '@/lib/modules/code-review/model'
+import { type FindingView, type RoundView, ghPrNumber, postedHere, where } from '@/lib/modules/code-review/model'
 
 import {
   commentAction,
@@ -36,6 +36,8 @@ interface GhState {
   access: GithubAccess
   recheck: () => Promise<void>
   itemId: number
+  /** The PR the review follows now — a comment on an earlier PR is not "sent" here. */
+  prNumber: number | null
   discussion: Discussion | null
   error: string
   loading: boolean
@@ -50,6 +52,7 @@ const GhContext = createContext<GhState>({
   access: NO_ACCESS,
   recheck: async () => {},
   itemId: 0,
+  prNumber: null,
   discussion: null,
   error: '',
   loading: false,
@@ -58,13 +61,18 @@ const GhContext = createContext<GhState>({
 
 export const useGh = () => useContext(GhContext)
 
+/** Sent to the PR the review follows now (not just to one it moved off). */
+export const usePostedHere = (f: Pick<FindingView, 'ghUrl'>) => postedHere(f, useGh().prNumber)
+
 export function GhProvider({
   itemId,
+  prNumber,
   onGithub,
   initialAccess,
   children,
 }: {
   itemId: number
+  prNumber: number | null
   /** The item is tied to a PR on github.com at all. */
   onGithub: boolean
   initialAccess: GithubAccess
@@ -85,7 +93,8 @@ export function GhProvider({
       setDiscussion(r.discussion)
       setError('')
     } else setError(r.message)
-  }, [enabled, itemId])
+    // prNumber: the review moved to another PR — its discussion is the one to show.
+  }, [enabled, itemId, prNumber])
 
   useEffect(() => {
     void reload()
@@ -96,7 +105,7 @@ export function GhProvider({
   }, [itemId, onGithub])
 
   return (
-    <GhContext.Provider value={{ enabled, canWrite: enabled && access.write, access, recheck, itemId, discussion, error, loading, reload }}>
+    <GhContext.Provider value={{ enabled, canWrite: enabled && access.write, access, recheck, itemId, prNumber, discussion, error, loading, reload }}>
       {children}
     </GhContext.Provider>
   )
@@ -169,12 +178,19 @@ export function FindingGithub({ f, onPosted }: { f: FindingView; onPosted: () =>
   const [msg, setMsg] = useState('')
   if (!gh.enabled) return null
 
-  if (!f.ghUrl) {
-    if (!gh.canWrite) return null
+  if (!postedHere(f, gh.prNumber)) {
+    // Sent to a PR the review has since moved off: keep the link, offer this PR.
+    const old = f.ghUrl ? (
+      <a href={f.ghUrl} target="_blank" rel="noreferrer" className="text-[12px] text-ink-3 hover:underline" title="PR cũ đã bỏ — comment ở đó không theo sang PR mới">
+        đã gửi ở PR cũ #{ghPrNumber(f.ghUrl)} ↗
+      </a>
+    ) : null
+    if (!gh.canWrite) return old
     return (
       <span className="inline-flex items-center gap-2">
+        {old}
         <ConfirmButton
-          label="Gửi lên PR"
+          label={f.ghUrl ? `Gửi lại lên PR #${gh.prNumber}` : 'Gửi lên PR'}
           confirm={f.inDiff ? `Gửi comment vào ${where(f)}?` : 'Gửi thành comment chung?'}
           disabled={busy}
           onConfirm={() =>
@@ -653,7 +669,7 @@ export function SubmitReview({
   onDone: () => void
 }) {
   const gh = useGh()
-  const candidates = findings.filter((f) => !f.ghUrl && f.status !== 'fixed' && f.status !== 'dismissed')
+  const candidates = findings.filter((f) => !postedHere(f, gh.prNumber) && f.status !== 'fixed' && f.status !== 'dismissed')
   const [picked, setPicked] = useState<Set<number>>(() => new Set(candidates.map((f) => f.id)))
   const [event, setEvent] = useState<'COMMENT' | 'REQUEST_CHANGES'>(round.verdict === 'request_changes' ? 'REQUEST_CHANGES' : 'COMMENT')
   const [open, setOpen] = useState(false)
@@ -767,7 +783,7 @@ export function ReplyWithBody({ f, body, onSent }: { f: FindingView; body: strin
   const gh = useGh()
   const [busy, start] = useTransition()
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
-  if (!gh.canWrite || !f.ghUrl) return null
+  if (!gh.canWrite || !postedHere(f, gh.prNumber)) return null
   return (
     <span className="inline-flex items-center gap-1.5">
       <ConfirmButton

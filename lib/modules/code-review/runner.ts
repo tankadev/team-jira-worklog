@@ -28,7 +28,7 @@ import {
 import { type RawFinding, buildFreshRows } from './findings'
 import { getDiscussion, getPull, listPullComments } from './github'
 import { cleanupLinks, linkDirs, prepareLinks } from './links'
-import { type DocFile, type FindingStatus, confluencePages, type FindingView, type RoundLink, type TestSuggestion, anchorInDiff, isFetched, ticketPlan } from './model'
+import { type DocFile, type FindingStatus, confluencePages, type FindingView, type RoundLink, type TestSuggestion, anchorInDiff, ghPrNumber, isFetched, postedHere, ticketPlan } from './model'
 import { ALLOWED_TOOLS, DISALLOWED_TOOLS, ISOLATION_FLAGS, reviewEnv } from './guard'
 import { CODE_SCHEMA, DOC_SCHEMA, type ThreadTalk, codePrompt, docPrompt } from './prompts'
 import { type LogLine, bootTime, lastResult, parseLog, pidAlive, readLog, strayLines } from './proc'
@@ -264,6 +264,7 @@ async function prepareAndSpawn(roundId: number) {
         talk,
         title: item.title,
         prNumber: item.prNumber,
+        movedFrom: item.movedFrom.map((m) => m.prNumber),
         author: item.author,
         baseRef: item.baseRef,
         headRef: item.headRef,
@@ -411,18 +412,21 @@ async function prepareAndSpawn(roundId: number) {
 async function threadTalk(repo: string, number: number, previous: FindingView[]): Promise<ThreadTalk | undefined> {
   const posted = previous.filter((f) => f.ghCommentId)
   if (!posted.length) return undefined
-  try {
-    const d = await getDiscussion(repo, number)
-    const talk: ThreadTalk = new Map()
-    for (const f of posted) {
-      const thread = d.threads.find((t) => t.comments.some((c) => c.id === f.ghCommentId))
-      const after = thread?.comments.filter((c) => c.id !== f.ghCommentId) ?? []
-      if (after.length) talk.set(f.id, after.map((c) => ({ author: c.author, body: c.body })))
-    }
-    return talk
-  } catch {
-    return undefined
+  // A review that moved PRs has threads on the old PR too — what the member
+  // said there is still the answer to the finding.
+  const prs = [...new Set(posted.map((f) => ghPrNumber(f.ghUrl) ?? number))]
+  const talk: ThreadTalk = new Map()
+  for (const pr of prs) {
+    try {
+      const d = await getDiscussion(repo, pr)
+      for (const f of posted.filter((x) => (ghPrNumber(x.ghUrl) ?? number) === pr)) {
+        const thread = d.threads.find((t) => t.comments.some((c) => c.id === f.ghCommentId))
+        const after = thread?.comments.filter((c) => c.id !== f.ghCommentId) ?? []
+        if (after.length) talk.set(f.id, after.map((c) => ({ author: c.author, body: c.body })))
+      }
+    } catch {}
   }
+  return talk.size ? talk : undefined
 }
 
 /** Replies under the previous findings already posted on Confluence — best-effort, read-only. */
@@ -596,7 +600,8 @@ async function storeOutput(r: RoundRow, out: Output) {
         status,
         followNote: v?.note?.trim() || (v ? '' : 'Claude không đánh giá lại điểm này — tự kiểm tra.'),
         // Only meaningful for a finding already on GitHub: what to say next in its thread.
-        followReply: old.ghUrl ? (v?.reply ?? '').trim() : '',
+        // A thread on a PR the review moved off takes no more replies.
+        followReply: old.ghUrl && postedHere(old, item.prNumber) ? (v?.reply ?? '').trim() : '',
         docRef: pages.has(old.docRef) ? old.docRef : '',
         quote: old.quote,
         commentKind: old.commentKind,

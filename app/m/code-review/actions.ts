@@ -40,7 +40,7 @@ import { type DiffFile, parseDiff } from '@/lib/modules/code-review/diff'
 import { buildFreshRows } from '@/lib/modules/code-review/findings'
 import { ForbiddenAction } from '@/lib/modules/code-review/guard'
 import { type TicketPreview, previewTickets } from '@/lib/modules/code-review/jira'
-import { type ConfluenceRef, type JiraContext, OWN_CATEGORY, SEVERITIES, type Severity, NO_JIRA, parseJiraKeys, confluencePages, type SubpageInfo, type Addressee, type DocFile, type DocTemplate, type FindingStatus, HONORIFICS, type PrLink, addressOf, anchorInDiff, linkLabel, cleanHandle, validHandle, type FindingView, type ItemSummary, type ItemView, type RepoPreset, type RoundView, where } from '@/lib/modules/code-review/model'
+import { type ConfluenceRef, type JiraContext, OWN_CATEGORY, SEVERITIES, type Severity, NO_JIRA, parseJiraKeys, confluencePages, type SubpageInfo, type Addressee, type DocFile, type DocTemplate, type FindingStatus, HONORIFICS, type PrLink, addressOf, anchorInDiff, linkLabel, cleanHandle, validHandle, type FindingView, ghPrNumber, postedHere, type ItemSummary, type ItemView, type RepoPreset, type RoundView, where } from '@/lib/modules/code-review/model'
 import { type LogLine, cancelRound, ensureTicker, tick, updateRoundSummary, viewLog } from '@/lib/modules/code-review/runner'
 import {
   createItem,
@@ -57,6 +57,7 @@ import {
   listItems,
   listRounds,
   markSeen,
+  moveItemToPr,
   patchFinding,
   patchItem,
   queueRound,
@@ -362,6 +363,67 @@ export async function reviewTogetherAction(itemId: number): Promise<Result> {
 }
 
 /**
+ * The member closed the PR under review (conflict, wrong base…) and reopened
+ * the work as another PR of the same repo: the review follows the new one.
+ * Rounds, findings and the chat stay; the next round reads the new PR and
+ * re-checks every open finding against it. Comments already on the old PR
+ * keep their link, and can be sent again to the new PR. Nothing is posted.
+ */
+export async function movePrAction(itemId: number, prNumber: number, review: boolean): Promise<Result> {
+  if (!enabled()) return OFF
+  const item = getItem(itemId)
+  if (!item || item.kind !== 'pr' || !item.prNumber) return { ok: false, message: 'Chỉ chuyển được hồ sơ đang theo một PR trên GitHub.' }
+  if (!Number.isInteger(prNumber) || prNumber <= 0) return { ok: false, message: 'Số PR không hợp lệ.' }
+  if (prNumber === item.prNumber) return { ok: false, message: 'Hồ sơ đang theo đúng PR này rồi.' }
+  const repo = getRepo(item.repoId)
+  if (!repo?.githubRepo) return { ok: false, message: 'Repo chưa điền owner/name GitHub trong Cấu hình.' }
+  if (hasLiveRound(itemId)) return { ok: false, message: 'Đang có vòng review chạy — đợi xong hoặc huỷ rồi chuyển.' }
+  const taken = findPrItem(item.repoId, prNumber)
+  if (taken) return { ok: false, message: `PR #${prNumber} đã có hồ sơ review riêng (mở ở /m/code-review/${taken.id}) — lưu trữ hoặc xoá hồ sơ đó trước rồi chuyển.` }
+  if (review) {
+    const blocked = await ready()
+    if (blocked) return blocked
+  }
+  let pull: Awaited<ReturnType<typeof getPull>>
+  try {
+    pull = await getPull(repo.githubRepo, prNumber)
+  } catch (err) {
+    return failure(err)
+  }
+  const old = { repoId: item.repoId, prNumber: item.prNumber }
+  moveItemToPr(
+    itemId,
+    { prNumber: item.prNumber, url: item.url, at: Math.floor(Date.now() / 1000) },
+    { prNumber, title: pull.title, baseRef: pull.baseRef, headRef: pull.headRef, author: pull.author, url: pull.url },
+  )
+  // A pair stays a pair: the other side's link follows the move.
+  let relinked = 0
+  for (const other of listItems('open')) {
+    if (!other.links.some((l) => l.repoId === old.repoId && l.prNumber === old.prNumber)) continue
+    setItemLinks(
+      other.id,
+      other.links.map((l) =>
+        l.repoId === old.repoId && l.prNumber === old.prNumber
+          ? { ...l, prNumber, headRef: pull.headRef, baseRef: pull.baseRef, title: pull.title, url: pull.url }
+          : l,
+      ),
+    )
+    relinked++
+  }
+  if (review) {
+    queueRound(itemId, carriedDocs(itemId))
+    ensureTicker()
+    void tick()
+  }
+  revalidatePath('/m/code-review')
+  revalidatePath(`/m/code-review/${itemId}`)
+  return {
+    ok: true,
+    message: `Đã chuyển sang PR #${prNumber}${relinked ? ` (cập nhật liên kết ở ${relinked} hồ sơ)` : ''}${review ? ' · đã xếp hàng vòng review mới' : ' — bấm "Review tiếp" khi sẵn sàng'}.`,
+  }
+}
+
+/**
  * The documents a PR's next round inherits: whatever the last round had.
  * Attached once, they follow the PR until someone uploads a newer version.
  */
@@ -531,10 +593,11 @@ export async function postFindingAction(findingId: number): Promise<Result & { u
   if (!enabled()) return OFF
   const f = getFinding(findingId)
   if (!f) return { ok: false, message: 'Không thấy finding.' }
-  if (f.ghUrl) return { ok: false, message: 'Finding này đã được gửi.' }
   const round = getRound(f.roundId)
   const ctx = round ? prContext(round.itemId) : 'Không thấy vòng review.'
   if (typeof ctx === 'string') return { ok: false, message: ctx }
+  // Sent to a PR the review has since moved off: it may go to this one.
+  if (postedHere(f, ctx.number)) return { ok: false, message: 'Finding này đã được gửi.' }
   const denied = await denyWrite(ctx)
   if (denied) return denied
   const asConversation = () => postIssueComment(ctx.repo, ctx.number, `${f.file ? `${locationLine(f)}\n\n` : ''}${f.body}`)
@@ -592,7 +655,7 @@ export async function submitReviewAction(input: {
   if (typeof ctx === 'string') return { ok: false, message: ctx }
   const denied = await denyWrite(ctx)
   if (denied) return denied
-  const chosen = listFindings(round.id).filter((f) => input.findingIds.includes(f.id) && !f.ghUrl)
+  const chosen = listFindings(round.id).filter((f) => input.findingIds.includes(f.id) && !postedHere(f, ctx.number))
   const ranges = await roundRanges(round.itemId, round.baseSha, round.headSha)
   const anchors = new Map(chosen.map((f) => [f.id, f.file ? anchorInDiff(ranges?.get(f.file), f.line, f.endLine) : null]))
   const inline = chosen.filter((f) => anchors.get(f.id))
@@ -1071,6 +1134,7 @@ export async function followUpAction(findingId: number, body: string): Promise<R
   const round = getRound(f.roundId)
   const ctx = round ? prContext(round.itemId) : 'Không thấy vòng review.'
   if (typeof ctx === 'string') return { ok: false, message: ctx }
+  if (!postedHere(f, ctx.number)) return { ok: false, message: `Comment này nằm ở PR cũ #${ghPrNumber(f.ghUrl)} — dùng "Gửi lên PR" để gửi lại lên PR #${ctx.number}.` }
   const denied = await denyWrite(ctx)
   if (denied) return denied
   try {

@@ -57,11 +57,12 @@ import {
   updateSummaryAction,
 } from '../actions'
 import { ContextPicker, type DocRepo, LinkPicker, type PrContext, RepoRows, type SourceRow, SourceRows, contextReady, sourcePayload, useAttachments, useDocUpload } from '../review'
+import { MovePrBar } from './move'
 import { CfAccessNote, CfProvider, FindingConfluence, SendAllConfluence } from './confluence'
 import { AskClaude, type ChatHandle, ChatPanel, ChatShortcut } from './chat'
 import { CommitsTab } from './commits'
 import { CodeTab } from './diff'
-import { AccessNote, DiscussionPanel, FindingGithub, GhProvider, ReplyWithBody, SubmitReview, useGh } from './github'
+import { AccessNote, DiscussionPanel, FindingGithub, GhProvider, ReplyWithBody, SubmitReview, useGh, usePostedHere } from './github'
 import {
   BTN,
   BTN_PRI,
@@ -159,7 +160,7 @@ export function ReviewDetail({
   useEffect(() => setSelected(null), [roundCount])
 
   return (
-    <GhProvider itemId={item.id} onGithub={onGithub} initialAccess={access}>
+    <GhProvider itemId={item.id} prNumber={item.prNumber} onGithub={onGithub} initialAccess={access}>
     <CfProvider itemId={item.id} enabled={item.kind === 'doc' && item.sources.length > 0} initialAccess={cfAccess}>
       <header className="mb-4">
         <Link href="/m/code-review" className={CTITLE + ' hover:text-ink'}>
@@ -202,6 +203,7 @@ export function ReviewDetail({
       {item.kind === 'doc' && <DocSourcesBar item={item} repos={repos} templates={templates} />}
       {item.kind === 'pr' && <LinksBar item={item} repos={repos} linkedItems={linkedItems} />}
       {item.kind === 'pr' && <PrContextBar item={item} />}
+      {item.kind === 'pr' && <MovePrBar item={item} live={live} />}
 
       <ClaudeBanner check={claude} onChange={setClaude} />
 
@@ -1199,6 +1201,8 @@ function FindingCard({
   const [body, setBody] = useState(f.body)
   useEffect(() => setBody(f.body), [f.body])
   const [editing, setEditing] = useState(false)
+  // On the PR the review follows now — a comment left on a PR it moved off can be sent again.
+  const here = usePostedHere(f)
   const dim = f.status === 'dismissed' || f.status === 'fixed'
   const loc = kind === 'doc' ? f.location : where(f)
 
@@ -1290,7 +1294,7 @@ function FindingCard({
       )}
       <div className="mt-2 flex flex-wrap items-center gap-1.5">
         <CopyButton text={findingClipboard({ ...f, body }, kind)} />
-        {!f.ghUrl && f.status !== 'dismissed' && f.status !== 'fixed' && <FindingGithub f={{ ...f, body }} onPosted={onPosted} />}
+        {!here && f.status !== 'dismissed' && f.status !== 'fixed' && <FindingGithub f={{ ...f, body }} onPosted={onPosted} />}
         <ReplyWithBody f={f} body={body} onSent={onPosted} />
         {kind === 'doc' && !f.ghUrl && <FindingConfluence f={f} body={body} docs={docs} onPosted={onPosted} />}
         <button type="button" className={BTN} onClick={() => setEditing(true)}>
@@ -1311,7 +1315,7 @@ function FindingCard({
           )
         )}
       </div>
-      {f.ghUrl && (
+      {here && (
         <div className="mt-2">
           {kind === 'doc' ? <FindingConfluence f={f} body={body} docs={docs} onPosted={onPosted} /> : <FindingGithub f={{ ...f, body }} onPosted={onPosted} />}
         </div>
