@@ -94,6 +94,7 @@ const toItem = (r: typeof reviewItems.$inferSelect): ItemView => ({
   sources: parseJsonArray<ConfluenceRef>(r.sources),
   jira: parseJira(r.jira),
   movedFrom: parseJsonArray<MovedPr>(r.movedFrom),
+  selfReview: r.selfReview,
   updatedAt: r.updatedAt,
 })
 
@@ -192,7 +193,8 @@ export function findLinkedItem(l: Pick<PrLink, 'repoId' | 'prNumber' | 'headRef'
 }
 
 export function createItem(
-  input: Omit<ItemView, 'id' | 'status' | 'updatedAt' | 'seenAt' | 'links' | 'addressee' | 'templateId' | 'sources' | 'jira' | 'movedFrom'> & {
+  input: Omit<ItemView, 'id' | 'status' | 'updatedAt' | 'seenAt' | 'links' | 'addressee' | 'templateId' | 'sources' | 'jira' | 'movedFrom' | 'selfReview'> & {
+    selfReview?: boolean
     links?: PrLink[]
     templateId?: string
     sources?: ConfluenceRef[]

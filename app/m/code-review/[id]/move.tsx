@@ -6,7 +6,7 @@ import { useState, useTransition } from 'react'
 
 import { type ItemView, detectJiraKeys } from '@/lib/modules/code-review/model'
 
-import { type PullRow, listPullsAction, movePrAction } from '../actions'
+import { type PullRow, listPullsAction, movePrAction, setSelfReviewAction } from '../actions'
 import { BTN, BTN_PRI, CARD, INPUT } from '../ui'
 
 /**
@@ -171,6 +171,48 @@ export function MovePrBar({ item, live }: { item: ItemView; live: boolean }) {
         </div>
       )}
       {msg && <p className={'mt-1 ' + (msg.ok ? 'text-good' : 'text-crit')}>{msg.text}</p>}
+    </div>
+  )
+}
+
+/**
+ * "PR của tôi — tự review": the reviewer reads the findings, fixes the code
+ * and runs the next round; nothing is offered for posting to the PR.
+ */
+export function SelfReviewBar({ item }: { item: ItemView }) {
+  const router = useRouter()
+  const [msg, setMsg] = useState('')
+  const [busy, start] = useTransition()
+  const set = (on: boolean) =>
+    start(async () => {
+      const r = await setSelfReviewAction(item.id, on)
+      setMsg(r.message)
+      if (r.ok) router.refresh()
+    })
+
+  return item.selfReview ? (
+    <div className="-mt-2 mb-4 flex flex-wrap items-center gap-2 rounded-md border border-line bg-surface-2 px-3 py-1.5 text-[12px]">
+      <span className="font-medium">🙋 PR của tôi — tự review</span>
+      <span className="text-ink-2">
+        Claude viết finding như ghi chú để bạn tự sửa (không xưng hô); không có nút gửi lên PR. Sửa xong thì push và bấm &quot;Review tiếp&quot; — vòng sau kiểm tra lại từng điểm.
+      </span>
+      <button type="button" className="ml-auto text-ink-3 underline-offset-2 hover:text-ink hover:underline" disabled={busy} onClick={() => set(false)}>
+        Không phải PR của tôi
+      </button>
+      {msg && <span className="w-full text-ink-2">{msg}</span>}
+    </div>
+  ) : (
+    <div className="-mt-2 mb-2 flex flex-wrap items-center gap-2 text-[12px]">
+      <button
+        type="button"
+        className="text-ink-3 underline-offset-2 hover:text-ink hover:underline"
+        disabled={busy}
+        title="Tự review PR của chính mình: finding là ghi chú để tự sửa, không gửi lên GitHub"
+        onClick={() => set(true)}
+      >
+        🙋 Đây là PR của tôi — tự review
+      </button>
+      {msg && <span className="text-ink-2">{msg}</span>}
     </div>
   )
 }

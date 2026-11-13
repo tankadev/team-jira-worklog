@@ -57,7 +57,7 @@ import {
   updateSummaryAction,
 } from '../actions'
 import { ContextPicker, type DocRepo, LinkPicker, type PrContext, RepoRows, type SourceRow, SourceRows, contextReady, sourcePayload, useAttachments, useDocUpload } from '../review'
-import { MovePrBar } from './move'
+import { MovePrBar, SelfReviewBar } from './move'
 import { CfAccessNote, CfProvider, FindingConfluence, SendAllConfluence } from './confluence'
 import { AskClaude, type ChatHandle, ChatPanel, ChatShortcut } from './chat'
 import { CommitsTab } from './commits'
@@ -160,7 +160,7 @@ export function ReviewDetail({
   useEffect(() => setSelected(null), [roundCount])
 
   return (
-    <GhProvider itemId={item.id} prNumber={item.prNumber} onGithub={onGithub} initialAccess={access}>
+    <GhProvider itemId={item.id} prNumber={item.prNumber} self={item.selfReview} onGithub={onGithub} initialAccess={access}>
     <CfProvider itemId={item.id} enabled={item.kind === 'doc' && item.sources.length > 0} initialAccess={cfAccess}>
       <header className="mb-4">
         <Link href="/m/code-review" className={CTITLE + ' hover:text-ink'}>
@@ -198,7 +198,8 @@ export function ReviewDetail({
         </div>
       </header>
 
-      {item.kind === 'pr' && <AddresseeBar item={item} addressee={addressee} />}
+      {item.kind === 'pr' && <SelfReviewBar item={item} />}
+      {item.kind === 'pr' && !item.selfReview && <AddresseeBar item={item} addressee={addressee} />}
       {item.kind === 'doc' && <TemplateBar item={item} templates={templates} />}
       {item.kind === 'doc' && <DocSourcesBar item={item} repos={repos} templates={templates} />}
       {item.kind === 'pr' && <LinksBar item={item} repos={repos} linkedItems={linkedItems} />}

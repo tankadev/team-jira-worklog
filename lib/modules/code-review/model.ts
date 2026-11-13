@@ -409,6 +409,12 @@ export interface ItemView {
   jira: JiraContext
   /** PRs this review followed before, oldest first — the member closed one and reopened the work as another. */
   movedFrom: MovedPr[]
+  /**
+   * The reviewer's own PR: they read the findings and fix the code themselves,
+   * then run the next round. Findings are written as fix-it notes and nothing
+   * is offered for posting to GitHub.
+   */
+  selfReview: boolean
   updatedAt: number
 }
 

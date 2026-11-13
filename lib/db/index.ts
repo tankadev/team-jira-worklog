@@ -365,6 +365,8 @@ function open() {
   ensureColumn(sqlite, "review_items", "jira", "jira TEXT NOT NULL DEFAULT ''");
   // PRs a review followed before the member moved the work to a new one.
   ensureColumn(sqlite, "review_items", "moved_from", "moved_from TEXT NOT NULL DEFAULT '[]'");
+  // The reviewer reviewing their own PR: fix-it notes, no posting.
+  ensureColumn(sqlite, "review_items", "self_review", "self_review INTEGER NOT NULL DEFAULT 0");
   return drizzle(sqlite, { schema });
 }
 

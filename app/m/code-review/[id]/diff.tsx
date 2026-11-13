@@ -929,11 +929,11 @@ function Composer({
                 </option>
               ))}
             </select>
-            {gh.canWrite && (
+            {gh.canPost && (
               <ConfirmButton primary label="Gửi lên PR" confirm="Bấm lần nữa để gửi lên GitHub" disabled={busy || !canComment || !text.trim()} onConfirm={post} />
             )}
-            <button type="button" className={gh.canWrite ? BTN : BTN_PRI} disabled={busy || !canComment || !text.trim()} title="Lưu lại, chưa gửi — gửi sau bằng nút Gửi lên PR trên comment" onClick={() => save(false)}>
-              Lưu, chưa gửi
+            <button type="button" className={gh.canPost ? BTN : BTN_PRI} disabled={busy || !canComment || !text.trim()} title="Lưu lại, chưa gửi — gửi sau bằng nút Gửi lên PR trên comment" onClick={() => save(false)}>
+              {gh.self ? 'Lưu' : 'Lưu, chưa gửi'}
             </button>
             <button
               type="button"

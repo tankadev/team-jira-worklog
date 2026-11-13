@@ -339,6 +339,8 @@ export const reviewItems = sqliteTable(
     jira: text("jira").notNull().default(""),
     /** JSON [{prNumber, url, at}]: PRs this review followed before (member closed one, reopened as another). */
     movedFrom: text("moved_from").notNull().default("[]"),
+    /** The reviewer's own PR: findings are notes to fix, nothing goes to GitHub. */
+    selfReview: integer("self_review", { mode: "boolean" }).notNull().default(false),
     createdAt: integer("created_at").notNull().default(now),
     updatedAt: integer("updated_at").notNull().default(now),
   },

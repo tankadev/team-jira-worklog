@@ -265,6 +265,7 @@ async function prepareAndSpawn(roundId: number) {
         title: item.title,
         prNumber: item.prNumber,
         movedFrom: item.movedFrom.map((m) => m.prNumber),
+        self: item.selfReview,
         author: item.author,
         baseRef: item.baseRef,
         headRef: item.headRef,
@@ -601,7 +602,7 @@ async function storeOutput(r: RoundRow, out: Output) {
         followNote: v?.note?.trim() || (v ? '' : 'Claude không đánh giá lại điểm này — tự kiểm tra.'),
         // Only meaningful for a finding already on GitHub: what to say next in its thread.
         // A thread on a PR the review moved off takes no more replies.
-        followReply: old.ghUrl && postedHere(old, item.prNumber) ? (v?.reply ?? '').trim() : '',
+        followReply: old.ghUrl && !item.selfReview && postedHere(old, item.prNumber) ? (v?.reply ?? '').trim() : '',
         docRef: pages.has(old.docRef) ? old.docRef : '',
         quote: old.quote,
         commentKind: old.commentKind,

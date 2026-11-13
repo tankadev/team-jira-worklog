@@ -174,6 +174,7 @@ export async function queuePullsAction(input: {
         author: p.author,
         url: p.url,
         note: input.note.trim(),
+        selfReview: await isMine(p.author),
         sources,
         jira,
       })
@@ -322,6 +323,7 @@ async function queueLinked(
         note: ctx.note.trim(),
         sources: ctx.sources,
         jira: ctx.jira,
+        selfReview: await isMine(meta.author),
       })
       other = getItem(id)!
     } else {
@@ -420,6 +422,36 @@ export async function movePrAction(itemId: number, prNumber: number, review: boo
   return {
     ok: true,
     message: `Đã chuyển sang PR #${prNumber}${relinked ? ` (cập nhật liên kết ở ${relinked} hồ sơ)` : ''}${review ? ' · đã xếp hàng vòng review mới' : ' — bấm "Review tiếp" khi sẵn sàng'}.`,
+  }
+}
+
+/**
+ * A PR opened by the GitHub account the module reads with — the reviewer's
+ * own work. Best-effort: no token, or GitHub down, reads as "not mine".
+ */
+async function isMine(author: string): Promise<boolean> {
+  if (!author) return false
+  try {
+    return (await viewerLogin()).toLowerCase() === author.toLowerCase()
+  } catch {
+    return false
+  }
+}
+
+/**
+ * "PR của tôi — tự review": findings become fix-it notes for the reviewer,
+ * written without addressing anyone, and nothing is offered for posting.
+ * Applies from the next round (and to the chat right away).
+ */
+export async function setSelfReviewAction(itemId: number, on: boolean): Promise<Result> {
+  if (!enabled()) return OFF
+  const item = getItem(itemId)
+  if (!item || item.kind !== 'pr') return { ok: false, message: 'Không thấy hồ sơ PR.' }
+  patchItem(itemId, { selfReview: on })
+  revalidatePath(`/m/code-review/${itemId}`)
+  return {
+    ok: true,
+    message: on ? 'Đã chuyển sang tự review — vòng sau Claude viết ghi chú để bạn tự sửa, không gửi gì lên PR.' : 'Đã chuyển về review PR của member.',
   }
 }
 

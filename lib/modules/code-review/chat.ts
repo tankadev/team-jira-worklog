@@ -190,6 +190,7 @@ export async function sendChat(roundId: number, text: string): Promise<{ ok: boo
     findings: listFindings(roundId),
     fresh: resume ? null : { title: item.title, baseSha: round.baseSha, headSha: round.headSha, docs: parseDocs(round.docs) },
     addressee: resolveAddressee(item),
+    self: item.selfReview,
   })
 
   await fs.mkdir(LOG_DIR, { recursive: true })

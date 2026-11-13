@@ -33,6 +33,10 @@ interface GhState {
   enabled: boolean
   /** The token can comment: send / reply / resolve are shown. Otherwise Copy only. */
   canWrite: boolean
+  /** The reviewer's own PR: findings are fix-it notes, nothing is offered for posting. */
+  self: boolean
+  /** Findings may be sent to the PR: can comment, and it is not a self-review. */
+  canPost: boolean
   access: GithubAccess
   recheck: () => Promise<void>
   itemId: number
@@ -49,6 +53,8 @@ const NO_ACCESS: GithubAccess = { read: false, write: false, reason: '' }
 const GhContext = createContext<GhState>({
   enabled: false,
   canWrite: false,
+  self: false,
+  canPost: false,
   access: NO_ACCESS,
   recheck: async () => {},
   itemId: 0,
@@ -67,12 +73,14 @@ export const usePostedHere = (f: Pick<FindingView, 'ghUrl'>) => postedHere(f, us
 export function GhProvider({
   itemId,
   prNumber,
+  self = false,
   onGithub,
   initialAccess,
   children,
 }: {
   itemId: number
   prNumber: number | null
+  self?: boolean
   /** The item is tied to a PR on github.com at all. */
   onGithub: boolean
   initialAccess: GithubAccess
@@ -105,7 +113,7 @@ export function GhProvider({
   }, [itemId, onGithub])
 
   return (
-    <GhContext.Provider value={{ enabled, canWrite: enabled && access.write, access, recheck, itemId, prNumber, discussion, error, loading, reload }}>
+    <GhContext.Provider value={{ enabled, canWrite: enabled && access.write, self, canPost: enabled && access.write && !self, access, recheck, itemId, prNumber, discussion, error, loading, reload }}>
       {children}
     </GhContext.Provider>
   )
@@ -119,7 +127,7 @@ export function GhProvider({
 export function AccessNote({ onGithub }: { onGithub: boolean }) {
   const gh = useGh()
   const [busy, start] = useTransition()
-  if (!onGithub || gh.canWrite) return null
+  if (!onGithub || gh.canWrite || gh.self) return null
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-md border border-dashed border-line-strong bg-surface px-3 py-2 text-[12px] text-ink-2">
       <span>🔒 {gh.access.reason || 'Token GitHub chưa có quyền ghi.'} Dùng nút Copy rồi tự dán comment trên GitHub.</span>
@@ -185,7 +193,7 @@ export function FindingGithub({ f, onPosted }: { f: FindingView; onPosted: () =>
         đã gửi ở PR cũ #{ghPrNumber(f.ghUrl)} ↗
       </a>
     ) : null
-    if (!gh.canWrite) return old
+    if (!gh.canPost) return old
     return (
       <span className="inline-flex items-center gap-2">
         {old}
@@ -678,7 +686,7 @@ export function SubmitReview({
   const [body, setBody] = useState('')
   const [msg, setMsg] = useState<{ ok: boolean; text: string; url?: string } | null>(null)
   const [busy, start] = useTransition()
-  if (!gh.canWrite) return null
+  if (!gh.canPost) return null
 
   const chosen = candidates.filter((f) => picked.has(f.id))
   const inline = chosen.filter((f) => f.inDiff && f.line).length
@@ -783,7 +791,7 @@ export function ReplyWithBody({ f, body, onSent }: { f: FindingView; body: strin
   const gh = useGh()
   const [busy, start] = useTransition()
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
-  if (!gh.canWrite || !postedHere(f, gh.prNumber)) return null
+  if (!gh.canPost || !postedHere(f, gh.prNumber)) return null
   return (
     <span className="inline-flex items-center gap-1.5">
       <ConfirmButton
