@@ -84,6 +84,12 @@ export const CODE_SCHEMA = {
           category: { type: 'string' },
           title: { type: 'string' },
           comment: { type: 'string' },
+          raised_by: {
+            type: 'object',
+            description: 'Chỉ điền khi vấn đề này ĐÃ được người khác nêu trong "Comment đã có trên PR": người nêu, link comment đó (đúng link trong danh sách), và note ngắn — "trùng" hoặc finding này bổ sung gì.',
+            properties: { author: { type: 'string' }, url: { type: 'string' }, note: { type: 'string' } },
+            required: ['author', 'url'],
+          },
         },
         required: ['severity', 'category', 'title', 'comment'],
       },
@@ -235,16 +241,57 @@ function previousBlock(prev: FindingView[], kind: 'code' | 'doc', talk?: ThreadT
   }\n`
 }
 
-function commentsBlock(comments: PullComment[]): string {
-  if (!comments.length) return ''
-  const list = comments
-    .slice(-40)
-    .map(
-      (c) =>
-        `- ${c.author}${c.path ? ` (${c.path}${c.line ? `:${c.line}` : ''})` : ''}: ${c.body.replace(/\s+/g, ' ').slice(0, 300)}`,
-    )
-    .join('\n')
-  return `\n## Comment đã có trên PR (đừng lặp lại điều người khác đã nói)\n${list}\n`
+/** Who wrote what — the reviewer's own comments, and those this app posted for them. */
+export interface CommentsContext {
+  /** GitHub login of the reviewer (the token's account); '' if unknown. */
+  viewer: string
+  /** Comments this review already posted — the previous findings list covers them. */
+  posted: Set<string>
+}
+
+const REVIEW_STATE: Record<string, string> = { APPROVED: 'approve', CHANGES_REQUESTED: 'request changes', COMMENTED: 'comment', DISMISSED: 'đã bị dismiss' }
+
+/**
+ * What others said on the PR, inline replies under their thread's first
+ * comment, each with its link so a finding can point at the one it repeats.
+ * Oldest first; long PRs keep the newest within a size budget.
+ */
+export function commentsBlock(comments: PullComment[], ctx: CommentsContext = { viewer: '', posted: new Set() }): string {
+  const shown = comments.filter((c) => !ctx.posted.has(c.url) && c.body.trim())
+  if (!shown.length) return ''
+  const who = (c: PullComment) => `${c.author}${ctx.viewer && c.author.toLowerCase() === ctx.viewer.toLowerCase() ? ' (chính người review)' : ''}`
+  const text = (c: PullComment, max: number) => {
+    const t = c.body.replace(/\s+/g, ' ').trim()
+    return t.length > max ? `${t.slice(0, max)}…` : t
+  }
+  const ids = new Set(shown.map((c) => c.id))
+  const replies = new Map<number, PullComment[]>()
+  for (const c of shown) if (c.replyTo && ids.has(c.replyTo)) replies.set(c.replyTo, [...(replies.get(c.replyTo) ?? []), c])
+  const entries = shown
+    .filter((c) => !(c.replyTo && ids.has(c.replyTo)))
+    .map((c) => {
+      const where = c.kind === 'inline' ? ` · ${c.path}${c.line ? `:${c.line}` : ''}` : c.kind === 'review' ? ` · review tổng (${REVIEW_STATE[c.state ?? ''] ?? c.state})` : ' · comment chung'
+      const sub = (replies.get(c.id) ?? []).map((r) => `\n    ↳ ${who(r)}: ${text(r, 400)}`).join('')
+      return `- ${who(c)}${where} — ${c.url}\n  ${text(c, 800)}${sub}`
+    })
+  // Newest first into the budget, then back in order.
+  const BUDGET = 24_000
+  const kept: string[] = []
+  let size = 0
+  for (const e of [...entries].reverse()) {
+    if (size + e.length > BUDGET) break
+    kept.unshift(e)
+    size += e.length
+  }
+  const cut = entries.length - kept.length
+  return `
+## Comment đã có trên PR (của người khác — đừng lặp lại)
+${cut ? `(${cut} comment cũ hơn không đưa vào vì quá dài)\n` : ''}${kept.join('\n')}
+Trước khi thêm một finding, đối chiếu danh sách này:
+- Người khác đã nêu đúng vấn đề đó (cùng chỗ, cùng ý — kể cả khác câu chữ) → vẫn đưa vào \`findings\` nhưng điền \`raised_by\` (người nêu, link comment, note). App sẽ không gửi nó mặc định. Trong \`comment\` chỉ viết phần bổ sung (bằng chứng, hậu quả, cách sửa cụ thể hơn) nếu có; nếu không có gì thêm thì \`note\` = "trùng".
+- Vấn đề đã được nêu và code hiện tại đã sửa, hoặc tác giả đã giải thích hợp lý trong thread → không đưa vào.
+- Vấn đề chỉ liên quan một phần → finding bình thường, không điền \`raised_by\`.
+`
 }
 
 function linksBlock(links: RoundLink[]): string {
@@ -348,6 +395,7 @@ export function codePrompt(input: {
   incremental: boolean
   previous: FindingView[]
   comments: PullComment[]
+  commentsContext?: CommentsContext
   diffStat: string
   globalRules: string
   repoRules: string
@@ -407,7 +455,7 @@ ${input.self ? SELF_VOICE : `${VOICE}\n${addressBlock(input.addressee)}`}
 \`\`\`
 ${input.diffStat.slice(0, 6000)}
 \`\`\`
-${linksBlock(input.links)}${docsBlock(input.docs, input.docsChanged, input.context)}${input.prBody.trim() ? `\n## Mô tả PR\n${input.prBody.trim().slice(0, 4000)}\n` : ''}${input.note.trim() ? `\n## Ghi chú của người review\n${input.note.trim()}\n` : ''}${rulesBlock(input.globalRules, input.repoRules)}${commentsBlock(input.comments)}${previousBlock(input.previous, 'code', input.talk, input.prNumber, input.self)}
+${linksBlock(input.links)}${docsBlock(input.docs, input.docsChanged, input.context)}${input.prBody.trim() ? `\n## Mô tả PR\n${input.prBody.trim().slice(0, 4000)}\n` : ''}${input.note.trim() ? `\n## Ghi chú của người review\n${input.note.trim()}\n` : ''}${rulesBlock(input.globalRules, input.repoRules)}${commentsBlock(input.comments, input.commentsContext)}${previousBlock(input.previous, 'code', input.talk, input.prNumber, input.self)}
 Khi xong, trả kết quả qua structured output theo schema.`
 }
 
@@ -543,6 +591,7 @@ export const CHAT_SCHEMA = {
                 type: 'string',
                 description: 'Câu trả lời tiếp trên PR cho finding ĐÃ gửi lên PR — khi người review nhờ soạn / sửa câu trả lời tiếp. Hoàn chỉnh, paste thẳng lên PR được.',
               },
+              raised_by: { type: 'object', description: 'Vấn đề này đã được người khác nêu trên PR: người nêu, link comment (đúng link trong danh sách comment), note ngắn.', properties: { author: { type: 'string' }, url: { type: 'string' }, note: { type: 'string' } }, required: ['author', 'url'] },
               reason: { type: 'string', description: 'Vì sao đổi — một câu.' },
             },
             required: ['id'],
@@ -561,6 +610,7 @@ export const CHAT_SCHEMA = {
               category: { type: 'string' },
               title: { type: 'string' },
               comment: { type: 'string' },
+              raised_by: { type: 'object', description: 'Vấn đề này đã được người khác nêu trên PR: người nêu, link comment (đúng link trong danh sách comment), note ngắn.', properties: { author: { type: 'string' }, url: { type: 'string' }, note: { type: 'string' } }, required: ['author', 'url'] },
             },
             required: ['severity', 'title', 'comment'],
           },
@@ -581,6 +631,8 @@ export function chatPrompt(input: {
   addressee: Addressee | null
   /** The reviewer's own PR: nothing goes to GitHub, so no replies to draft. */
   self?: boolean
+  /** What others said on the PR, as `commentsBlock` renders it; '' if none / not a PR. */
+  comments?: string
 }): string {
   const list = input.findings.length
     ? input.findings
@@ -608,7 +660,7 @@ ${input.summary.trim() || '(trống)'}
 
 ## Findings
 ${list}
-
+${input.comments ?? ''}
 ## Tin nhắn của người review
 """
 ${input.message.trim()}
@@ -618,7 +670,7 @@ Nếu tin nhắn có kết quả chạy test / log do người review tự chạ
 Trả lời trong \`reply\`: tiếng Việt, đi thẳng vào câu hỏi; mở lại code / tài liệu để kiểm chứng khi cần, đừng trả lời theo trí nhớ nếu không chắc. Nếu người review yêu cầu (hoặc bạn thấy rõ là cần) sửa bản review, đề xuất trong \`changes\`:
 - \`update\`: sửa title / comment / severity của finding theo id, hoặc \`dismiss: true\` nếu nó sai; kèm \`reason\`.
 ${followBullet}
-- \`add\`: finding mới (cùng dạng như lúc review${input.kind === 'pr' ? '; điều không gắn với dòng code nào là comment rời — bỏ trống file / line' : ''}).
+${input.comments ? '- `update[].raised_by`: khi một finding hiện có trùng với điều người khác đã nêu trên PR (danh sách "Comment đã có trên PR" ở trên) — kèm `reason`. Finding mới trong `add` cũng có thể điền `raised_by`.\n' : ''}- \`add\`: finding mới (cùng dạng như lúc review${input.kind === 'pr' ? '; điều không gắn với dòng code nào là comment rời — bỏ trống file / line' : ''}).
 ${input.self ? 'Comment đề xuất viết như ghi chú để người review tự sửa PR của chính họ (không xưng hô, không gửi lên GitHub).' : 'Comment đề xuất giữ đúng giọng văn đã quy định (tiếng Việt, paste thẳng lên GitHub được).'} Không có gì cần đổi thì bỏ \`changes\`. Người review sẽ tự bấm áp dụng.
 ${input.self ? '' : addressBlock(input.addressee)}
 ${UNTRUSTED}`

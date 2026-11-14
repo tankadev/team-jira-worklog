@@ -26,7 +26,7 @@ import {
   withRepoLock,
 } from './git'
 import { type RawFinding, buildFreshRows } from './findings'
-import { getDiscussion, getPull, listPullComments } from './github'
+import { getDiscussion, getPull, listPullComments, viewerLogin } from './github'
 import { cleanupLinks, linkDirs, prepareLinks } from './links'
 import { type DocFile, type FindingStatus, confluencePages, type FindingView, type RoundLink, type TestSuggestion, anchorInDiff, ghPrNumber, isFetched, postedHere, ticketPlan } from './model'
 import { ALLOWED_TOOLS, DISALLOWED_TOOLS, ISOLATION_FLAGS, reviewEnv } from './guard'
@@ -43,6 +43,7 @@ import {
   hasLiveRound,
   insertFindings,
   lastDoneRound,
+  listItemFindings,
   openFindings,
   patchItem,
   roundsIn,
@@ -197,6 +198,7 @@ async function prepareAndSpawn(roundId: number) {
       let prBody = ''
       let talk: ThreadTalk | undefined
       let comments: Awaited<ReturnType<typeof listPullComments>> = []
+      let viewer = ''
       if (item.prNumber && r.githubRepo) {
         const pull = await getPull(r.githubRepo, item.prNumber)
         prBody = pull.body
@@ -204,6 +206,7 @@ async function prepareAndSpawn(roundId: number) {
         patchItem(item.id, { title: pull.title, baseRef: pull.baseRef, headRef: pull.headRef, author: pull.author, url: pull.url })
         Object.assign(item, { title: pull.title, baseRef: pull.baseRef, headRef: pull.headRef, author: pull.author })
         comments = await listPullComments(r.githubRepo, item.prNumber)
+        viewer = await viewerLogin().catch(() => '')
         talk = await threadTalk(r.githubRepo, item.prNumber, previous)
       }
 
@@ -278,6 +281,8 @@ async function prepareAndSpawn(roundId: number) {
         incremental,
         previous,
         comments,
+        // What this review posted itself is in the previous-findings list already.
+        commentsContext: { viewer, posted: new Set(listItemFindings(item.id).flatMap((f) => [f.ghUrl, f.followSentUrl]).filter(Boolean)) },
         diffStat: await diffStat(r.localPath, baseSha, headSha),
         globalRules: cfg.globalRules,
         repoRules: r.rules,
@@ -606,6 +611,7 @@ async function storeOutput(r: RoundRow, out: Output) {
         docRef: pages.has(old.docRef) ? old.docRef : '',
         quote: old.quote,
         commentKind: old.commentKind,
+        raisedBy: old.raisedBy ? JSON.stringify(old.raisedBy) : '',
         position: position++,
       })
     }

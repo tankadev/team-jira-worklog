@@ -678,7 +678,8 @@ export function SubmitReview({
 }) {
   const gh = useGh()
   const candidates = findings.filter((f) => !postedHere(f, gh.prNumber) && f.status !== 'fixed' && f.status !== 'dismissed')
-  const [picked, setPicked] = useState<Set<number>>(() => new Set(candidates.map((f) => f.id)))
+  // Someone else already said it: there to pick, not picked.
+  const [picked, setPicked] = useState<Set<number>>(() => new Set(candidates.filter((f) => !f.raisedBy).map((f) => f.id)))
   const [event, setEvent] = useState<'COMMENT' | 'REQUEST_CHANGES'>(round.verdict === 'request_changes' ? 'REQUEST_CHANGES' : 'COMMENT')
   const [open, setOpen] = useState(false)
   // Empty by default: the reviewer rarely writes a summary. Loose comments
@@ -735,6 +736,11 @@ export function SubmitReview({
                   />
                   <SeverityPill s={f.severity} />
                   <span className="truncate">{f.title}</span>
+                  {f.raisedBy && (
+                    <span className="shrink-0 rounded bg-surface-2 px-1.5 text-[11px] text-ink-3" title={f.raisedBy.note || 'Người khác đã nêu trên PR'}>
+                      👥 @{f.raisedBy.author} đã nêu
+                    </span>
+                  )}
                   <span className="ml-auto shrink-0 font-mono text-[11px] text-ink-3">
                     {where(f) || 'comment rời'} {f.inDiff ? '· trên dòng code' : '· trong nội dung'}
                   </span>

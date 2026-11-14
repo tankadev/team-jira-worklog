@@ -367,6 +367,8 @@ function open() {
   ensureColumn(sqlite, "review_items", "moved_from", "moved_from TEXT NOT NULL DEFAULT '[]'");
   // The reviewer reviewing their own PR: fix-it notes, no posting.
   ensureColumn(sqlite, "review_items", "self_review", "self_review INTEGER NOT NULL DEFAULT 0");
+  // A finding someone else already raised on the PR: who, and where.
+  ensureColumn(sqlite, "review_findings", "raised_by", "raised_by TEXT NOT NULL DEFAULT ''");
   return drizzle(sqlite, { schema });
 }
 

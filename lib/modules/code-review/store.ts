@@ -17,6 +17,7 @@ import {
   type ConfluenceRef,
   type JiraContext,
   type MovedPr,
+  type RaisedBy,
   NO_JIRA,
   type PrLink,
   type RoundLink,
@@ -144,7 +145,18 @@ const toFinding = (r: typeof reviewFindings.$inferSelect): FindingView => ({
   docRef: r.docRef,
   quote: r.quote,
   commentKind: r.commentKind === 'inline' || r.commentKind === 'footer' ? r.commentKind : '',
+  raisedBy: parseRaisedBy(r.raisedBy),
 })
+
+function parseRaisedBy(raw: string): RaisedBy | null {
+  if (!raw) return null
+  try {
+    const v = JSON.parse(raw) as RaisedBy
+    return v && typeof v.url === 'string' && v.url ? v : null
+  } catch {
+    return null
+  }
+}
 
 /* ── items ──────────────────────────────────────────────────────────────── */
 

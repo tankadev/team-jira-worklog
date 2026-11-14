@@ -9,10 +9,11 @@ import { getRepo, getReviewConfig, resolveAddressee, templatesForDocs } from './
 import { type RawFinding, buildFreshRows, cleanSeverity } from './findings'
 import { addWorktree, diffRanges, gitSays, removeWorktree, withRepoLock } from './git'
 import { ALLOWED_TOOLS, DISALLOWED_TOOLS, ISOLATION_FLAGS, reviewEnv } from './guard'
-import type { DocFile, FindingView } from './model'
+import { type DocFile, type FindingView, cleanRaisedBy } from './model'
+import { listPullComments, viewerLogin } from './github'
 import { type LogLine, bootTime, lastResult, parseLog, pidAlive, readLog, strayLines } from './proc'
 import { cleanupLinks, linkDirs, restoreLinks } from './links'
-import { CHAT_SCHEMA, chatPrompt } from './prompts'
+import { CHAT_SCHEMA, chatPrompt, commentsBlock } from './prompts'
 import {
   type MessageRow,
   finishMessage,
@@ -22,6 +23,7 @@ import {
   insertFindings,
   insertMessage,
   listFindings,
+  listItemFindings,
   listMessages,
   listRounds,
   patchFindingFull,
@@ -51,7 +53,7 @@ const SUPERVISOR = path.join(process.cwd(), 'lib/modules/code-review/supervise.m
 
 export interface ChatChanges {
   summary_comment?: string
-  update?: Array<{ id: number; title?: string; comment?: string; severity?: string; dismiss?: boolean; reason?: string; follow_reply?: string }>
+  update?: Array<{ id: number; title?: string; comment?: string; severity?: string; dismiss?: boolean; reason?: string; follow_reply?: string; raised_by?: RawFinding['raised_by'] }>
   add?: RawFinding[]
 }
 
@@ -182,6 +184,15 @@ export async function sendChat(roundId: number, text: string): Promise<{ ok: boo
   const ws = await workspace(roundId)
   if (typeof ws === 'string') return fail(ws)
 
+  // What others said on the PR, fresh — "has anyone raised this?" needs it. Best-effort.
+  let comments = ''
+  const repo = item.repoId ? getRepo(item.repoId) : undefined
+  if (item.kind === 'pr' && item.prNumber && repo?.githubRepo) {
+    const [list, viewer] = await Promise.all([listPullComments(repo.githubRepo, item.prNumber), viewerLogin().catch(() => '')])
+    const posted = new Set(listItemFindings(item.id).flatMap((f) => [f.ghUrl, f.followSentUrl]).filter(Boolean))
+    comments = commentsBlock(list, { viewer, posted })
+  }
+
   const resume = round.sessionId
   const prompt = chatPrompt({
     kind: item.kind,
@@ -191,6 +202,7 @@ export async function sendChat(roundId: number, text: string): Promise<{ ok: boo
     fresh: resume ? null : { title: item.title, baseSha: round.baseSha, headSha: round.headSha, docs: parseDocs(round.docs) },
     addressee: resolveAddressee(item),
     self: item.selfReview,
+    comments,
   })
 
   await fs.mkdir(LOG_DIR, { recursive: true })
@@ -315,8 +327,15 @@ export async function applyChanges(messageId: number): Promise<{ ok: boolean; me
   let edited = 0
   let dismissed = 0
   let replied = 0
+  let marked = 0
+  const githubRepo = (item.repoId ? getRepo(item.repoId)?.githubRepo : '') ?? ''
   for (const u of changes.update ?? []) {
     if (!mine.has(u.id)) continue
+    const raised = cleanRaisedBy(u.raised_by, githubRepo)
+    if (raised) {
+      patchFindingFull(u.id, { raisedBy: JSON.stringify(raised) })
+      marked++
+    }
     // The next thing to say on the PR: lands in the finding's "Trả lời tiếp" box, sent only by its own button.
     if (u.follow_reply?.trim() && mine.get(u.id)!.ghUrl) {
       patchFindingFull(u.id, { followReply: u.follow_reply.trim() })
@@ -354,6 +373,6 @@ export async function applyChanges(messageId: number): Promise<{ ok: boolean; me
   // The round note is Claude's read for the reviewer, not part of what gets
   // posted — chat does not rewrite it.
   updateMessage(m.id, { applied: true })
-  const parts = [edited && `sửa ${edited}`, dismissed && `bỏ ${dismissed}`, added && `thêm ${added}`, replied && `${replied} câu trả lời tiếp (đã vào ô trả lời của finding)`]
+  const parts = [edited && `sửa ${edited}`, dismissed && `bỏ ${dismissed}`, added && `thêm ${added}`, replied && `${replied} câu trả lời tiếp (đã vào ô trả lời của finding)`, marked && `đánh dấu ${marked} điểm đã có người nêu`]
   return { ok: true, message: `Đã áp dụng: ${parts.filter(Boolean).join(', ') || 'không có gì thay đổi'}.` }
 }

@@ -433,6 +433,8 @@ export const reviewFindings = sqliteTable(
     quote: text("quote").notNull().default(""),
     /** Posted to Confluence as: '' | inline | footer (gh_comment_id / gh_url hold the comment). */
     commentKind: text("comment_kind").notNull().default(""),
+    /** JSON {author, url, note}: someone else already raised this on the PR; '' = no one. */
+    raisedBy: text("raised_by").notNull().default(""),
     position: integer("position").notNull().default(0),
   },
   (t) => [

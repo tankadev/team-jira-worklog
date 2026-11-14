@@ -994,6 +994,25 @@ type Filter = 'live' | 'all' | 'fixed' | 'dismissed'
 /** Group of PR findings not tied to a line — questions and doubts for the member. */
 const LOOSE = '💬 Comment rời (không gắn với dòng code)'
 
+/** The standard "which of these did someone else already say?" question for the chat. */
+const DUP_CHECK = `Đối chiếu các finding còn mở của vòng này với "Comment đã có trên PR" (comment của người khác, đọc mới nhất). Với finding nào người khác ĐÃ nêu cùng vấn đề (cùng chỗ, cùng ý — kể cả khác câu chữ), đề xuất \`update\` với \`raised_by\` (người nêu, link đúng comment đó, note: "trùng" hoặc finding này bổ sung gì) và \`reason\`. Nếu người khác đã nêu VÀ tác giả đã sửa / giải thích hợp lý trong thread, đề xuất \`dismiss\`. Bỏ qua finding đã gửi lên PR và finding chỉ liên quan một phần. Không sửa nội dung comment, không cần đọc lại code trừ khi phải kiểm tra tác giả đã sửa chưa. Trong \`reply\`: liệt kê ngắn finding nào trùng với comment của ai; không có gì trùng thì nói vậy.`
+
+/**
+ * One click to have Claude mark findings someone else already raised on the
+ * PR — for rounds that ran before the review looked for that itself. It is a
+ * chat turn: the marks arrive as a proposal, applied only on "Áp dụng".
+ */
+function DupCheck({ onRun }: { onRun: () => void }) {
+  return (
+    <div className="-mt-1 flex flex-wrap items-center gap-2 text-[12px]">
+      <button type="button" className={BTN} onClick={onRun} title="Hỏi Claude qua chat — đề xuất đánh dấu, bấm Áp dụng mới đổi">
+        👥 Kiểm tra trùng với comment trên PR
+      </button>
+      <span className="text-ink-3">Claude đánh dấu finding mà người khác đã nêu — finding đó không được chọn sẵn khi gửi cả review.</span>
+    </div>
+  )
+}
+
 function DoneRound({
   item,
   round,
@@ -1121,6 +1140,14 @@ function DoneRound({
       )}
 
       {isLatest && <SubmitReview round={round} findings={findings} onDone={onChanged} />}
+      {isLatest && canRun && item.kind === 'pr' && Boolean(item.prNumber) && Boolean(githubRepo) && (
+        <DupCheck
+          onRun={() => {
+            chat.current?.send(DUP_CHECK)
+            document.getElementById('chat')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          }}
+        />
+      )}
       {isLatest && item.kind === 'doc' && <CfAccessNote />}
       {isLatest && item.kind === 'doc' && <SendAllConfluence roundId={round.id} findings={findings} docs={round.docs} onDone={onChanged} />}
       {isLatest && <AccessNote onGithub={item.kind === 'pr' && Boolean(item.prNumber) && Boolean(githubRepo)} />}
@@ -1228,6 +1255,16 @@ function FindingCard({
             <span className="text-[11px] text-ink-3">· {f.category}</span>
           ))}
       </div>
+      {f.raisedBy && (
+        <div className="mt-1 text-[12px] text-ink-2">
+          👥 Đã có{' '}
+          <a href={f.raisedBy.url} target="_blank" rel="noreferrer" className="font-medium text-accent-ink hover:underline">
+            @{f.raisedBy.author} nêu trên PR ↗
+          </a>
+          {f.raisedBy.note && <span className="text-ink-3"> — {f.raisedBy.note}</span>}
+          {!here && <span className="text-ink-3"> · không chọn sẵn khi gửi cả review</span>}
+        </div>
+      )}
       {kind === 'doc' && f.quote && (
         <div className="mt-1 truncate text-[11.5px] text-ink-3" title={f.quote}>
           ❝ {f.quote}

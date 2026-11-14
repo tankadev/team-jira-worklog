@@ -31,12 +31,20 @@ export interface PullDetail extends PullSummary {
 }
 
 export interface PullComment {
+  id: number
   author: string
   body: string
   /** File path for an inline comment, '' for a conversation comment. */
   path: string
   line: number | null
   createdAt: string
+  url: string
+  /** inline: on a code line · conversation: the PR's Conversation tab · review: a submitted review's summary. */
+  kind: 'inline' | 'conversation' | 'review'
+  /** Inline replies: the comment this one answers (its thread's first comment, on GitHub). */
+  replyTo: number | null
+  /** Review summaries: APPROVED / CHANGES_REQUESTED / COMMENTED. */
+  state?: string
 }
 
 export class GithubError extends Error {}
@@ -172,38 +180,71 @@ export async function compareCommits(repo: string, base: string, head: string): 
 }
 
 /**
- * What people have already said on the PR, so the review does not repeat it.
+ * What people have already said on the PR, so the review does not repeat it:
+ * comments on code lines, comments in the Conversation tab, and the summary
+ * of every submitted review. Bots (CI, coverage…) are left out — they raise
+ * nothing a reviewer would. Up to 300 of each kind, oldest first.
  * Best-effort: a failure here costs context, not the review.
  */
 export async function listPullComments(repo: string, number: number): Promise<PullComment[]> {
-  try {
-    const [inline, convo] = await Promise.all([
-      gh<Array<{ user: { login: string } | null; body: string; path: string; line: number | null; original_line: number | null; created_at: string }>>(
-        `/repos/${repo}/pulls/${number}/comments?per_page=100`,
-      ),
-      gh<Array<{ user: { login: string } | null; body: string; created_at: string }>>(
-        `/repos/${repo}/issues/${number}/comments?per_page=100`,
-      ),
-    ])
-    return [
-      ...inline.map((c) => ({
-        author: c.user?.login ?? '',
-        body: c.body,
-        path: c.path,
-        line: c.line ?? c.original_line,
-        createdAt: c.created_at,
-      })),
-      ...convo.map((c) => ({
-        author: c.user?.login ?? '',
-        body: c.body,
-        path: '',
-        line: null,
-        createdAt: c.created_at,
-      })),
-    ].sort((a, b) => a.createdAt.localeCompare(b.createdAt))
-  } catch {
-    return []
+  type User = { login: string; type?: string } | null
+  const human = (u: User) => Boolean(u?.login) && u!.type !== 'Bot' && !u!.login.endsWith('[bot]')
+  const pages = async <T,>(path: string): Promise<T[]> => {
+    const out: T[] = []
+    for (let page = 1; page <= 3; page++) {
+      const rows = await gh<T[]>(`${path}${path.includes('?') ? '&' : '?'}per_page=100&page=${page}`)
+      out.push(...rows)
+      if (rows.length < 100) break
+    }
+    return out
   }
+  const safe = <T,>(p: Promise<T[]>) => p.catch(() => [] as T[])
+  const [inline, convo, reviews] = await Promise.all([
+    safe(
+      pages<{ id: number; user: User; body: string; path: string; line: number | null; original_line: number | null; created_at: string; html_url: string; in_reply_to_id?: number }>(
+        `/repos/${repo}/pulls/${number}/comments`,
+      ),
+    ),
+    safe(pages<{ id: number; user: User; body: string; created_at: string; html_url: string }>(`/repos/${repo}/issues/${number}/comments`)),
+    safe(pages<{ id: number; user: User; body: string | null; state: string; submitted_at: string | null; html_url: string }>(`/repos/${repo}/pulls/${number}/reviews`)),
+  ])
+  return [
+    ...inline.filter((c) => human(c.user)).map((c) => ({
+      id: c.id,
+      author: c.user!.login,
+      body: c.body,
+      path: c.path,
+      line: c.line ?? c.original_line,
+      createdAt: c.created_at,
+      url: c.html_url,
+      kind: 'inline' as const,
+      replyTo: c.in_reply_to_id ?? null,
+    })),
+    ...convo.filter((c) => human(c.user)).map((c) => ({
+      id: c.id,
+      author: c.user!.login,
+      body: c.body,
+      path: '',
+      line: null,
+      createdAt: c.created_at,
+      url: c.html_url,
+      kind: 'conversation' as const,
+      replyTo: null,
+    })),
+    // A review with no summary is just the wrapper of its inline comments.
+    ...reviews.filter((r) => human(r.user) && r.body?.trim()).map((r) => ({
+      id: r.id,
+      author: r.user!.login,
+      body: r.body!,
+      path: '',
+      line: null,
+      createdAt: r.submitted_at ?? '',
+      url: r.html_url,
+      kind: 'review' as const,
+      replyTo: null,
+      state: r.state,
+    })),
+  ].sort((a, b) => a.createdAt.localeCompare(b.createdAt))
 }
 
 /* ── writing ─────────────────────────────────────────────────────────────── */

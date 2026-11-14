@@ -3,7 +3,7 @@ import 'server-only'
 import type { reviewFindings } from '@/lib/db/schema'
 
 import { snippetAt } from './git'
-import { DOC_CATEGORIES, type DocFile, type ItemKind, type RepoPreset, SEVERITIES, type Severity, anchorInDiff } from './model'
+import { DOC_CATEGORIES, type DocFile, type ItemKind, type RepoPreset, SEVERITIES, type Severity, anchorInDiff, cleanRaisedBy } from './model'
 import type { RoundRow } from './store'
 
 /**
@@ -25,6 +25,8 @@ export interface RawFinding {
   doc?: string
   /** Doc reviews on Confluence: page text to hang an inline comment on. */
   quote?: string
+  /** Code reviews: a comment on the PR by someone else that already says this. */
+  raised_by?: { author?: string; url?: string; note?: string }
 }
 
 /**
@@ -47,6 +49,8 @@ export function pageOf(f: Pick<RawFinding, 'doc' | 'location'>, docs: DocFile[])
   if (byTitle) return byTitle.source!.pageId
   return pages.length === 1 ? pages[0].source!.pageId : ''
 }
+
+const raisedJson = (r: ReturnType<typeof cleanRaisedBy>) => (r ? JSON.stringify(r) : '')
 
 export const SEVERITY_ORDER: Record<Severity, number> = { blocker: 0, major: 1, minor: 2, nit: 3 }
 
@@ -100,6 +104,7 @@ export async function buildFreshRows(
       status: 'open',
       docRef: kind === 'doc' ? pageOf(f, docs) : '',
       quote: kind === 'doc' ? (f.quote ?? '').trim().slice(0, 300) : '',
+      raisedBy: raisedJson(kind === 'pr' && repo ? cleanRaisedBy(f.raised_by, repo.githubRepo) : null),
       position: position++,
     })
   }

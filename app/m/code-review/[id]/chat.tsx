@@ -220,6 +220,7 @@ function Proposal({
             updates.filter((u) => !u.dismiss && (u.title || u.comment || u.severity)).length &&
               `sửa ${updates.filter((u) => !u.dismiss && (u.title || u.comment || u.severity)).length}`,
             updates.filter((u) => u.dismiss).length && `bỏ ${updates.filter((u) => u.dismiss).length}`,
+            updates.filter((u) => u.raised_by?.url).length && `${updates.filter((u) => u.raised_by?.url).length} đã có người nêu`,
             adds.length && `thêm ${adds.length}`,
           ]
             .filter(Boolean)
@@ -245,7 +246,7 @@ function Proposal({
             return (
               <div key={`u${i}`} className="border-l-2 border-line pl-2">
                 <div className="font-medium">
-                  {u.dismiss ? '🗑 Bỏ' : u.title || u.comment || u.severity ? '✏️ Sửa' : '↩ Trả lời tiếp'} #{u.id} {f ? `“${f.title}”` : '(không thuộc vòng này — sẽ bỏ qua)'}
+                  {u.dismiss ? '🗑 Bỏ' : u.title || u.comment || u.severity ? '✏️ Sửa' : u.follow_reply?.trim() ? '↩ Trả lời tiếp' : '👥 Đánh dấu'} #{u.id} {f ? `“${f.title}”` : '(không thuộc vòng này — sẽ bỏ qua)'}
                   {u.severity && f && u.severity !== f.severity && (
                     <span className="ml-1 text-ink-3">
                       {SEVERITY_LABEL[f.severity]} → {SEVERITY_LABEL[u.severity as Severity] ?? u.severity}
@@ -253,6 +254,7 @@ function Proposal({
                   )}
                 </div>
                 {u.reason && <div className="text-ink-3">{u.reason}</div>}
+                {u.raised_by?.url && <RaisedNote r={u.raised_by} />}
                 {u.title && u.title !== f?.title && <div className="text-ink-2">Tiêu đề: {u.title}</div>}
                 {u.comment && <div className="mt-0.5 whitespace-pre-wrap text-ink-2">{u.comment}</div>}
                 {u.follow_reply?.trim() && (
@@ -273,6 +275,7 @@ function Proposal({
                 </span>
               </div>
               <div className="mt-0.5 whitespace-pre-wrap text-ink-2">{a.comment}</div>
+              {a.raised_by?.url && <RaisedNote r={a.raised_by} />}
             </div>
           ))}
 
@@ -287,5 +290,18 @@ export function ChatShortcut() {
     <a href="#chat" className={BTN}>
       💬 Hỏi Claude
     </a>
+  )
+}
+
+/** "Đã có @x nêu" on a proposal — the finding will not be sent by default. */
+function RaisedNote({ r }: { r: { author?: string; url?: string; note?: string } }) {
+  return (
+    <div className="mt-0.5 text-[11.5px] text-ink-3">
+      👥 Đã có{' '}
+      <a href={r.url} target="_blank" rel="noreferrer" className="text-accent-ink hover:underline">
+        @{r.author} nêu ↗
+      </a>
+      {r.note ? ` — ${r.note}` : ''}
+    </div>
   )
 }

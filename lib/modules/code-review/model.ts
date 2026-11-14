@@ -361,6 +361,27 @@ export interface FindingView {
   quote: string
   /** Once posted to Confluence: 'inline' | 'footer' — replies go to the same kind. */
   commentKind: '' | 'inline' | 'footer'
+  /** Someone else already said this on the PR — not sent by default. */
+  raisedBy: RaisedBy | null
+}
+
+/** Who already raised a finding on the PR, and where. */
+export interface RaisedBy {
+  author: string
+  /** That comment on GitHub. */
+  url: string
+  /** What this finding adds, or "trùng" — Claude's words. */
+  note: string
+}
+
+/** A `raised_by` from Claude, kept only if it points at a comment on this repo's PRs. */
+export function cleanRaisedBy(v: unknown, githubRepo: string): RaisedBy | null {
+  if (!v || typeof v !== 'object' || !githubRepo) return null
+  const r = v as Record<string, unknown>
+  const url = String(r.url ?? '').trim()
+  const author = String(r.author ?? '').trim().replace(/^@/, '')
+  if (!author || !url.startsWith(`https://github.com/${githubRepo}/pull/`)) return null
+  return { author: author.slice(0, 80), url: url.slice(0, 300), note: String(r.note ?? '').trim().slice(0, 500) }
 }
 
 export interface RoundView {
